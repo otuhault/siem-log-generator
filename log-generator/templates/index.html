@@ -13,56 +13,107 @@
             <p>SIEM Testing & Log Simulation Tool</p>
         </header>
 
+        <!-- Navigation Tabs -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="senders">Senders</button>
+            <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
+        </nav>
+
         <div class="main-content">
-            <!-- Create Sender Form -->
-            <div class="card">
-                <h2>Create New Sender</h2>
-                <form id="createSenderForm">
-                    <div class="form-group">
-                        <label for="senderName">Sender Name:</label>
-                        <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs">
+            <!-- Senders Tab Content -->
+            <div id="sendersTab" class="tab-content active">
+                <!-- Add Sender Button -->
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Senders: <strong id="totalSenders">0</strong></span>
+                        <span class="stat-item">Enabled: <strong id="enabledSenders">0</strong></span>
+                        <span class="stat-item">Disabled: <strong id="disabledSenders">0</strong></span>
                     </div>
+                    <button id="addSenderBtn" class="btn btn-primary">+ Add Sender</button>
+                </div>
 
-                    <div class="form-group">
-                        <label for="logType">Log Type:</label>
-                        <select id="logType" name="log_type" required>
-                            <option value="">Select a log type...</option>
-                            <option value="apache_access">Apache Access Log</option>
-                            <option value="windows_security">Windows Security Event Log</option>
-                        </select>
-                        <div id="logTypeDescription" class="description"></div>
+                <!-- Create Sender Form (Hidden by default) -->
+                <div id="senderFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2>Create New Sender</h2>
+                        <button id="closeSenderForm" class="btn-close">×</button>
                     </div>
+                    <form id="createSenderForm">
+                        <div class="form-group">
+                            <label for="senderName">Sender Name:</label>
+                            <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="destination">Destination File Path:</label>
-                        <input type="text" id="destination" name="destination" required 
-                               placeholder="/tmp/logs/apache_access.log">
-                        <small>Full path where logs will be written</small>
+                        <div class="form-group">
+                            <label for="logType">Log Type:</label>
+                            <select id="logType" name="log_type" required>
+                                <option value="">Select a log type...</option>
+                            </select>
+                            <div id="logTypeDescription" class="description"></div>
+                        </div>
+
+                        <!-- Windows Render Format Option (hidden by default) -->
+                        <div class="form-group" id="renderFormatGroup" style="display: none;">
+                            <label for="renderFormat">Render Format:</label>
+                            <select id="renderFormat" name="render_format">
+                                <option value="xml">XML (Default)</option>
+                                <option value="classic">Classic (Text)</option>
+                            </select>
+                            <small>XML format is standard Windows Event XML. Classic format is the text format displayed in Event Viewer.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="destination">Destination File Path:</label>
+                            <input type="text" id="destination" name="destination" required
+                                   placeholder="/tmp/logs/apache_access.log">
+                            <small>Full path where logs will be written</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="frequency">Frequency (logs per second):</label>
+                            <input type="number" id="frequency" name="frequency" required
+                                   min="1" max="1000" value="10">
+                            <small>Number of log entries to generate per second</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enabledOnCreate" name="enabled">
+                                Start immediately after creation
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Create Sender</button>
+                        <button type="button" id="cancelSenderForm" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+
+                <!-- Active Senders -->
+                <div class="card">
+                    <h2>Active Senders</h2>
+                    <div id="sendersContainer">
+                        <p class="no-senders">No senders created yet. Click "Add Sender" to create one!</p>
                     </div>
-
-                    <div class="form-group">
-                        <label for="frequency">Frequency (logs per second):</label>
-                        <input type="number" id="frequency" name="frequency" required 
-                               min="1" max="1000" value="10">
-                        <small>Number of log entries to generate per second</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enabledOnCreate" name="enabled">
-                            Start immediately after creation
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Create Sender</button>
-                </form>
+                </div>
             </div>
 
-            <!-- Active Senders -->
-            <div class="card">
-                <h2>Active Senders</h2>
-                <div id="sendersContainer">
-                    <p class="no-senders">No senders created yet. Create your first sender above!</p>
+            <!-- Sourcetypes Tab Content -->
+            <div id="sourcetypesTab" class="tab-content">
+                <div class="card">
+                    <h2>Available Sourcetypes</h2>
+                    <div id="sourcetypesContainer">
+                        <p class="loading">Loading sourcetypes...</p>
+                    </div>
+                </div>
+
+                <!-- Log Example Display -->
+                <div id="logExampleCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="logExampleTitle">Log Example</h2>
+                        <button id="closeLogExample" class="btn-close">×</button>
+                    </div>
+                    <div id="logExampleContent" class="log-example">
+                    </div>
                 </div>
             </div>
         </div>

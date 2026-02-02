@@ -17,7 +17,7 @@
     "frequency": 5,
     "enabled": false,
     "created_at": "2026-02-02T20:44:30.423061",
-    "logs_generated": 0
+    "logs_generated": 13
   },
   "7a6a2359-e665-4fb3-ac95-388edfdd2087": {
     "id": "7a6a2359-e665-4fb3-ac95-388edfdd2087",
@@ -28,5 +28,18 @@
     "enabled": false,
     "created_at": "2026-02-02T20:53:20.143295",
     "logs_generated": 0
+  },
+  "98fde93b-28bc-4e03-bee0-6b2ddd666512": {
+    "id": "98fde93b-28bc-4e03-bee0-6b2ddd666512",
+    "name": "Windows Classic",
+    "log_type": "windows_security",
+    "destination": "/Users/ratelon/Documents/Dev/SLG/windows_classic.log",
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-02T22:15:30.802081",
+    "logs_generated": 39,
+    "options": {
+      "render_format": "classic"
+    }
   }
 }

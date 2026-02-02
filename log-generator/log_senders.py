@@ -37,11 +37,11 @@ class SenderManager:
         with open(self.config_file, 'w') as f:
             json.dump(self.senders, f, indent=2)
     
-    def create_sender(self, name, log_type, destination, frequency, enabled=False):
+    def create_sender(self, name, log_type, destination, frequency, enabled=False, options=None):
         """Create a new sender"""
         if log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
-        
+
         sender_id = str(uuid.uuid4())
         self.senders[sender_id] = {
             'id': sender_id,
@@ -51,13 +51,14 @@ class SenderManager:
             'frequency': frequency,  # logs per second
             'enabled': enabled,
             'created_at': datetime.now().isoformat(),
-            'logs_generated': 0
+            'logs_generated': 0,
+            'options': options or {}  # Store log type specific options
         }
         self.save_config()
-        
+
         if enabled:
             self.start_sender(sender_id)
-        
+
         return sender_id
     
     def update_sender(self, sender_id, data):
@@ -119,10 +120,16 @@ class SenderManager:
         """Start a sender thread"""
         if sender_id in self.threads:
             return  # Already running
-        
+
         sender = self.senders[sender_id]
         generator_class = self.log_generators[sender['log_type']]
-        generator = generator_class()
+
+        # Pass options to generator if available
+        options = sender.get('options', {})
+        if sender['log_type'] == 'windows_security' and 'render_format' in options:
+            generator = generator_class(render_format=options['render_format'])
+        else:
+            generator = generator_class()
         
         stop_event = threading.Event()
         thread = threading.Thread(

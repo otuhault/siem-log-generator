@@ -11,8 +11,10 @@ from xml.dom import minidom
 
 class WindowsEventLogGenerator:
     """Generates Windows Security Event Logs matching real endpoint output"""
-    
-    def __init__(self):
+
+    def __init__(self, render_format='xml'):
+        self.render_format = render_format  # 'xml' or 'classic'
+
         # Common Event IDs with descriptions and weights
         self.event_types = [
             (4624, 'Successful Logon', 40),
@@ -66,24 +68,147 @@ class WindowsEventLogGenerator:
         ]
     
     def generate(self):
-        """Generate a single Windows Event Log in XML format"""
+        """Generate a single Windows Event Log in specified format"""
         # Select event type with weighted probability
         weights = [e[2] for e in self.event_types]
         event_id, description, _ = random.choices(self.event_types, weights=weights)[0]
-        
-        # Generate based on event type
-        if event_id in [4624, 4625]:
-            return self._generate_logon_event(event_id)
-        elif event_id == 4634:
-            return self._generate_logoff_event()
-        elif event_id == 4672:
-            return self._generate_special_privileges_event()
-        elif event_id == 4688:
-            return self._generate_process_creation_event()
-        elif event_id == 4689:
-            return self._generate_process_termination_event()
+
+        # Generate based on event type and format
+        if self.render_format == 'classic':
+            return self._generate_classic_format(event_id, description)
         else:
-            return self._generate_generic_event(event_id, description)
+            # Generate based on event type
+            if event_id in [4624, 4625]:
+                return self._generate_logon_event(event_id)
+            elif event_id == 4634:
+                return self._generate_logoff_event()
+            elif event_id == 4672:
+                return self._generate_special_privileges_event()
+            elif event_id == 4688:
+                return self._generate_process_creation_event()
+            elif event_id == 4689:
+                return self._generate_process_termination_event()
+            else:
+                return self._generate_generic_event(event_id, description)
+
+    def _generate_classic_format(self, event_id, description):
+        """Generate event in classic text format (like Event Viewer)"""
+        timestamp = datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
+        computer = self._get_random_workstation()
+        domain = random.choice(self.domains)
+        username = random.choice(self.usernames)
+
+        if event_id in [4624, 4625]:
+            logon_type = random.choice(list(self.logon_types.keys()))
+            logon_type_desc = self.logon_types[logon_type]
+            source_ip = f'192.168.{random.randint(1,255)}.{random.randint(1,254)}'
+            status = 'Success' if event_id == 4624 else 'Failure'
+
+            return f'''Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          {timestamp}
+Event ID:      {event_id}
+Task Category: Logon
+Level:         Information
+Keywords:      Audit {status}
+User:          N/A
+Computer:      {computer}
+Description:
+An account was successfully logged on.
+
+Subject:
+\tSecurity ID:\t\tS-1-5-18
+\tAccount Name:\t\t{computer}$
+\tAccount Domain:\t\t{domain}
+\tLogon ID:\t\t0x{random.randint(100000, 999999):x}
+
+Logon Information:
+\tLogon Type:\t\t{logon_type}
+\tRestricted Admin Mode:\t-
+\tVirtual Account:\t\tNo
+\tElevated Token:\t\tNo
+
+Impersonation Level:\t\tImpersonation
+
+New Logon:
+\tSecurity ID:\t\t{domain}\\{username}
+\tAccount Name:\t\t{username}
+\tAccount Domain:\t\t{domain}
+\tLogon ID:\t\t0x{random.randint(100000, 999999):x}
+\tLinked Logon ID:\t\t0x0
+\tNetwork Account Name:\t-
+\tNetwork Account Domain:\t-
+\tLogon GUID:\t\t{{00000000-0000-0000-0000-000000000000}}
+
+Process Information:
+\tProcess ID:\t\t0x{random.randint(500, 5000):x}
+\tProcess Name:\t\t-
+
+Network Information:
+\tWorkstation Name:\t{computer}
+\tSource Network Address:\t{source_ip}
+\tSource Port:\t\t{random.randint(49152, 65535)}
+
+Detailed Authentication Information:
+\tLogon Process:\t\tNtLmSsp
+\tAuthentication Package:\tNTLM
+\tTransited Services:\t-
+\tPackage Name (NTLM only):\tNTLM V2
+\tKey Length:\t\t128'''
+
+        elif event_id == 4688:
+            process_path, process_name = random.choice(self.processes)
+            return f'''Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          {timestamp}
+Event ID:      4688
+Task Category: Process Creation
+Level:         Information
+Keywords:      Audit Success
+User:          N/A
+Computer:      {computer}
+Description:
+A new process has been created.
+
+Creator Subject:
+\tSecurity ID:\t\t{domain}\\{username}
+\tAccount Name:\t\t{username}
+\tAccount Domain:\t\t{domain}
+\tLogon ID:\t\t0x{random.randint(100000, 999999):x}
+
+Target Subject:
+\tSecurity ID:\t\tNULL SID
+\tAccount Name:\t\t-
+\tAccount Domain:\t\t-
+\tLogon ID:\t\t0x0
+
+Process Information:
+\tNew Process ID:\t\t0x{random.randint(1000, 9999):x}
+\tNew Process Name:\t{process_path}
+\tToken Elevation Type:\t%%1936
+\tMandatory Label:\t\tMandatory Label\\Medium Mandatory Level
+\tCreator Process ID:\t0x{random.randint(500, 5000):x}
+\tCreator Process Name:\tC:\\Windows\\explorer.exe
+\tProcess Command Line:\t{process_path}'''
+
+        else:
+            return f'''Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          {timestamp}
+Event ID:      {event_id}
+Task Category: {description}
+Level:         Information
+Keywords:      Audit Success
+User:          N/A
+Computer:      {computer}
+Description:
+{description}
+
+Subject:
+\tSecurity ID:\t\t{domain}\\{username}
+\tAccount Name:\t\t{username}
+\tAccount Domain:\t\t{domain}
+\tLogon ID:\t\t0x{random.randint(100000, 999999):x}'''
     
     def _generate_logon_event(self, event_id):
         """Generate Event ID 4624 (success) or 4625 (failure)"""

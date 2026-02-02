@@ -50,6 +50,70 @@ header p {
     opacity: 0.9;
 }
 
+/* Navigation Tabs */
+.tabs-nav {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-color);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tab-header {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sender-stats {
+    display: flex;
+    gap: 20px;
+    color: var(--text-secondary);
+    font-size: 0.95em;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stat-item strong {
+    color: var(--text-primary);
+    font-size: 1.1em;
+}
+
 .main-content {
     display: grid;
     gap: 30px;
@@ -69,6 +133,40 @@ header p {
     font-size: 1.5em;
     border-bottom: 2px solid var(--primary-color);
     padding-bottom: 10px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.card-header h2 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.btn-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-close:hover {
+    background: var(--bg-color);
+    color: var(--text-primary);
 }
 
 .form-group {
@@ -141,6 +239,17 @@ header p {
     background: #1e40af;
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+    background: var(--secondary-color);
+    color: white;
+    margin-left: 10px;
+}
+
+.btn-secondary:hover {
+    background: #475569;
+    transform: translateY(-1px);
 }
 
 .btn-small {
@@ -275,6 +384,53 @@ header p {
 
 .senders-table td.sender-actions {
     white-space: nowrap;
+}
+
+/* Sourcetypes */
+.sourcetype-list {
+    display: grid;
+    gap: 10px;
+}
+
+.sourcetype-item {
+    padding: 15px 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sourcetype-item:hover {
+    background: var(--bg-color);
+    border-color: var(--primary-color);
+    transform: translateX(5px);
+}
+
+.sourcetype-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sourcetype-description {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.log-example {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 @media (max-width: 768px) {

@@ -36,7 +36,8 @@ def create_sender():
             log_type=data['log_type'],
             destination=data['destination'],
             frequency=data['frequency'],
-            enabled=data.get('enabled', False)
+            enabled=data.get('enabled', False),
+            options=data.get('options', {})
         )
         return jsonify({'success': True, 'sender_id': sender_id})
     except Exception as e:

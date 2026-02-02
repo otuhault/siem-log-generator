@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadLogTypes();
     loadSenders();
     setupEventListeners();
-    
+    setupTabs();
+
     // Refresh senders every 2 seconds to update counts
     setInterval(loadSenders, 2000);
 });
@@ -15,18 +16,74 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupEventListeners() {
     // Form submission
     document.getElementById('createSenderForm').addEventListener('submit', handleCreateSender);
-    
-    // Log type selection - show description
+
+    // Add Sender button
+    document.getElementById('addSenderBtn').addEventListener('click', function() {
+        document.getElementById('senderFormCard').style.display = 'block';
+    });
+
+    // Close/Cancel sender form
+    document.getElementById('closeSenderForm').addEventListener('click', closeSenderForm);
+    document.getElementById('cancelSenderForm').addEventListener('click', closeSenderForm);
+
+    // Close log example
+    const closeLogExample = document.getElementById('closeLogExample');
+    if (closeLogExample) {
+        closeLogExample.addEventListener('click', function() {
+            document.getElementById('logExampleCard').style.display = 'none';
+        });
+    }
+
+    // Log type selection - show description and format options
     document.getElementById('logType').addEventListener('change', function(e) {
         const description = document.getElementById('logTypeDescription');
         const selectedType = e.target.value;
-        
+        const renderFormatGroup = document.getElementById('renderFormatGroup');
+
         if (selectedType && logTypes[selectedType]) {
             description.textContent = logTypes[selectedType].description;
             description.classList.add('show');
+
+            // Show render format option only for Windows logs
+            if (selectedType === 'windows_security') {
+                renderFormatGroup.style.display = 'block';
+            } else {
+                renderFormatGroup.style.display = 'none';
+            }
         } else {
             description.classList.remove('show');
+            renderFormatGroup.style.display = 'none';
         }
+    });
+}
+
+function closeSenderForm() {
+    document.getElementById('senderFormCard').style.display = 'none';
+    document.getElementById('createSenderForm').reset();
+    document.getElementById('logTypeDescription').classList.remove('show');
+    document.getElementById('renderFormatGroup').style.display = 'none';
+}
+
+function setupTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+
+            // Remove active class from all buttons and contents
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            // Add active class to clicked button and corresponding content
+            this.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            // Load sourcetypes if switching to sourcetypes tab
+            if (tabName === 'sourcetypes') {
+                loadSourcetypes();
+            }
+        });
     });
 }
 
@@ -34,9 +91,100 @@ async function loadLogTypes() {
     try {
         const response = await fetch('/api/log-types');
         logTypes = await response.json();
+
+        // Populate log type select
+        const select = document.getElementById('logType');
+        select.innerHTML = '<option value="">Select a log type...</option>';
+
+        Object.keys(logTypes).sort().forEach(key => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = logTypes[key].name;
+            select.appendChild(option);
+        });
     } catch (error) {
         console.error('Error loading log types:', error);
     }
+}
+
+async function loadSourcetypes() {
+    try {
+        const container = document.getElementById('sourcetypesContainer');
+
+        if (!logTypes || Object.keys(logTypes).length === 0) {
+            await loadLogTypes();
+        }
+
+        // Sort log types alphabetically by name
+        const sortedTypes = Object.entries(logTypes).sort((a, b) => {
+            return a[1].name.localeCompare(b[1].name);
+        });
+
+        // Create sourcetype list
+        const listDiv = document.createElement('div');
+        listDiv.className = 'sourcetype-list';
+
+        sortedTypes.forEach(([key, type]) => {
+            const item = document.createElement('div');
+            item.className = 'sourcetype-item';
+            item.dataset.type = key;
+
+            const content = document.createElement('div');
+            const name = document.createElement('div');
+            name.className = 'sourcetype-name';
+            name.textContent = type.name;
+
+            const description = document.createElement('div');
+            description.className = 'sourcetype-description';
+            description.textContent = type.description;
+
+            content.appendChild(name);
+            content.appendChild(description);
+            item.appendChild(content);
+
+            // Add click event to show example
+            item.addEventListener('click', () => showLogExample(key, type));
+
+            listDiv.appendChild(item);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(listDiv);
+    } catch (error) {
+        console.error('Error loading sourcetypes:', error);
+        document.getElementById('sourcetypesContainer').innerHTML = '<p class="error">Error loading sourcetypes</p>';
+    }
+}
+
+async function showLogExample(typeKey, type) {
+    try {
+        // For now, we'll generate a sample log on the client side
+        // In a real implementation, you might want to fetch this from the server
+        const exampleCard = document.getElementById('logExampleCard');
+        const titleElement = document.getElementById('logExampleTitle');
+        const contentElement = document.getElementById('logExampleContent');
+
+        titleElement.textContent = `${type.name} - Example Log`;
+
+        // Generate or fetch example log
+        const example = await fetchLogExample(typeKey);
+        contentElement.textContent = example;
+
+        exampleCard.style.display = 'block';
+    } catch (error) {
+        console.error('Error showing log example:', error);
+        showNotification('Error loading log example', 'error');
+    }
+}
+
+async function fetchLogExample(typeKey) {
+    // Return static examples for now
+    const examples = {
+        'apache_access': '192.168.1.100 - - [02/Feb/2026:14:32:10 +0000] "GET /api/users HTTP/1.1" 200 1234 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"',
+        'windows_security': 'EventID: 4624\nTimestamp: 2026-02-02 14:32:10\nLogon Type: 3\nAccount Name: admin\nAccount Domain: DOMAIN\nLogon ID: 0x1A2B3C\nSource Network Address: 192.168.1.50\nSource Port: 49152'
+    };
+
+    return examples[typeKey] || 'No example available for this log type.';
 }
 
 async function loadSenders() {
@@ -46,8 +194,17 @@ async function loadSenders() {
 
         const container = document.getElementById('sendersContainer');
 
+        // Update statistics
+        const totalSenders = senders.length;
+        const enabledSenders = senders.filter(s => s.enabled).length;
+        const disabledSenders = totalSenders - enabledSenders;
+
+        document.getElementById('totalSenders').textContent = totalSenders;
+        document.getElementById('enabledSenders').textContent = enabledSenders;
+        document.getElementById('disabledSenders').textContent = disabledSenders;
+
         if (senders.length === 0) {
-            container.innerHTML = '<p class="no-senders">No senders created yet. Create your first sender above!</p>';
+            container.innerHTML = '<p class="no-senders">No senders created yet. Click "Add Sender" to create one!</p>';
             return;
         }
 
@@ -174,16 +331,25 @@ function getLogTypeName(logType) {
 
 async function handleCreateSender(e) {
     e.preventDefault();
-    
+
     const formData = new FormData(e.target);
+    const logType = formData.get('log_type');
+
     const data = {
         name: formData.get('name'),
-        log_type: formData.get('log_type'),
+        log_type: logType,
         destination: formData.get('destination'),
         frequency: parseInt(formData.get('frequency')),
         enabled: document.getElementById('enabledOnCreate').checked
     };
-    
+
+    // Add options for Windows logs
+    if (logType === 'windows_security') {
+        data.options = {
+            render_format: formData.get('render_format') || 'xml'
+        };
+    }
+
     try {
         const response = await fetch('/api/senders', {
             method: 'POST',
@@ -194,13 +360,12 @@ async function handleCreateSender(e) {
         const result = await response.json();
         
         if (result.success) {
-            // Reset form
-            e.target.reset();
-            document.getElementById('logTypeDescription').classList.remove('show');
-            
+            // Close and reset form
+            closeSenderForm();
+
             // Reload senders
             await loadSenders();
-            
+
             showNotification('Sender created successfully!', 'success');
         } else {
             showNotification('Error: ' + result.error, 'error');
