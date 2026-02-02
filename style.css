@@ -183,38 +183,68 @@ header p {
     font-style: italic;
 }
 
-.sender-card {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 15px;
-    transition: all 0.2s;
+.senders-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
 }
 
-.sender-card:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+.senders-table thead {
+    background: #f1f5f9;
 }
 
-.sender-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
+.senders-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.senders-table td {
+    padding: 16px;
     border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
 }
 
-.sender-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+.senders-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.senders-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.senders-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .sender-name {
-    font-size: 1.2em;
+    font-weight: 600;
     color: var(--text-primary);
+}
+
+.sender-destination {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sender-logs-count {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+}
+
+.sender-created {
+    font-size: 0.85em;
+    color: var(--text-secondary);
 }
 
 .badge {
@@ -223,6 +253,7 @@ header p {
     font-size: 0.75em;
     font-weight: 600;
     text-transform: uppercase;
+    display: inline-block;
 }
 
 .sender-type {
@@ -243,45 +274,42 @@ header p {
 .sender-actions {
     display: flex;
     gap: 5px;
-}
-
-.sender-details {
-    display: grid;
-    gap: 10px;
-}
-
-.detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-}
-
-.detail-label {
-    font-weight: 500;
-    color: var(--text-secondary);
-    min-width: 150px;
-}
-
-.detail-value {
-    color: var(--text-primary);
-    font-family: 'Courier New', monospace;
-    word-break: break-all;
+    justify-content: flex-start;
 }
 
 @media (max-width: 768px) {
     header h1 {
         font-size: 1.8em;
     }
-    
-    .sender-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
+
+    .senders-table {
+        font-size: 0.85em;
     }
-    
-    .detail-row {
+
+    .senders-table th,
+    .senders-table td {
+        padding: 8px 10px;
+    }
+
+    .sender-destination {
+        max-width: 150px;
+    }
+
+    .sender-actions {
         flex-direction: column;
-        gap: 5px;
+        gap: 3px;
+    }
+
+    .btn-small {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .senders-table {
+        display: block;
+        overflow-x: auto;
     }
 }
 
