@@ -8,5 +8,25 @@
     "enabled": false,
     "created_at": "2026-02-02T20:19:45.761181",
     "logs_generated": 287
+  },
+  "1f125dae-d0d4-4039-b938-3aac338974c4": {
+    "id": "1f125dae-d0d4-4039-b938-3aac338974c4",
+    "name": "Windows Security Logs",
+    "log_type": "windows_security",
+    "destination": "/Users/ratelon/Documents/Dev/SLG/windows_security.log",
+    "frequency": 5,
+    "enabled": false,
+    "created_at": "2026-02-02T20:44:30.423061",
+    "logs_generated": 0
+  },
+  "7a6a2359-e665-4fb3-ac95-388edfdd2087": {
+    "id": "7a6a2359-e665-4fb3-ac95-388edfdd2087",
+    "name": "Windows Security Logs (copy)",
+    "log_type": "windows_security",
+    "destination": "/Users/ratelon/Documents/Dev/SLG/windows_security.log",
+    "frequency": 5,
+    "enabled": false,
+    "created_at": "2026-02-02T20:53:20.143295",
+    "logs_generated": 0
   }
 }

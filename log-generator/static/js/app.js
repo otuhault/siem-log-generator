@@ -43,59 +43,126 @@ async function loadSenders() {
     try {
         const response = await fetch('/api/senders');
         const senders = await response.json();
-        
+
         const container = document.getElementById('sendersContainer');
-        
+
         if (senders.length === 0) {
             container.innerHTML = '<p class="no-senders">No senders created yet. Create your first sender above!</p>';
             return;
         }
-        
-        // Clear container
-        container.innerHTML = '';
-        
-        // Render each sender
+
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'senders-table';
+
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Destination</th>
+                <th>Frequency</th>
+                <th>Logs Generated</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement('tbody');
         senders.forEach(sender => {
-            container.appendChild(createSenderCard(sender));
+            tbody.appendChild(createSenderRow(sender));
         });
-        
+        table.appendChild(tbody);
+
+        // Clear container and add table
+        container.innerHTML = '';
+        container.appendChild(table);
+
     } catch (error) {
         console.error('Error loading senders:', error);
     }
 }
 
-function createSenderCard(sender) {
-    const template = document.getElementById('senderTemplate');
-    const clone = template.content.cloneNode(true);
-    
-    const card = clone.querySelector('.sender-card');
-    card.dataset.senderId = sender.id;
-    
-    // Set sender info
-    clone.querySelector('.sender-name').textContent = sender.name;
-    clone.querySelector('.sender-type').textContent = getLogTypeName(sender.log_type);
-    
-    const statusBadge = clone.querySelector('.sender-status');
-    statusBadge.textContent = sender.enabled ? 'Running' : 'Stopped';
-    statusBadge.classList.add(sender.enabled ? 'enabled' : 'disabled');
-    
-    // Set details
-    clone.querySelector('.sender-destination').textContent = sender.destination;
-    clone.querySelector('.sender-frequency').textContent = `${sender.frequency} logs/sec`;
-    clone.querySelector('.sender-logs-count').textContent = sender.logs_generated.toLocaleString();
-    clone.querySelector('.sender-created').textContent = new Date(sender.created_at).toLocaleString();
-    
-    // Set toggle button icon
-    const toggleBtn = clone.querySelector('.btn-toggle');
-    const toggleIcon = toggleBtn.querySelector('.toggle-icon');
-    toggleIcon.textContent = sender.enabled ? '⏸️' : '▶️';
-    
-    // Event listeners
+function createSenderRow(sender) {
+    const row = document.createElement('tr');
+    row.dataset.senderId = sender.id;
+
+    // Name
+    const nameCell = document.createElement('td');
+    nameCell.textContent = sender.name;
+    nameCell.className = 'sender-name';
+    row.appendChild(nameCell);
+
+    // Type
+    const typeCell = document.createElement('td');
+    typeCell.textContent = getLogTypeName(sender.log_type);
+    typeCell.className = 'sender-type';
+    row.appendChild(typeCell);
+
+    // Status
+    const statusCell = document.createElement('td');
+    statusCell.textContent = sender.enabled ? 'Running' : 'Stopped';
+    statusCell.className = 'sender-status';
+    row.appendChild(statusCell);
+
+    // Destination
+    const destCell = document.createElement('td');
+    destCell.textContent = sender.destination;
+    destCell.className = 'sender-destination';
+    row.appendChild(destCell);
+
+    // Frequency
+    const freqCell = document.createElement('td');
+    freqCell.textContent = `${sender.frequency} logs/sec`;
+    row.appendChild(freqCell);
+
+    // Logs Generated
+    const logsCell = document.createElement('td');
+    logsCell.textContent = sender.logs_generated.toLocaleString();
+    logsCell.className = 'sender-logs-count';
+    row.appendChild(logsCell);
+
+    // Created
+    const createdCell = document.createElement('td');
+    createdCell.textContent = new Date(sender.created_at).toLocaleString();
+    createdCell.className = 'sender-created';
+    row.appendChild(createdCell);
+
+    // Actions
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'sender-actions';
+
+    // Toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn btn-small btn-toggle';
+    toggleBtn.title = 'Enable/Disable';
+    toggleBtn.textContent = sender.enabled ? '⏸' : '▶';
     toggleBtn.addEventListener('click', () => toggleSender(sender.id));
-    clone.querySelector('.btn-clone').addEventListener('click', () => cloneSender(sender.id));
-    clone.querySelector('.btn-delete').addEventListener('click', () => deleteSender(sender.id));
-    
-    return clone;
+
+    // Clone button
+    const cloneBtn = document.createElement('button');
+    cloneBtn.className = 'btn btn-small btn-clone';
+    cloneBtn.title = 'Clone';
+    cloneBtn.textContent = '⎘';
+    cloneBtn.addEventListener('click', () => cloneSender(sender.id));
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-small btn-delete';
+    deleteBtn.title = 'Delete';
+    deleteBtn.textContent = '×';
+    deleteBtn.addEventListener('click', () => deleteSender(sender.id));
+
+    actionsCell.appendChild(toggleBtn);
+    actionsCell.appendChild(cloneBtn);
+    actionsCell.appendChild(deleteBtn);
+    row.appendChild(actionsCell);
+
+    return row;
 }
 
 function getLogTypeName(logType) {
