@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Generator - SIEM Testing Tool</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 Log Generator</h1>
+            <p>SIEM Testing & Log Simulation Tool</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Create Sender Form -->
+            <div class="card">
+                <h2>Create New Sender</h2>
+                <form id="createSenderForm">
+                    <div class="form-group">
+                        <label for="senderName">Sender Name:</label>
+                        <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="logType">Log Type:</label>
+                        <select id="logType" name="log_type" required>
+                            <option value="">Select a log type...</option>
+                            <option value="apache_access">Apache Access Log</option>
+                            <option value="windows_security">Windows Security Event Log</option>
+                        </select>
+                        <div id="logTypeDescription" class="description"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="destination">Destination File Path:</label>
+                        <input type="text" id="destination" name="destination" required 
+                               placeholder="/tmp/logs/apache_access.log">
+                        <small>Full path where logs will be written</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="frequency">Frequency (logs per second):</label>
+                        <input type="number" id="frequency" name="frequency" required 
+                               min="1" max="1000" value="10">
+                        <small>Number of log entries to generate per second</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enabledOnCreate" name="enabled">
+                            Start immediately after creation
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Create Sender</button>
+                </form>
+            </div>
+
+            <!-- Active Senders -->
+            <div class="card">
+                <h2>Active Senders</h2>
+                <div id="sendersContainer">
+                    <p class="no-senders">No senders created yet. Create your first sender above!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sender Card Template -->
+    <template id="senderTemplate">
+        <div class="sender-card" data-sender-id="">
+            <div class="sender-header">
+                <div class="sender-info">
+                    <h3 class="sender-name"></h3>
+                    <span class="sender-type badge"></span>
+                    <span class="sender-status badge"></span>
+                </div>
+                <div class="sender-actions">
+                    <button class="btn btn-small btn-toggle" title="Enable/Disable">
+                        <span class="toggle-icon">⏸️</span>
+                    </button>
+                    <button class="btn btn-small btn-clone" title="Clone">📋</button>
+                    <button class="btn btn-small btn-delete" title="Delete">🗑️</button>
+                </div>
+            </div>
+            <div class="sender-details">
+                <div class="detail-row">
+                    <span class="detail-label">Destination:</span>
+                    <span class="detail-value sender-destination"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Frequency:</span>
+                    <span class="detail-value sender-frequency"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Logs Generated:</span>
+                    <span class="detail-value sender-logs-count"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value sender-created"></span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

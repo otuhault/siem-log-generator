@@ -1,0 +1,12 @@
+{
+  "5ffb0220-42e4-4674-99f2-13ba7cd5cec7": {
+    "id": "5ffb0220-42e4-4674-99f2-13ba7cd5cec7",
+    "name": "Apache_Access",
+    "log_type": "apache_access",
+    "destination": "/Users/ratelon/Documents/Dev/SLG/access_combined_log_format.log",
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-02T20:19:45.761181",
+    "logs_generated": 287
+  }
+}
