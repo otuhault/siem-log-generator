@@ -39,20 +39,47 @@ function setupEventListeners() {
         const description = document.getElementById('logTypeDescription');
         const selectedType = e.target.value;
         const renderFormatGroup = document.getElementById('renderFormatGroup');
+        const windowsSourcesGroup = document.getElementById('windowsSourcesGroup');
+        const apacheLogTypesGroup = document.getElementById('apacheLogTypesGroup');
+        const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
 
         if (selectedType && logTypes[selectedType]) {
             description.textContent = logTypes[selectedType].description;
             description.classList.add('show');
 
-            // Show render format option only for Windows logs
-            if (selectedType === 'windows_security') {
+            // Show Windows-specific options
+            if (selectedType === 'windows') {
+                windowsSourcesGroup.style.display = 'block';
                 renderFormatGroup.style.display = 'block';
-            } else {
+                apacheLogTypesGroup.style.display = 'none';
+                sshEventCategoriesGroup.style.display = 'none';
+            }
+            // Show Apache-specific options
+            else if (selectedType === 'apache') {
+                apacheLogTypesGroup.style.display = 'block';
+                windowsSourcesGroup.style.display = 'none';
                 renderFormatGroup.style.display = 'none';
+                sshEventCategoriesGroup.style.display = 'none';
+            }
+            // Show SSH-specific options
+            else if (selectedType === 'ssh') {
+                sshEventCategoriesGroup.style.display = 'block';
+                windowsSourcesGroup.style.display = 'none';
+                renderFormatGroup.style.display = 'none';
+                apacheLogTypesGroup.style.display = 'none';
+            }
+            else {
+                windowsSourcesGroup.style.display = 'none';
+                renderFormatGroup.style.display = 'none';
+                apacheLogTypesGroup.style.display = 'none';
+                sshEventCategoriesGroup.style.display = 'none';
             }
         } else {
             description.classList.remove('show');
+            windowsSourcesGroup.style.display = 'none';
             renderFormatGroup.style.display = 'none';
+            apacheLogTypesGroup.style.display = 'none';
+            sshEventCategoriesGroup.style.display = 'none';
         }
     });
 }
@@ -61,7 +88,19 @@ function closeSenderForm() {
     document.getElementById('senderFormCard').style.display = 'none';
     document.getElementById('createSenderForm').reset();
     document.getElementById('logTypeDescription').classList.remove('show');
+    document.getElementById('windowsSourcesGroup').style.display = 'none';
     document.getElementById('renderFormatGroup').style.display = 'none';
+    document.getElementById('apacheLogTypesGroup').style.display = 'none';
+    document.getElementById('sshEventCategoriesGroup').style.display = 'none';
+
+    // Reset all Windows source checkboxes to checked by default
+    document.querySelectorAll('input[name="windows_sources"]').forEach(cb => cb.checked = true);
+
+    // Reset all Apache log type checkboxes to checked by default
+    document.querySelectorAll('input[name="apache_log_types"]').forEach(cb => cb.checked = true);
+
+    // Reset all SSH event category checkboxes to checked by default
+    document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => cb.checked = true);
 }
 
 function setupTabs() {
@@ -142,8 +181,56 @@ async function loadSourcetypes() {
             content.appendChild(description);
             item.appendChild(content);
 
-            // Add click event to show example
-            item.addEventListener('click', () => showLogExample(key, type));
+            // Check if this type has sources (e.g., Windows)
+            if (type.sources && type.sources.length > 0) {
+                // Add expandable arrow indicator
+                const arrow = document.createElement('span');
+                arrow.className = 'sourcetype-arrow';
+                arrow.textContent = '›';
+                item.appendChild(arrow);
+
+                // Create sub-list for sources
+                const subList = document.createElement('div');
+                subList.className = 'sourcetype-sublist';
+                subList.style.display = 'none';
+
+                type.sources.forEach(source => {
+                    const subItem = document.createElement('div');
+                    subItem.className = 'sourcetype-subitem';
+
+                    const subName = document.createElement('div');
+                    subName.className = 'sourcetype-subname';
+                    subName.textContent = source.name;
+
+                    const subDesc = document.createElement('div');
+                    subDesc.className = 'sourcetype-subdesc';
+                    subDesc.textContent = source.description;
+
+                    subItem.appendChild(subName);
+                    subItem.appendChild(subDesc);
+
+                    // Add click event to show source-specific example
+                    subItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showLogExample(key, type, source.id);
+                    });
+
+                    subList.appendChild(subItem);
+                });
+
+                item.appendChild(subList);
+
+                // Toggle sub-list on parent click
+                item.addEventListener('click', () => {
+                    const isExpanded = subList.style.display === 'block';
+                    subList.style.display = isExpanded ? 'none' : 'block';
+                    arrow.textContent = isExpanded ? '›' : '⌄';
+                    item.classList.toggle('expanded', !isExpanded);
+                });
+            } else {
+                // For non-Windows types, show example directly
+                item.addEventListener('click', () => showLogExample(key, type));
+            }
 
             listDiv.appendChild(item);
         });
@@ -156,18 +243,21 @@ async function loadSourcetypes() {
     }
 }
 
-async function showLogExample(typeKey, type) {
+async function showLogExample(typeKey, type, sourceId = null) {
     try {
-        // For now, we'll generate a sample log on the client side
-        // In a real implementation, you might want to fetch this from the server
         const exampleCard = document.getElementById('logExampleCard');
         const titleElement = document.getElementById('logExampleTitle');
         const contentElement = document.getElementById('logExampleContent');
 
-        titleElement.textContent = `${type.name} - Example Log`;
+        // Set title based on whether we have a specific source
+        if (sourceId) {
+            titleElement.textContent = `${type.name} - ${sourceId} - Example Log`;
+        } else {
+            titleElement.textContent = `${type.name} - Example Log`;
+        }
 
         // Generate or fetch example log
-        const example = await fetchLogExample(typeKey);
+        const example = await fetchLogExample(typeKey, sourceId);
         contentElement.textContent = example;
 
         exampleCard.style.display = 'block';
@@ -177,13 +267,104 @@ async function showLogExample(typeKey, type) {
     }
 }
 
-async function fetchLogExample(typeKey) {
-    // Return static examples for now
+async function fetchLogExample(typeKey, sourceId = null) {
+    // Static examples for different log types and sources
     const examples = {
-        'apache_access': '192.168.1.100 - - [02/Feb/2026:14:32:10 +0000] "GET /api/users HTTP/1.1" 200 1234 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"',
-        'windows_security': 'EventID: 4624\nTimestamp: 2026-02-02 14:32:10\nLogon Type: 3\nAccount Name: admin\nAccount Domain: DOMAIN\nLogon ID: 0x1A2B3C\nSource Network Address: 192.168.1.50\nSource Port: 49152'
+        'apache': {
+            'access': '192.168.1.100 - - [03/Feb/2026:14:32:10 +0000] "GET /api/users HTTP/1.1" 200 1234',
+            'error': '[Mon Feb 03 14:32:10.123456 2026] [error] [pid 1234:tid 987654321] [client 192.168.1.100:49152] File does not exist: /var/www/html/admin.php',
+            'combined': '192.168.1.100 - - [03/Feb/2026:14:32:10 +0000] "GET /api/users HTTP/1.1" 200 1234 "https://www.google.com/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+        },
+        'ssh': {
+            'auth_success': 'Feb  3 17:32:15 vmi829310 sshd[813270]: Accepted publickey for root from 192.168.1.100 port 45678 ssh2: RSA SHA256:1a2b3c4d5e6f7g8h9i0j',
+            'auth_failed': 'Feb  3 17:32:15 vmi829310 sshd[813270]: Failed password for invalid user admin from 195.211.191.206 port 20090 ssh2',
+            'sessions': 'Feb  3 17:32:15 vmi829310 CRON[813270]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)',
+            'connections': 'Feb  3 17:32:15 vmi829310 sshd[813270]: Connection closed by invalid user test 195.211.191.206 port 20090 [preauth]',
+            'errors': 'Feb  3 17:32:15 vmi829310 sshd[813270]: Did not receive identification string from 120.26.243.81 port 54766'
+        },
+        'windows': {
+            'Security': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>4624</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>12544</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-03T15:30:00.000Z" />
+    <EventRecordID>123456</EventRecordID>
+    <Channel>Security</Channel>
+    <Computer>DESKTOP-ABC123</Computer>
+  </System>
+  <EventData>
+    <Data Name="SubjectUserSid">S-1-5-18</Data>
+    <Data Name="SubjectUserName">DESKTOP-ABC123$</Data>
+    <Data Name="SubjectDomainName">CONTOSO</Data>
+    <Data Name="SubjectLogonId">0x3e7</Data>
+    <Data Name="TargetUserName">admin</Data>
+    <Data Name="TargetDomainName">CONTOSO</Data>
+    <Data Name="LogonType">3</Data>
+    <Data Name="IpAddress">192.168.1.50</Data>
+    <Data Name="IpPort">49152</Data>
+  </EventData>
+</Event>`,
+            'Application': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Google Chrome" />
+    <EventID>1000</EventID>
+    <Version>0</Version>
+    <Level>2</Level>
+    <Task>0</Task>
+    <Keywords>0x80000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-03T15:30:00.000Z" />
+    <EventRecordID>234567</EventRecordID>
+    <Channel>Application</Channel>
+    <Computer>DESKTOP-ABC123</Computer>
+  </System>
+  <EventData>
+    <Data>Application Error</Data>
+    <Data>Application: Google Chrome</Data>
+    <Data>Version: 120.0.6099</Data>
+  </EventData>
+</Event>`,
+            'System': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Service Control Manager" Guid="{555908d1-a6d7-4695-8e1e-26931d2012f4}" />
+    <EventID>7036</EventID>
+    <Version>0</Version>
+    <Level>4</Level>
+    <Task>0</Task>
+    <Keywords>0x8080000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-03T15:30:00.000Z" />
+    <EventRecordID>345678</EventRecordID>
+    <Channel>System</Channel>
+    <Computer>SRV-PROD01</Computer>
+  </System>
+  <EventData>
+    <Data Name="param1">wuauserv</Data>
+    <Data Name="param2">running</Data>
+    <Data Name="Description">Service State Change</Data>
+  </EventData>
+</Event>`
+        }
     };
 
+    // Handle Apache with specific log type
+    if (typeKey === 'apache' && sourceId) {
+        return examples.apache[sourceId] || 'No example available for this log type.';
+    }
+
+    // Handle SSH with specific event category
+    if (typeKey === 'ssh' && sourceId) {
+        return examples.ssh[sourceId] || 'No example available for this category.';
+    }
+
+    // Handle Windows with specific source
+    if (typeKey === 'windows' && sourceId) {
+        return examples.windows[sourceId] || 'No example available for this source.';
+    }
+
+    // Handle regular log types (fallback)
     return examples[typeKey] || 'No example available for this log type.';
 }
 
@@ -344,9 +525,55 @@ async function handleCreateSender(e) {
     };
 
     // Add options for Windows logs
-    if (logType === 'windows_security') {
+    if (logType === 'windows') {
+        // Get selected sources
+        const selectedSources = Array.from(
+            document.querySelectorAll('input[name="windows_sources"]:checked')
+        ).map(cb => cb.value);
+
+        // Validate at least one source is selected
+        if (selectedSources.length === 0) {
+            showNotification('Please select at least one Windows source', 'error');
+            return;
+        }
+
         data.options = {
+            sources: selectedSources,
             render_format: formData.get('render_format') || 'xml'
+        };
+    }
+    // Add options for Apache logs
+    else if (logType === 'apache') {
+        // Get selected log types
+        const selectedLogTypes = Array.from(
+            document.querySelectorAll('input[name="apache_log_types"]:checked')
+        ).map(cb => cb.value);
+
+        // Validate at least one log type is selected
+        if (selectedLogTypes.length === 0) {
+            showNotification('Please select at least one Apache log type', 'error');
+            return;
+        }
+
+        data.options = {
+            log_types: selectedLogTypes
+        };
+    }
+    // Add options for SSH logs
+    else if (logType === 'ssh') {
+        // Get selected event categories
+        const selectedCategories = Array.from(
+            document.querySelectorAll('input[name="ssh_event_categories"]:checked')
+        ).map(cb => cb.value);
+
+        // Validate at least one category is selected
+        if (selectedCategories.length === 0) {
+            showNotification('Please select at least one SSH event category', 'error');
+            return;
+        }
+
+        data.options = {
+            event_categories: selectedCategories
         };
     }
 

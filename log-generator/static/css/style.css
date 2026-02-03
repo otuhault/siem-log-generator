@@ -219,6 +219,54 @@ header p {
     display: block;
 }
 
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 10px;
+}
+
+.checkbox-label {
+    display: block;
+    padding: 8px 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.checkbox-label:last-child {
+    border-bottom: none;
+}
+
+.checkbox-label:hover {
+    background: var(--bg-color);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+.checkbox-text {
+    display: inline;
+}
+
+.checkbox-text strong {
+    color: var(--text-primary);
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.checkbox-text small {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    line-height: 1.3;
+    margin-left: 6px;
+}
+
 .btn {
     padding: 12px 24px;
     border: none;
@@ -401,13 +449,17 @@ header p {
     transition: all 0.2s;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    flex-direction: column;
 }
 
 .sourcetype-item:hover {
     background: var(--bg-color);
     border-color: var(--primary-color);
-    transform: translateX(5px);
+}
+
+.sourcetype-item.expanded {
+    background: var(--bg-color);
 }
 
 .sourcetype-name {
@@ -419,6 +471,50 @@ header p {
     color: var(--text-secondary);
     font-size: 0.9em;
     margin-top: 5px;
+}
+
+.sourcetype-arrow {
+    font-size: 1.5em;
+    color: var(--text-secondary);
+    margin-left: auto;
+    transition: transform 0.2s;
+    user-select: none;
+}
+
+.sourcetype-sublist {
+    width: 100%;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    display: none;
+}
+
+.sourcetype-subitem {
+    padding: 10px 15px;
+    margin: 5px 0;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sourcetype-subitem:hover {
+    background: #f8fafc;
+    border-color: var(--primary-color);
+    transform: translateX(5px);
+}
+
+.sourcetype-subname {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95em;
+}
+
+.sourcetype-subdesc {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    margin-top: 3px;
 }
 
 .log-example {

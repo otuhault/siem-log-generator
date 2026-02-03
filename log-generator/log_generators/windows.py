@@ -1,7 +1,7 @@
 """
-Windows Security Event Log Generator
-Generates realistic Windows Security Event Logs in XML format
-Focuses on the most common Event IDs
+Windows Event Log Generator
+Generates realistic Windows Event Logs in XML or Classic format
+Supports Security, Application, and System log sources
 """
 
 import random
@@ -10,26 +10,70 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 class WindowsEventLogGenerator:
-    """Generates Windows Security Event Logs matching real endpoint output"""
+    """Generates Windows Event Logs for different sources (Security, Application, System)"""
 
-    def __init__(self, render_format='xml'):
+    def __init__(self, source='Security', render_format='xml'):
+        self.source = source  # 'Security', 'Application', or 'System'
         self.render_format = render_format  # 'xml' or 'classic'
 
-        # Common Event IDs with descriptions and weights
-        self.event_types = [
-            (4624, 'Successful Logon', 40),
-            (4625, 'Failed Logon', 10),
-            (4634, 'Logoff', 35),
-            (4672, 'Special Privileges Assigned', 8),
-            (4688, 'Process Created', 20),
-            (4689, 'Process Terminated', 18),
-            (4698, 'Scheduled Task Created', 2),
-            (4699, 'Scheduled Task Deleted', 1),
-            (4720, 'User Account Created', 1),
-            (4726, 'User Account Deleted', 1),
-            (4732, 'Member Added to Security Group', 2),
-            (4756, 'Member Added to Universal Security Group', 1),
-        ]
+        # Define event types based on source
+        self._setup_event_types()
+
+    def _setup_event_types(self):
+        """Setup event types based on the source"""
+        if self.source == 'Security':
+            self.event_types = [
+                (4624, 'Successful Logon', 40),
+                (4625, 'Failed Logon', 10),
+                (4634, 'Logoff', 35),
+                (4672, 'Special Privileges Assigned', 8),
+                (4688, 'Process Created', 20),
+                (4689, 'Process Terminated', 18),
+                (4698, 'Scheduled Task Created', 2),
+                (4699, 'Scheduled Task Deleted', 1),
+                (4720, 'User Account Created', 1),
+                (4726, 'User Account Deleted', 1),
+                (4732, 'Member Added to Security Group', 2),
+                (4756, 'Member Added to Universal Security Group', 1),
+            ]
+            self.provider_name = 'Microsoft-Windows-Security-Auditing'
+            self.provider_guid = '{54849625-5478-4994-A5BA-3E3B0328C30D}'
+
+        elif self.source == 'Application':
+            self.event_types = [
+                (1000, 'Application Error', 15),
+                (1001, 'Application Hang', 10),
+                (1002, 'Application Recovery', 5),
+                (1033, 'Installation Success', 8),
+                (1034, 'Installation Failure', 3),
+                (1040, 'Application Update', 12),
+                (11707, 'Install Operation Completed', 20),
+                (11708, 'Install Operation Failed', 8),
+                (11724, 'Application Configuration Changed', 15),
+                (1530, 'User Profile Service Warning', 4),
+            ]
+            self.provider_name = 'Application'
+            self.provider_guid = '{00000000-0000-0000-0000-000000000000}'
+
+        elif self.source == 'System':
+            self.event_types = [
+                (6005, 'Event Log Service Started', 3),
+                (6006, 'Event Log Service Stopped', 2),
+                (6008, 'Unexpected System Shutdown', 1),
+                (6009, 'System Started', 3),
+                (7034, 'Service Crashed', 5),
+                (7035, 'Service Control Request', 20),
+                (7036, 'Service State Change', 35),
+                (7040, 'Service Start Type Changed', 8),
+                (10016, 'DCOM Error', 10),
+                (1074, 'System Shutdown Initiated', 2),
+                (41, 'System Kernel Power', 5),
+            ]
+            self.provider_name = 'Service Control Manager'
+            self.provider_guid = '{555908d1-a6d7-4695-8e1e-26931d2012f4}'
+
+        else:
+            raise ValueError(f"Unknown source: {self.source}. Must be 'Security', 'Application', or 'System'")
         
         # Logon types for Event ID 4624/4625
         self.logon_types = {
@@ -77,19 +121,133 @@ class WindowsEventLogGenerator:
         if self.render_format == 'classic':
             return self._generate_classic_format(event_id, description)
         else:
-            # Generate based on event type
-            if event_id in [4624, 4625]:
-                return self._generate_logon_event(event_id)
-            elif event_id == 4634:
-                return self._generate_logoff_event()
-            elif event_id == 4672:
-                return self._generate_special_privileges_event()
-            elif event_id == 4688:
-                return self._generate_process_creation_event()
-            elif event_id == 4689:
-                return self._generate_process_termination_event()
+            # Generate XML format based on source and event type
+            if self.source == 'Security':
+                return self._generate_security_event(event_id, description)
+            elif self.source == 'Application':
+                return self._generate_application_event(event_id, description)
+            elif self.source == 'System':
+                return self._generate_system_event(event_id, description)
             else:
                 return self._generate_generic_event(event_id, description)
+
+    def _generate_security_event(self, event_id, description):
+        """Generate Security event in XML format"""
+        if event_id in [4624, 4625]:
+            return self._generate_logon_event(event_id)
+        elif event_id == 4634:
+            return self._generate_logoff_event()
+        elif event_id == 4672:
+            return self._generate_special_privileges_event()
+        elif event_id == 4688:
+            return self._generate_process_creation_event()
+        elif event_id == 4689:
+            return self._generate_process_termination_event()
+        else:
+            return self._generate_generic_event(event_id, description)
+
+    def _generate_application_event(self, event_id, description):
+        """Generate Application event in XML format"""
+        timestamp = datetime.now().isoformat()
+        computer = self._get_random_workstation()
+
+        # Common application names
+        app_names = ['Microsoft Office', 'Google Chrome', 'Firefox', 'Visual Studio',
+                    'Adobe Reader', 'Outlook', 'Teams', 'OneDrive']
+        app_name = random.choice(app_names)
+
+        level_map = {
+            1000: 2,  # Error
+            1001: 2,  # Error
+            1002: 4,  # Information
+            1033: 4,  # Information
+            1034: 2,  # Error
+            1040: 4,  # Information
+            11707: 4, # Information
+            11708: 2, # Error
+            11724: 4, # Information
+            1530: 3,  # Warning
+        }
+        level = level_map.get(event_id, 4)
+
+        event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="{app_name}" />
+    <EventID>{event_id}</EventID>
+    <Version>0</Version>
+    <Level>{level}</Level>
+    <Task>0</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x80000000000000</Keywords>
+    <TimeCreated SystemTime="{timestamp}" />
+    <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
+    <Correlation />
+    <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
+    <Channel>Application</Channel>
+    <Computer>{computer}</Computer>
+    <Security />
+  </System>
+  <EventData>
+    <Data>{description}</Data>
+    <Data>Application: {app_name}</Data>
+    <Data>Version: {random.randint(1, 20)}.{random.randint(0, 9)}.{random.randint(0, 9999)}</Data>
+  </EventData>
+</Event>'''
+
+        return event_xml.strip()
+
+    def _generate_system_event(self, event_id, description):
+        """Generate System event in XML format"""
+        timestamp = datetime.now().isoformat()
+        computer = self._get_random_workstation()
+
+        # Common service names
+        services = ['wuauserv', 'MSSQLSERVER', 'W32Time', 'Spooler', 'Netlogon',
+                   'DNS', 'DHCP', 'EventLog', 'WinRM', 'TermService']
+        service = random.choice(services)
+
+        level_map = {
+            6005: 4,  # Information
+            6006: 4,  # Information
+            6008: 1,  # Critical
+            6009: 4,  # Information
+            7034: 2,  # Error
+            7035: 4,  # Information
+            7036: 4,  # Information
+            7040: 4,  # Information
+            10016: 2, # Error
+            1074: 4,  # Information
+            41: 1,    # Critical
+        }
+        level = level_map.get(event_id, 4)
+
+        state = random.choice(['running', 'stopped'])
+
+        event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
+    <EventID>{event_id}</EventID>
+    <Version>0</Version>
+    <Level>{level}</Level>
+    <Task>0</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8080000000000000</Keywords>
+    <TimeCreated SystemTime="{timestamp}" />
+    <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
+    <Correlation />
+    <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
+    <Channel>System</Channel>
+    <Computer>{computer}</Computer>
+    <Security />
+  </System>
+  <EventData>
+    <Data Name="param1">{service}</Data>
+    <Data Name="param2">{state}</Data>
+    <Data Name="Description">{description}</Data>
+  </EventData>
+</Event>'''
+
+        return event_xml.strip()
 
     def _generate_classic_format(self, event_id, description):
         """Generate event in classic text format (like Event Viewer)"""
@@ -98,7 +256,8 @@ class WindowsEventLogGenerator:
         domain = random.choice(self.domains)
         username = random.choice(self.usernames)
 
-        if event_id in [4624, 4625]:
+        # Handle Security events
+        if self.source == 'Security' and event_id in [4624, 4625]:
             logon_type = random.choice(list(self.logon_types.keys()))
             logon_type_desc = self.logon_types[logon_type]
             source_ip = f'192.168.{random.randint(1,255)}.{random.randint(1,254)}'
@@ -156,7 +315,7 @@ Detailed Authentication Information:
 \tPackage Name (NTLM only):\tNTLM V2
 \tKey Length:\t\t128'''
 
-        elif event_id == 4688:
+        elif self.source == 'Security' and event_id == 4688:
             process_path, process_name = random.choice(self.processes)
             return f'''Log Name:      Security
 Source:        Microsoft-Windows-Security-Auditing
@@ -191,9 +350,54 @@ Process Information:
 \tCreator Process Name:\tC:\\Windows\\explorer.exe
 \tProcess Command Line:\t{process_path}'''
 
+        # Handle Application events
+        elif self.source == 'Application':
+            app_names = ['Microsoft Office', 'Google Chrome', 'Firefox', 'Visual Studio']
+            app_name = random.choice(app_names)
+            level = 'Error' if event_id in [1000, 1001, 1034, 11708] else 'Information'
+
+            return f'''Log Name:      Application
+Source:        {app_name}
+Date:          {timestamp}
+Event ID:      {event_id}
+Task Category: None
+Level:         {level}
+Keywords:      Classic
+User:          N/A
+Computer:      {computer}
+Description:
+{description}
+
+Application: {app_name}
+Version: {random.randint(1, 20)}.{random.randint(0, 9)}.{random.randint(0, 9999)}
+Process ID: {random.randint(1000, 9999)}'''
+
+        # Handle System events
+        elif self.source == 'System':
+            services = ['wuauserv', 'MSSQLSERVER', 'W32Time', 'Spooler', 'Netlogon']
+            service = random.choice(services)
+            level = 'Error' if event_id in [6008, 7034, 10016] else 'Information'
+            state = random.choice(['running', 'stopped'])
+
+            return f'''Log Name:      System
+Source:        {self.provider_name}
+Date:          {timestamp}
+Event ID:      {event_id}
+Task Category: None
+Level:         {level}
+Keywords:      Classic
+User:          N/A
+Computer:      {computer}
+Description:
+{description}
+
+Service: {service}
+State: {state}'''
+
+        # Default Security event
         else:
-            return f'''Log Name:      Security
-Source:        Microsoft-Windows-Security-Auditing
+            return f'''Log Name:      {self.source}
+Source:        {self.provider_name}
 Date:          {timestamp}
 Event ID:      {event_id}
 Task Category: {description}
@@ -218,13 +422,13 @@ Subject:
         username = random.choice(self.usernames)
         logon_type = random.choice(list(self.logon_types.keys()))
         source_ip = f'192.168.{random.randint(1,255)}.{random.randint(1,254)}'
-        
+
         status = 'Success' if event_id == 4624 else 'Failure'
-        
+
         # Simplified Windows Event Log XML format
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>{event_id}</EventID>
     <Version>0</Version>
     <Level>0</Level>
@@ -235,7 +439,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>
@@ -270,7 +474,7 @@ Subject:
         
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>4634</EventID>
     <Version>0</Version>
     <Level>0</Level>
@@ -281,7 +485,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>
@@ -312,7 +516,7 @@ Subject:
         
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>4672</EventID>
     <Version>0</Version>
     <Level>0</Level>
@@ -323,7 +527,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>
@@ -348,7 +552,7 @@ Subject:
         
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>4688</EventID>
     <Version>2</Version>
     <Level>0</Level>
@@ -359,7 +563,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>
@@ -394,7 +598,7 @@ Subject:
         
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>4689</EventID>
     <Version>0</Version>
     <Level>0</Level>
@@ -405,7 +609,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>
@@ -431,7 +635,7 @@ Subject:
         
         event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System>
-    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />
     <EventID>{event_id}</EventID>
     <Version>0</Version>
     <Level>0</Level>
@@ -442,7 +646,7 @@ Subject:
     <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
     <Correlation />
     <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
-    <Channel>Security</Channel>
+    <Channel>{self.source}</Channel>
     <Computer>{computer}</Computer>
     <Security />
   </System>

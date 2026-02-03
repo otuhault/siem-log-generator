@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Generator - SIEM Testing Tool</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260203e">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🔥 Log Generator</h1>
-            <p>SIEM Testing & Log Simulation Tool</p>
+            <h1>SIEM Logs Generator</h1>
         </header>
 
         <!-- Navigation Tabs -->
@@ -50,6 +49,104 @@
                                 <option value="">Select a log type...</option>
                             </select>
                             <div id="logTypeDescription" class="description"></div>
+                        </div>
+
+                        <!-- Apache Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="apacheLogTypesGroup" style="display: none;">
+                            <label>Apache Log Types:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="access" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Access Log (Common)</strong>
+                                        <small>Common Log Format without referer and user-agent</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="error" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Error Log</strong>
+                                        <small>Apache error logs with various severity levels</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="combined" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Access Log (Combined)</strong>
+                                        <small>Combined Log Format with referer and user-agent</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- SSH Event Categories Selection (hidden by default) -->
+                        <div class="form-group" id="sshEventCategoriesGroup" style="display: none;">
+                            <label>SSH Event Categories:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="auth_success" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Successful Authentication</strong>
+                                        <small>Accepted password and publickey authentications</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="auth_failed" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Failed Authentication</strong>
+                                        <small>Failed password, invalid users, max auth attempts</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="sessions" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Session Management</strong>
+                                        <small>Session opened and closed events (PAM)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="connections" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Connection Events</strong>
+                                        <small>Connection closed, disconnected, reset events</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="errors" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Errors & Other</strong>
+                                        <small>Protocol errors, identification issues, server events</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Windows Sources Selection (hidden by default) -->
+                        <div class="form-group" id="windowsSourcesGroup" style="display: none;">
+                            <label>Sources Windows:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="Security" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Security</strong>
+                                        <small>Authentication, privileges, processes (4624, 4625, 4688, etc.)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="Application" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Application</strong>
+                                        <small>Application errors, installations, updates (1000, 1001, 11707, etc.)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="System" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System</strong>
+                                        <small>Service management, system events (6005, 7036, 7034, etc.)</small>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
 
                         <!-- Windows Render Format Option (hidden by default) -->

@@ -8,8 +8,64 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from log_generators.apache import ApacheAccessLogGenerator
+from log_generators.apache import ApacheLogGenerator
 from log_generators.windows import WindowsEventLogGenerator
+from log_generators.ssh import SSHAuthLogGenerator
+
+class SSHMultiCategoryGenerator:
+    """Wrapper that generates logs from multiple SSH event categories"""
+
+    def __init__(self, event_categories):
+        """
+        Initialize with multiple event categories
+        event_categories: list of category names like ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors']
+        """
+        self.generator = SSHAuthLogGenerator(event_categories=event_categories)
+        self.event_categories = event_categories
+
+    def generate(self):
+        """Generate a log from the configured categories"""
+        return self.generator.generate()
+
+class ApacheMultiSourceGenerator:
+    """Wrapper that generates logs from multiple Apache log types"""
+
+    def __init__(self, log_types):
+        """
+        Initialize with multiple log types
+        log_types: list of type names like ['access', 'error', 'combined']
+        """
+        self.generators = [
+            ApacheLogGenerator(log_type=log_type)
+            for log_type in log_types
+        ]
+        self.log_types = log_types
+
+    def generate(self):
+        """Generate a log from a randomly selected type"""
+        import random
+        generator = random.choice(self.generators)
+        return generator.generate()
+
+class WindowsMultiSourceGenerator:
+    """Wrapper that generates logs from multiple Windows sources"""
+
+    def __init__(self, sources, render_format='xml'):
+        """
+        Initialize with multiple sources
+        sources: list of source names like ['Security', 'Application', 'System']
+        """
+        self.generators = [
+            WindowsEventLogGenerator(source=source, render_format=render_format)
+            for source in sources
+        ]
+        self.sources = sources
+
+    def generate(self):
+        """Generate a log from a randomly selected source"""
+        import random
+        generator = random.choice(self.generators)
+        return generator.generate()
 
 class SenderManager:
     """Manages log senders and their lifecycle"""
@@ -22,8 +78,9 @@ class SenderManager:
         
         # Register available log generators
         self.log_generators = {
-            'apache_access': ApacheAccessLogGenerator,
-            'windows_security': WindowsEventLogGenerator,
+            'apache': ApacheLogGenerator,
+            'windows': WindowsEventLogGenerator,
+            'ssh': SSHAuthLogGenerator,
         }
     
     def load_config(self):
@@ -126,9 +183,31 @@ class SenderManager:
 
         # Pass options to generator if available
         options = sender.get('options', {})
-        if sender['log_type'] == 'windows_security' and 'render_format' in options:
-            generator = generator_class(render_format=options['render_format'])
+
+        # Handle Windows Event Log generators
+        if sender['log_type'] == 'windows':
+            # Get selected sources (default to Security if none specified)
+            sources = options.get('sources', ['Security'])
+            render_format = options.get('render_format', 'xml')
+
+            # Create a multi-source generator wrapper
+            generator = WindowsMultiSourceGenerator(sources, render_format)
+        # Handle Apache Log generators
+        elif sender['log_type'] == 'apache':
+            # Get selected log types (default to combined if none specified)
+            log_types = options.get('log_types', ['combined'])
+
+            # Create a multi-source generator wrapper
+            generator = ApacheMultiSourceGenerator(log_types)
+        # Handle SSH Log generators
+        elif sender['log_type'] == 'ssh':
+            # Get selected event categories (default to all if none specified)
+            event_categories = options.get('event_categories', ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'])
+
+            # Create a multi-category generator wrapper
+            generator = SSHMultiCategoryGenerator(event_categories)
         else:
+            # Other log types
             generator = generator_class()
         
         stop_event = threading.Event()
@@ -174,14 +253,80 @@ class SenderManager:
     def get_available_log_types(self):
         """Get available log types with descriptions"""
         return {
-            'apache_access': {
-                'name': 'Apache Access Log',
-                'description': 'Apache/Nginx web server access logs (Combined Log Format)',
-                'example': '192.168.1.100 - - [02/Feb/2026:18:52:00 +0000] "GET /index.html HTTP/1.1" 200 1234'
+            'apache': {
+                'name': 'Apache/Nginx Log',
+                'description': 'Apache/Nginx web server logs in various formats',
+                'example': 'Access, Error, and Combined log formats',
+                'sources': [
+                    {
+                        'id': 'access',
+                        'name': 'Access Log (Common)',
+                        'description': 'Common Log Format without referer and user-agent'
+                    },
+                    {
+                        'id': 'error',
+                        'name': 'Error Log',
+                        'description': 'Apache error logs with various severity levels'
+                    },
+                    {
+                        'id': 'combined',
+                        'name': 'Access Log (Combined)',
+                        'description': 'Combined Log Format with referer and user-agent'
+                    }
+                ]
             },
-            'windows_security': {
-                'name': 'Windows Security Event Log',
-                'description': 'Windows Security Event Logs (XML format, common Event IDs)',
-                'example': 'Event ID 4624 - Successful Logon'
+            'ssh': {
+                'name': 'SSH Auth Log',
+                'description': 'SSH authentication logs (auth.log) - login attempts, sessions, disconnections',
+                'example': 'Failed password, accepted publickey, connection closed, etc.',
+                'sources': [
+                    {
+                        'id': 'auth_success',
+                        'name': 'Successful Authentication',
+                        'description': 'Accepted password and publickey authentications'
+                    },
+                    {
+                        'id': 'auth_failed',
+                        'name': 'Failed Authentication',
+                        'description': 'Failed password, invalid users, max auth attempts'
+                    },
+                    {
+                        'id': 'sessions',
+                        'name': 'Session Management',
+                        'description': 'Session opened and closed events (PAM)'
+                    },
+                    {
+                        'id': 'connections',
+                        'name': 'Connection Events',
+                        'description': 'Connection closed, disconnected, reset events'
+                    },
+                    {
+                        'id': 'errors',
+                        'name': 'Errors & Other',
+                        'description': 'Protocol errors, identification issues, server events'
+                    }
+                ]
+            },
+            'windows': {
+                'name': 'Windows Event Log',
+                'description': 'Windows Event Logs - Security, Application, and System sources',
+                'example': 'Event ID 4624 - Successful Logon (Security)',
+                'sources': [
+                    {
+                        'id': 'Security',
+                        'name': 'Security',
+                        'description': 'Authentication, privileges, processes (4624, 4625, 4688, etc.)'
+                    },
+                    {
+                        'id': 'Application',
+                        'name': 'Application',
+                        'description': 'Application errors, installations, updates (1000, 1001, 11707, etc.)'
+                    },
+                    {
+                        'id': 'System',
+                        'name': 'System',
+                        'description': 'Service management, system events (6005, 7036, 7034, etc.)'
+                    }
+                ]
             }
         }
