@@ -448,9 +448,12 @@ header p {
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sourcetype-item > div:first-child {
+    flex: 1;
 }
 
 .sourcetype-item:hover {
@@ -476,13 +479,13 @@ header p {
 .sourcetype-arrow {
     font-size: 1.5em;
     color: var(--text-secondary);
-    margin-left: auto;
+    margin-left: 15px;
     transition: transform 0.2s;
     user-select: none;
 }
 
 .sourcetype-sublist {
-    width: 100%;
+    flex-basis: 100%;
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid var(--border-color);
