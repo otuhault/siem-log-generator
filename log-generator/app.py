@@ -9,12 +9,14 @@ import json
 import os
 from datetime import datetime
 from log_senders import SenderManager
+from configuration_manager import ConfigurationManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 
-# Initialize sender manager
+# Initialize managers
 sender_manager = SenderManager()
+configuration_manager = ConfigurationManager()
 
 @app.route('/')
 def index():
@@ -26,6 +28,14 @@ def get_senders():
     """Get all senders"""
     return jsonify(sender_manager.get_all_senders())
 
+@app.route('/api/senders/<sender_id>', methods=['GET'])
+def get_sender(sender_id):
+    """Get a specific sender"""
+    sender = sender_manager.get_sender(sender_id)
+    if sender:
+        return jsonify(sender)
+    return jsonify({'error': 'Sender not found'}), 404
+
 @app.route('/api/senders', methods=['POST'])
 def create_sender():
     """Create a new sender"""
@@ -34,10 +44,12 @@ def create_sender():
         sender_id = sender_manager.create_sender(
             name=data['name'],
             log_type=data['log_type'],
-            destination=data['destination'],
             frequency=data['frequency'],
             enabled=data.get('enabled', False),
-            options=data.get('options', {})
+            options=data.get('options', {}),
+            destination=data.get('destination'),
+            destination_type=data.get('destination_type', 'file'),
+            configuration_id=data.get('configuration_id')
         )
         return jsonify({'success': True, 'sender_id': sender_id})
     except Exception as e:
@@ -77,6 +89,66 @@ def clone_sender(sender_id):
     try:
         new_id = sender_manager.clone_sender(sender_id)
         return jsonify({'success': True, 'sender_id': new_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/configurations', methods=['GET'])
+def get_configurations():
+    """Get all configurations"""
+    return jsonify(configuration_manager.get_all_configurations())
+
+@app.route('/api/configurations/<config_id>', methods=['GET'])
+def get_configuration(config_id):
+    """Get a specific configuration"""
+    config = configuration_manager.get_configuration(config_id)
+    if config:
+        return jsonify(config)
+    return jsonify({'error': 'Configuration not found'}), 404
+
+@app.route('/api/configurations', methods=['POST'])
+def create_configuration():
+    """Create a new configuration"""
+    data = request.json
+    try:
+        config_id = configuration_manager.create_configuration(
+            name=data['name'],
+            url=data['url'],
+            port=data['port'],
+            token=data['token'],
+            index=data.get('index'),
+            sourcetype=data.get('sourcetype'),
+            host=data.get('host'),
+            source=data.get('source')
+        )
+        return jsonify({'success': True, 'configuration_id': config_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/configurations/<config_id>', methods=['PUT'])
+def update_configuration(config_id):
+    """Update configuration"""
+    data = request.json
+    try:
+        configuration_manager.update_configuration(config_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/configurations/<config_id>', methods=['DELETE'])
+def delete_configuration(config_id):
+    """Delete a configuration"""
+    try:
+        configuration_manager.delete_configuration(config_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/configurations/<config_id>/clone', methods=['POST'])
+def clone_configuration(config_id):
+    """Clone a configuration"""
+    try:
+        new_id = configuration_manager.clone_configuration(config_id)
+        return jsonify({'success': True, 'configuration_id': new_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 

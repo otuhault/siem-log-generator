@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Generator - SIEM Testing Tool</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260203e">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260203f">
 </head>
 <body>
     <div class="container">
@@ -16,6 +16,7 @@
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="senders">Senders</button>
             <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
+            <button class="tab-btn" data-tab="configurations">HEC Destinations</button>
         </nav>
 
         <div class="main-content">
@@ -34,10 +35,11 @@
                 <!-- Create Sender Form (Hidden by default) -->
                 <div id="senderFormCard" class="card" style="display: none;">
                     <div class="card-header">
-                        <h2>Create New Sender</h2>
+                        <h2 id="senderFormTitle">Create New Sender</h2>
                         <button id="closeSenderForm" class="btn-close">×</button>
                     </div>
                     <form id="createSenderForm">
+                        <input type="hidden" id="senderId" name="id">
                         <div class="form-group">
                             <label for="senderName">Sender Name:</label>
                             <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs">
@@ -160,10 +162,34 @@
                         </div>
 
                         <div class="form-group">
+                            <label>Destination Type:</label>
+                            <div style="display: flex; gap: 20px; margin-top: 8px;">
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="radio" name="destination_type" value="file" checked>
+                                    <span>Local File</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="radio" name="destination_type" value="configuration">
+                                    <span>Configuration (HEC)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- File Destination -->
+                        <div class="form-group" id="fileDestinationGroup">
                             <label for="destination">Destination File Path:</label>
-                            <input type="text" id="destination" name="destination" required
+                            <input type="text" id="destination" name="destination"
                                    placeholder="/tmp/logs/apache_access.log">
                             <small>Full path where logs will be written</small>
+                        </div>
+
+                        <!-- Configuration Destination -->
+                        <div class="form-group" id="configurationDestinationGroup" style="display: none;">
+                            <label for="configurationSelect">Select Configuration:</label>
+                            <select id="configurationSelect" name="configuration_id">
+                                <option value="">Select a configuration...</option>
+                            </select>
+                            <small>Choose a pre-configured HEC destination</small>
                         </div>
 
                         <div class="form-group">
@@ -180,7 +206,7 @@
                             </label>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Create Sender</button>
+                        <button type="submit" id="submitSenderBtn" class="btn btn-primary">Create Sender</button>
                         <button type="button" id="cancelSenderForm" class="btn btn-secondary">Cancel</button>
                     </form>
                 </div>
@@ -190,6 +216,92 @@
                     <h2>Active Senders</h2>
                     <div id="sendersContainer">
                         <p class="no-senders">No senders created yet. Click "Add Sender" to create one!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configurations Tab Content -->
+            <div id="configurationsTab" class="tab-content">
+                <!-- Add Configuration Button -->
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">HEC Destinations: <strong id="totalConfigurations">0</strong></span>
+                    </div>
+                    <button id="addConfigurationBtn" class="btn btn-primary">+ Add HEC Destination</button>
+                </div>
+
+                <!-- Create Configuration Form (Hidden by default) -->
+                <div id="configurationFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="configurationFormTitle">Create New HEC Destination</h2>
+                        <button id="closeConfigurationForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createConfigurationForm">
+                        <input type="hidden" id="configurationId" name="id">
+                        <div class="form-group">
+                            <label for="configurationName">Destination Name:</label>
+                            <input type="text" id="configurationName" name="name" required placeholder="e.g., Splunk HEC Production">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationUrl">URL:</label>
+                            <input type="text" id="configurationUrl" name="url" required
+                                   placeholder="https://splunk.example.com:8088">
+                            <small>Full URL of the Splunk HEC endpoint</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationPort">Port:</label>
+                            <input type="number" id="configurationPort" name="port" required
+                                   min="1" max="65535" value="8088">
+                            <small>HEC port (default: 8088)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationToken">HEC Token:</label>
+                            <input type="text" id="configurationToken" name="token" required
+                                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                            <small>Splunk HTTP Event Collector token</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationIndex">Index (Optional):</label>
+                            <input type="text" id="configurationIndex" name="index"
+                                   placeholder="main">
+                            <small>Splunk index name (leave empty to use default)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationSourcetype">Sourcetype (Optional):</label>
+                            <input type="text" id="configurationSourcetype" name="sourcetype"
+                                   placeholder="http:custom">
+                            <small>Custom sourcetype (leave empty to use default)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationHost">Host (Optional):</label>
+                            <input type="text" id="configurationHost" name="host"
+                                   placeholder="log-generator">
+                            <small>Custom host value (leave empty to use default)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationSource">Source (Optional):</label>
+                            <input type="text" id="configurationSource" name="source"
+                                   placeholder="http:log-generator">
+                            <small>Custom source value for events (leave empty to use default)</small>
+                        </div>
+
+                        <button type="submit" id="submitConfigurationBtn" class="btn btn-primary">Create HEC Destination</button>
+                        <button type="button" id="cancelConfigurationForm" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+
+                <!-- Configurations Table -->
+                <div class="card">
+                    <h2>HEC Destinations</h2>
+                    <div id="configurationsContainer">
+                        <p class="no-senders">No HEC destinations created yet. Click "Add HEC Destination" to create one!</p>
                     </div>
                 </div>
             </div>

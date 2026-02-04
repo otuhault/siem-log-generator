@@ -11,6 +11,7 @@ from pathlib import Path
 from log_generators.apache import ApacheLogGenerator
 from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
+from hec_sender import HECSender
 
 class SSHMultiCategoryGenerator:
     """Wrapper that generates logs from multiple SSH event categories"""
@@ -94,7 +95,8 @@ class SenderManager:
         with open(self.config_file, 'w') as f:
             json.dump(self.senders, f, indent=2)
     
-    def create_sender(self, name, log_type, destination, frequency, enabled=False, options=None):
+    def create_sender(self, name, log_type, frequency, enabled=False, options=None,
+                      destination=None, destination_type='file', configuration_id=None):
         """Create a new sender"""
         if log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
@@ -105,6 +107,8 @@ class SenderManager:
             'name': name,
             'log_type': log_type,
             'destination': destination,
+            'destination_type': destination_type,
+            'configuration_id': configuration_id,
             'frequency': frequency,  # logs per second
             'enabled': enabled,
             'created_at': datetime.now().isoformat(),
@@ -213,11 +217,10 @@ class SenderManager:
         stop_event = threading.Event()
         thread = threading.Thread(
             target=self._generate_logs,
-            args=(sender_id, generator, sender['destination'], 
-                  sender['frequency'], stop_event),
+            args=(sender_id, generator, sender, stop_event),
             daemon=True
         )
-        
+
         self.threads[sender_id] = {'thread': thread, 'stop_event': stop_event}
         thread.start()
     
@@ -228,28 +231,80 @@ class SenderManager:
             self.threads[sender_id]['thread'].join(timeout=2)
             del self.threads[sender_id]
     
-    def _generate_logs(self, sender_id, generator, destination, frequency, stop_event):
+    def _generate_logs(self, sender_id, generator, sender_config, stop_event):
         """Generate logs at specified frequency"""
+        frequency = sender_config['frequency']
         interval = 1.0 / frequency if frequency > 0 else 1.0
-        
-        # Ensure destination directory exists
-        dest_path = Path(destination)
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(destination, 'a') as f:
-            while not stop_event.is_set():
-                log_line = generator.generate()
-                f.write(log_line + '\n')
-                f.flush()
-                
-                self.senders[sender_id]['logs_generated'] += 1
-                
-                time.sleep(interval)
+
+        destination_type = sender_config.get('destination_type', 'file')
+
+        # Handle file destination
+        if destination_type == 'file':
+            destination = sender_config['destination']
+
+            # Ensure destination directory exists
+            dest_path = Path(destination)
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(destination, 'a') as f:
+                while not stop_event.is_set():
+                    log_line = generator.generate()
+                    f.write(log_line + '\n')
+                    f.flush()
+
+                    self.senders[sender_id]['logs_generated'] += 1
+
+                    time.sleep(interval)
+
+        # Handle HEC destination
+        elif destination_type == 'configuration':
+            # Load configuration manager to get HEC config
+            from configuration_manager import ConfigurationManager
+            config_mgr = ConfigurationManager()
+
+            config_id = sender_config.get('configuration_id')
+            if not config_id:
+                print(f"Error: No configuration_id specified for sender {sender_id}")
+                return
+
+            hec_config = config_mgr.get_configuration(config_id)
+            if not hec_config:
+                print(f"Error: Configuration {config_id} not found")
+                return
+
+            # Create HEC sender
+            hec_sender = HECSender(
+                url=hec_config['url'],
+                port=hec_config['port'],
+                token=hec_config['token'],
+                index=hec_config.get('index'),
+                sourcetype=hec_config.get('sourcetype'),
+                host=hec_config.get('host'),
+                source=hec_config.get('source')
+            )
+
+            try:
+                while not stop_event.is_set():
+                    log_line = generator.generate()
+
+                    # Send to HEC
+                    success = hec_sender.send_event(log_line)
+
+                    if success:
+                        self.senders[sender_id]['logs_generated'] += 1
+
+                    time.sleep(interval)
+            finally:
+                hec_sender.close()
     
     def get_all_senders(self):
         """Get all senders"""
         return list(self.senders.values())
-    
+
+    def get_sender(self, sender_id):
+        """Get a specific sender"""
+        return self.senders.get(sender_id)
+
     def get_available_log_types(self):
         """Get available log types with descriptions"""
         return {

@@ -1,11 +1,13 @@
 // Log Generator UI - Main JavaScript
 
 let logTypes = {};
+let configurations = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadLogTypes();
     loadSenders();
+    loadConfigurations();
     setupEventListeners();
     setupTabs();
 
@@ -16,15 +18,47 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupEventListeners() {
     // Form submission
     document.getElementById('createSenderForm').addEventListener('submit', handleCreateSender);
+    document.getElementById('createConfigurationForm').addEventListener('submit', handleCreateConfiguration);
 
     // Add Sender button
     document.getElementById('addSenderBtn').addEventListener('click', function() {
         document.getElementById('senderFormCard').style.display = 'block';
+        loadConfigurations(); // Reload configurations for dropdown
     });
 
     // Close/Cancel sender form
     document.getElementById('closeSenderForm').addEventListener('click', closeSenderForm);
     document.getElementById('cancelSenderForm').addEventListener('click', closeSenderForm);
+
+    // Add Configuration button
+    document.getElementById('addConfigurationBtn').addEventListener('click', function() {
+        document.getElementById('configurationFormCard').style.display = 'block';
+    });
+
+    // Close/Cancel configuration form
+    document.getElementById('closeConfigurationForm').addEventListener('click', closeConfigurationForm);
+    document.getElementById('cancelConfigurationForm').addEventListener('click', closeConfigurationForm);
+
+    // Destination type radio buttons
+    document.querySelectorAll('input[name="destination_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const fileGroup = document.getElementById('fileDestinationGroup');
+            const configGroup = document.getElementById('configurationDestinationGroup');
+            const destinationInput = document.getElementById('destination');
+
+            if (this.value === 'file') {
+                fileGroup.style.display = 'block';
+                configGroup.style.display = 'none';
+                destinationInput.required = true;
+                document.getElementById('configurationSelect').required = false;
+            } else {
+                fileGroup.style.display = 'none';
+                configGroup.style.display = 'block';
+                destinationInput.required = false;
+                document.getElementById('configurationSelect').required = true;
+            }
+        });
+    });
 
     // Close log example
     const closeLogExample = document.getElementById('closeLogExample');
@@ -87,11 +121,21 @@ function setupEventListeners() {
 function closeSenderForm() {
     document.getElementById('senderFormCard').style.display = 'none';
     document.getElementById('createSenderForm').reset();
+    document.getElementById('senderId').value = '';
+    document.getElementById('senderFormTitle').textContent = 'Create New Sender';
+    document.getElementById('submitSenderBtn').textContent = 'Create Sender';
     document.getElementById('logTypeDescription').classList.remove('show');
     document.getElementById('windowsSourcesGroup').style.display = 'none';
     document.getElementById('renderFormatGroup').style.display = 'none';
     document.getElementById('apacheLogTypesGroup').style.display = 'none';
     document.getElementById('sshEventCategoriesGroup').style.display = 'none';
+
+    // Reset destination type to file
+    document.querySelector('input[name="destination_type"][value="file"]').checked = true;
+    document.getElementById('fileDestinationGroup').style.display = 'block';
+    document.getElementById('configurationDestinationGroup').style.display = 'none';
+    document.getElementById('destination').required = true;
+    document.getElementById('configurationSelect').required = false;
 
     // Reset all Windows source checkboxes to checked by default
     document.querySelectorAll('input[name="windows_sources"]').forEach(cb => cb.checked = true);
@@ -101,6 +145,14 @@ function closeSenderForm() {
 
     // Reset all SSH event category checkboxes to checked by default
     document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => cb.checked = true);
+}
+
+function closeConfigurationForm() {
+    document.getElementById('configurationFormCard').style.display = 'none';
+    document.getElementById('createConfigurationForm').reset();
+    document.getElementById('configurationId').value = '';
+    document.getElementById('configurationFormTitle').textContent = 'Create New HEC Destination';
+    document.getElementById('submitConfigurationBtn').textContent = 'Create HEC Destination';
 }
 
 function setupTabs() {
@@ -118,9 +170,11 @@ function setupTabs() {
             this.classList.add('active');
             document.getElementById(tabName + 'Tab').classList.add('active');
 
-            // Load sourcetypes if switching to sourcetypes tab
+            // Load data based on tab
             if (tabName === 'sourcetypes') {
                 loadSourcetypes();
+            } else if (tabName === 'configurations') {
+                loadConfigurations();
             }
         });
     });
@@ -449,7 +503,13 @@ function createSenderRow(sender) {
 
     // Destination
     const destCell = document.createElement('td');
-    destCell.textContent = sender.destination;
+    if (sender.destination_type === 'configuration' && sender.configuration_id) {
+        // Find configuration name
+        const config = configurations.find(c => c.id === sender.configuration_id);
+        destCell.textContent = config ? `HEC: ${config.name}` : 'HEC (Configuration not found)';
+    } else {
+        destCell.textContent = sender.destination;
+    }
     destCell.className = 'sender-destination';
     row.appendChild(destCell);
 
@@ -466,7 +526,7 @@ function createSenderRow(sender) {
 
     // Created
     const createdCell = document.createElement('td');
-    createdCell.textContent = new Date(sender.created_at).toLocaleString();
+    createdCell.textContent = formatDate(sender.created_at);
     createdCell.className = 'sender-created';
     row.appendChild(createdCell);
 
@@ -480,6 +540,14 @@ function createSenderRow(sender) {
     toggleBtn.title = 'Enable/Disable';
     toggleBtn.textContent = sender.enabled ? '⏸' : '▶';
     toggleBtn.addEventListener('click', () => toggleSender(sender.id));
+
+    // Edit button (only enabled when sender is stopped)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-small btn-secondary';
+    editBtn.title = sender.enabled ? 'Stop sender to edit' : 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.disabled = sender.enabled;
+    editBtn.addEventListener('click', () => editSender(sender.id));
 
     // Clone button
     const cloneBtn = document.createElement('button');
@@ -496,6 +564,7 @@ function createSenderRow(sender) {
     deleteBtn.addEventListener('click', () => deleteSender(sender.id));
 
     actionsCell.appendChild(toggleBtn);
+    actionsCell.appendChild(editBtn);
     actionsCell.appendChild(cloneBtn);
     actionsCell.appendChild(deleteBtn);
     row.appendChild(actionsCell);
@@ -510,19 +579,42 @@ function getLogTypeName(logType) {
     return logType;
 }
 
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}/${month}/${day}`;
+}
+
 async function handleCreateSender(e) {
     e.preventDefault();
 
     const formData = new FormData(e.target);
+    const senderId = formData.get('id');
     const logType = formData.get('log_type');
+    const destinationType = formData.get('destination_type');
 
     const data = {
         name: formData.get('name'),
         log_type: logType,
-        destination: formData.get('destination'),
         frequency: parseInt(formData.get('frequency')),
         enabled: document.getElementById('enabledOnCreate').checked
     };
+
+    // Set destination based on type
+    if (destinationType === 'file') {
+        data.destination = formData.get('destination');
+        data.destination_type = 'file';
+    } else {
+        const configId = formData.get('configuration_id');
+        if (!configId) {
+            showNotification('Please select a configuration', 'error');
+            return;
+        }
+        data.configuration_id = configId;
+        data.destination_type = 'configuration';
+    }
 
     // Add options for Windows logs
     if (logType === 'windows') {
@@ -578,14 +670,29 @@ async function handleCreateSender(e) {
     }
 
     try {
-        const response = await fetch('/api/senders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        
+        let response;
+        let successMessage;
+
+        if (senderId) {
+            // Edit mode
+            response = await fetch(`/api/senders/${senderId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Sender updated successfully!';
+        } else {
+            // Create mode
+            response = await fetch('/api/senders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Sender created successfully!';
+        }
+
         const result = await response.json();
-        
+
         if (result.success) {
             // Close and reset form
             closeSenderForm();
@@ -593,12 +700,12 @@ async function handleCreateSender(e) {
             // Reload senders
             await loadSenders();
 
-            showNotification('Sender created successfully!', 'success');
+            showNotification(successMessage, 'success');
         } else {
             showNotification('Error: ' + result.error, 'error');
         }
     } catch (error) {
-        showNotification('Error creating sender: ' + error.message, 'error');
+        showNotification('Error saving sender: ' + error.message, 'error');
     }
 }
 
@@ -618,6 +725,84 @@ async function toggleSender(senderId) {
         }
     } catch (error) {
         showNotification('Error toggling sender: ' + error.message, 'error');
+    }
+}
+
+async function editSender(senderId) {
+    try {
+        const response = await fetch(`/api/senders/${senderId}`);
+        const sender = await response.json();
+
+        if (sender) {
+            // Populate form with sender data
+            document.getElementById('senderId').value = sender.id;
+            document.getElementById('senderName').value = sender.name;
+            document.getElementById('logType').value = sender.log_type;
+            document.getElementById('frequency').value = sender.frequency;
+            document.getElementById('enabledOnCreate').checked = sender.enabled;
+
+            // Trigger log type change event to show appropriate options
+            const logTypeSelect = document.getElementById('logType');
+            const changeEvent = new Event('change', { bubbles: true });
+            logTypeSelect.dispatchEvent(changeEvent);
+
+            // Set destination type
+            if (sender.destination_type === 'configuration') {
+                document.querySelector('input[name="destination_type"][value="configuration"]').checked = true;
+                document.getElementById('fileDestinationGroup').style.display = 'none';
+                document.getElementById('configurationDestinationGroup').style.display = 'block';
+                document.getElementById('destination').required = false;
+                document.getElementById('configurationSelect').required = true;
+                document.getElementById('configurationSelect').value = sender.configuration_id;
+            } else {
+                document.querySelector('input[name="destination_type"][value="file"]').checked = true;
+                document.getElementById('fileDestinationGroup').style.display = 'block';
+                document.getElementById('configurationDestinationGroup').style.display = 'none';
+                document.getElementById('destination').required = true;
+                document.getElementById('configurationSelect').required = false;
+                document.getElementById('destination').value = sender.destination;
+            }
+
+            // Set options based on log type
+            if (sender.log_type === 'windows' && sender.options) {
+                // Set Windows sources
+                if (sender.options.sources) {
+                    document.querySelectorAll('input[name="windows_sources"]').forEach(cb => {
+                        cb.checked = sender.options.sources.includes(cb.value);
+                    });
+                }
+                // Set render format
+                if (sender.options.render_format) {
+                    document.getElementById('renderFormat').value = sender.options.render_format;
+                }
+            } else if (sender.log_type === 'apache' && sender.options) {
+                // Set Apache log types
+                if (sender.options.log_types) {
+                    document.querySelectorAll('input[name="apache_log_types"]').forEach(cb => {
+                        cb.checked = sender.options.log_types.includes(cb.value);
+                    });
+                }
+            } else if (sender.log_type === 'ssh' && sender.options) {
+                // Set SSH event categories
+                if (sender.options.event_categories) {
+                    document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => {
+                        cb.checked = sender.options.event_categories.includes(cb.value);
+                    });
+                }
+            }
+
+            // Update form title and button
+            document.getElementById('senderFormTitle').textContent = 'Edit Sender';
+            document.getElementById('submitSenderBtn').textContent = 'Update Sender';
+
+            // Show the form
+            document.getElementById('senderFormCard').style.display = 'block';
+
+            // Reload configurations to populate dropdown
+            await loadConfigurations();
+        }
+    } catch (error) {
+        showNotification('Error loading sender: ' + error.message, 'error');
     }
 }
 
@@ -701,7 +886,7 @@ style.textContent = `
             opacity: 1;
         }
     }
-    
+
     @keyframes slideOut {
         from {
             transform: translateX(0);
@@ -714,3 +899,277 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Configuration Management Functions
+
+async function loadConfigurations() {
+    try {
+        const response = await fetch('/api/configurations');
+        configurations = await response.json();
+
+        const container = document.getElementById('configurationsContainer');
+        const totalConfigurations = document.getElementById('totalConfigurations');
+
+        if (totalConfigurations) {
+            totalConfigurations.textContent = configurations.length;
+        }
+
+        // Update configuration select dropdown in sender form
+        const configSelect = document.getElementById('configurationSelect');
+        if (configSelect) {
+            configSelect.innerHTML = '<option value="">Select a configuration...</option>';
+            configurations.forEach(config => {
+                const option = document.createElement('option');
+                option.value = config.id;
+                option.textContent = `${config.name} (${config.url}:${config.port})`;
+                configSelect.appendChild(option);
+            });
+        }
+
+        if (!container) return;
+
+        if (configurations.length === 0) {
+            container.innerHTML = '<p class="no-senders">No configurations created yet. Click "Add Configuration" to create one!</p>';
+            return;
+        }
+
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'senders-table';
+
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Port</th>
+                <th>Index</th>
+                <th>Sourcetype</th>
+                <th>Host</th>
+                <th>Source</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement('tbody');
+        configurations.forEach(config => {
+            tbody.appendChild(createConfigurationRow(config));
+        });
+        table.appendChild(tbody);
+
+        // Clear container and add table
+        container.innerHTML = '';
+        container.appendChild(table);
+
+    } catch (error) {
+        console.error('Error loading configurations:', error);
+    }
+}
+
+function createConfigurationRow(config) {
+    const row = document.createElement('tr');
+    row.dataset.configId = config.id;
+
+    // Name
+    const nameCell = document.createElement('td');
+    nameCell.textContent = config.name;
+    nameCell.className = 'sender-name';
+    row.appendChild(nameCell);
+
+    // URL
+    const urlCell = document.createElement('td');
+    urlCell.textContent = config.url;
+    urlCell.className = 'sender-destination';
+    row.appendChild(urlCell);
+
+    // Port
+    const portCell = document.createElement('td');
+    portCell.textContent = config.port;
+    row.appendChild(portCell);
+
+    // Index
+    const indexCell = document.createElement('td');
+    indexCell.textContent = config.index || '-';
+    row.appendChild(indexCell);
+
+    // Sourcetype
+    const sourcetypeCell = document.createElement('td');
+    sourcetypeCell.textContent = config.sourcetype || '-';
+    row.appendChild(sourcetypeCell);
+
+    // Host
+    const hostCell = document.createElement('td');
+    hostCell.textContent = config.host || '-';
+    row.appendChild(hostCell);
+
+    // Source
+    const sourceCell = document.createElement('td');
+    sourceCell.textContent = config.source || '-';
+    row.appendChild(sourceCell);
+
+    // Created
+    const createdCell = document.createElement('td');
+    createdCell.textContent = formatDate(config.created_at);
+    createdCell.className = 'sender-created';
+    row.appendChild(createdCell);
+
+    // Actions
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'sender-actions';
+
+    // Edit button
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-small btn-secondary';
+    editBtn.title = 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', () => editConfiguration(config.id));
+
+    // Clone button
+    const cloneBtn = document.createElement('button');
+    cloneBtn.className = 'btn btn-small btn-clone';
+    cloneBtn.title = 'Clone';
+    cloneBtn.textContent = '⎘';
+    cloneBtn.addEventListener('click', () => cloneConfiguration(config.id));
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-small btn-delete';
+    deleteBtn.title = 'Delete';
+    deleteBtn.textContent = '×';
+    deleteBtn.addEventListener('click', () => deleteConfiguration(config.id));
+
+    actionsCell.appendChild(editBtn);
+    actionsCell.appendChild(cloneBtn);
+    actionsCell.appendChild(deleteBtn);
+    row.appendChild(actionsCell);
+
+    return row;
+}
+
+async function handleCreateConfiguration(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const configId = formData.get('id');
+
+    const data = {
+        name: formData.get('name'),
+        url: formData.get('url'),
+        port: parseInt(formData.get('port')),
+        token: formData.get('token'),
+        index: formData.get('index') || undefined,
+        sourcetype: formData.get('sourcetype') || undefined,
+        host: formData.get('host') || undefined,
+        source: formData.get('source') || undefined
+    };
+
+    try {
+        let response;
+        let successMessage;
+
+        if (configId) {
+            // Edit mode
+            response = await fetch(`/api/configurations/${configId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Configuration updated successfully!';
+        } else {
+            // Create mode
+            response = await fetch('/api/configurations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Configuration created successfully!';
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            closeConfigurationForm();
+            await loadConfigurations();
+            showNotification(successMessage, 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error saving configuration: ' + error.message, 'error');
+    }
+}
+
+async function editConfiguration(configId) {
+    try {
+        const response = await fetch(`/api/configurations/${configId}`);
+        const config = await response.json();
+
+        if (config) {
+            // Populate form with configuration data
+            document.getElementById('configurationId').value = config.id;
+            document.getElementById('configurationName').value = config.name;
+            document.getElementById('configurationUrl').value = config.url;
+            document.getElementById('configurationPort').value = config.port;
+            document.getElementById('configurationToken').value = config.token;
+            document.getElementById('configurationIndex').value = config.index || '';
+            document.getElementById('configurationSourcetype').value = config.sourcetype || '';
+            document.getElementById('configurationHost').value = config.host || '';
+            document.getElementById('configurationSource').value = config.source || '';
+
+            // Update form title and button
+            document.getElementById('configurationFormTitle').textContent = 'Edit HEC Destination';
+            document.getElementById('submitConfigurationBtn').textContent = 'Update HEC Destination';
+
+            // Show the form
+            document.getElementById('configurationFormCard').style.display = 'block';
+        }
+    } catch (error) {
+        showNotification('Error loading configuration: ' + error.message, 'error');
+    }
+}
+
+async function cloneConfiguration(configId) {
+    try {
+        const response = await fetch(`/api/configurations/${configId}/clone`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await loadConfigurations();
+            showNotification('Configuration cloned successfully!', 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error cloning configuration: ' + error.message, 'error');
+    }
+}
+
+async function deleteConfiguration(configId) {
+    if (!confirm('Are you sure you want to delete this configuration?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/configurations/${configId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await loadConfigurations();
+            showNotification('Configuration deleted', 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error deleting configuration: ' + error.message, 'error');
+    }
+}
