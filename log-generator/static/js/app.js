@@ -2,12 +2,14 @@
 
 let logTypes = {};
 let configurations = [];
+let attacks = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadLogTypes();
     loadSenders();
     loadConfigurations();
+    loadAttacks();
     setupEventListeners();
     setupTabs();
 
@@ -38,6 +40,19 @@ function setupEventListeners() {
     // Close/Cancel configuration form
     document.getElementById('closeConfigurationForm').addEventListener('click', closeConfigurationForm);
     document.getElementById('cancelConfigurationForm').addEventListener('click', closeConfigurationForm);
+
+    // Attack form handling
+    document.getElementById('createAttackForm').addEventListener('submit', handleCreateAttack);
+
+    // Add Attack button
+    document.getElementById('addAttackBtn').addEventListener('click', function() {
+        document.getElementById('attackFormCard').style.display = 'block';
+        populateAttackLogTypes();
+    });
+
+    // Close/Cancel attack form
+    document.getElementById('closeAttackForm').addEventListener('click', closeAttackForm);
+    document.getElementById('cancelAttackForm').addEventListener('click', closeAttackForm);
 
     // Destination type radio buttons
     document.querySelectorAll('input[name="destination_type"]').forEach(radio => {
@@ -173,6 +188,26 @@ function closeConfigurationForm() {
     document.getElementById('submitConfigurationBtn').textContent = 'Create HEC Destination';
 }
 
+function closeAttackForm() {
+    document.getElementById('attackFormCard').style.display = 'none';
+    document.getElementById('createAttackForm').reset();
+    document.getElementById('attackId').value = '';
+    document.getElementById('attackFormTitle').textContent = 'Create New Attack';
+    document.getElementById('submitAttackBtn').textContent = 'Create Attack';
+}
+
+function populateAttackLogTypes() {
+    const select = document.getElementById('attackLogType');
+    select.innerHTML = '<option value="">Select a log type...</option>';
+
+    Object.keys(logTypes).sort().forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = logTypes[key].name;
+        select.appendChild(option);
+    });
+}
+
 function setupTabs() {
     const tabButtons = document.querySelectorAll('.tab-btn');
 
@@ -193,6 +228,8 @@ function setupTabs() {
                 loadSourcetypes();
             } else if (tabName === 'configurations') {
                 loadConfigurations();
+            } else if (tabName === 'attacks') {
+                loadAttacks();
             }
         });
     });
@@ -1270,5 +1307,291 @@ async function deleteConfiguration(configId) {
         }
     } catch (error) {
         showNotification('Error deleting configuration: ' + error.message, 'error');
+    }
+}
+
+// ============== Attacks Functions ==============
+
+async function loadAttacks() {
+    try {
+        const response = await fetch('/api/attacks');
+        attacks = await response.json();
+
+        const container = document.getElementById('attacksContainer');
+        const totalAttacks = document.getElementById('totalAttacks');
+
+        if (totalAttacks) {
+            totalAttacks.textContent = attacks.length;
+        }
+
+        if (!container) return;
+
+        if (attacks.length === 0) {
+            container.innerHTML = '<p class="no-senders">No attacks created yet. Click "Add Attack" to create one!</p>';
+            return;
+        }
+
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'senders-table';
+
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Log Type</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement('tbody');
+        attacks.forEach(attack => {
+            tbody.appendChild(createAttackRow(attack));
+        });
+        table.appendChild(tbody);
+
+        // Clear container and add table
+        container.innerHTML = '';
+        container.appendChild(table);
+
+    } catch (error) {
+        console.error('Error loading attacks:', error);
+    }
+}
+
+function createAttackRow(attack) {
+    const row = document.createElement('tr');
+    row.dataset.attackId = attack.id;
+    row.style.cursor = 'pointer';
+
+    // Name
+    const nameCell = document.createElement('td');
+    nameCell.textContent = attack.name;
+    nameCell.className = 'sender-name';
+    row.appendChild(nameCell);
+
+    // Description
+    const descCell = document.createElement('td');
+    descCell.textContent = attack.description;
+    descCell.style.maxWidth = '300px';
+    descCell.style.overflow = 'hidden';
+    descCell.style.textOverflow = 'ellipsis';
+    descCell.style.whiteSpace = 'nowrap';
+    row.appendChild(descCell);
+
+    // Log Type
+    const logTypeCell = document.createElement('td');
+    logTypeCell.textContent = getLogTypeName(attack.log_type);
+    row.appendChild(logTypeCell);
+
+    // Created
+    const createdCell = document.createElement('td');
+    createdCell.textContent = formatDate(attack.created_at);
+    createdCell.className = 'sender-created';
+    row.appendChild(createdCell);
+
+    // Actions
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'sender-actions';
+
+    // Edit button
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-small btn-secondary';
+    editBtn.title = 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editAttack(attack.id);
+    });
+
+    // Clone button
+    const cloneBtn = document.createElement('button');
+    cloneBtn.className = 'btn btn-small btn-clone';
+    cloneBtn.title = 'Clone';
+    cloneBtn.textContent = '⎘';
+    cloneBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cloneAttack(attack.id);
+    });
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-small btn-delete';
+    deleteBtn.title = 'Delete';
+    deleteBtn.textContent = '×';
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteAttack(attack.id);
+    });
+
+    actionsCell.appendChild(editBtn);
+    actionsCell.appendChild(cloneBtn);
+    actionsCell.appendChild(deleteBtn);
+    row.appendChild(actionsCell);
+
+    // Add click event to toggle inline example
+    row.addEventListener('click', () => toggleAttackExample(row, attack));
+
+    return row;
+}
+
+function toggleAttackExample(row, attack) {
+    // Check if example row already exists
+    const existingExample = row.nextElementSibling;
+    if (existingExample && existingExample.classList.contains('attack-example-row')) {
+        // Toggle visibility
+        if (existingExample.style.display === 'none') {
+            existingExample.style.display = 'table-row';
+        } else {
+            existingExample.style.display = 'none';
+        }
+        return;
+    }
+
+    // Create new example row
+    const exampleRow = document.createElement('tr');
+    exampleRow.className = 'attack-example-row';
+
+    const exampleCell = document.createElement('td');
+    exampleCell.colSpan = 5;
+    exampleCell.innerHTML = `
+        <div class="inline-log-example">
+            <div class="inline-example-title">Attack Example - ${attack.name}</div>
+            <pre class="inline-example-content">${escapeHtml(attack.example)}</pre>
+        </div>
+    `;
+
+    exampleRow.appendChild(exampleCell);
+    row.parentNode.insertBefore(exampleRow, row.nextSibling);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function handleCreateAttack(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const attackId = formData.get('id');
+
+    const data = {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        log_type: formData.get('log_type'),
+        example: formData.get('example')
+    };
+
+    try {
+        let response;
+        let successMessage;
+
+        if (attackId) {
+            // Edit mode
+            response = await fetch(`/api/attacks/${attackId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Attack updated successfully!';
+        } else {
+            // Create mode
+            response = await fetch('/api/attacks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            successMessage = 'Attack created successfully!';
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            closeAttackForm();
+            await loadAttacks();
+            showNotification(successMessage, 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error saving attack: ' + error.message, 'error');
+    }
+}
+
+async function editAttack(attackId) {
+    try {
+        const response = await fetch(`/api/attacks/${attackId}`);
+        const attack = await response.json();
+
+        if (attack) {
+            // Populate form with attack data
+            document.getElementById('attackId').value = attack.id;
+            document.getElementById('attackName').value = attack.name;
+            document.getElementById('attackDescription').value = attack.description;
+
+            // Populate log types and select the right one
+            populateAttackLogTypes();
+            document.getElementById('attackLogType').value = attack.log_type;
+
+            document.getElementById('attackExample').value = attack.example;
+
+            // Update form title and button
+            document.getElementById('attackFormTitle').textContent = 'Edit Attack';
+            document.getElementById('submitAttackBtn').textContent = 'Update Attack';
+
+            // Show the form
+            document.getElementById('attackFormCard').style.display = 'block';
+        }
+    } catch (error) {
+        showNotification('Error loading attack: ' + error.message, 'error');
+    }
+}
+
+async function cloneAttack(attackId) {
+    try {
+        const response = await fetch(`/api/attacks/${attackId}/clone`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await loadAttacks();
+            showNotification('Attack cloned successfully!', 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error cloning attack: ' + error.message, 'error');
+    }
+}
+
+async function deleteAttack(attackId) {
+    if (!confirm('Are you sure you want to delete this attack?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/attacks/${attackId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            await loadAttacks();
+            showNotification('Attack deleted', 'success');
+        } else {
+            showNotification('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error deleting attack: ' + error.message, 'error');
     }
 }

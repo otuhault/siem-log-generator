@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 from log_senders import SenderManager
 from configuration_manager import ConfigurationManager
+from attacks_manager import AttacksManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
@@ -17,6 +18,7 @@ app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 # Initialize managers
 sender_manager = SenderManager()
 configuration_manager = ConfigurationManager()
+attacks_manager = AttacksManager()
 
 @app.route('/')
 def index():
@@ -156,6 +158,63 @@ def clone_configuration(config_id):
 def get_log_types():
     """Get available log types"""
     return jsonify(sender_manager.get_available_log_types())
+
+# Attacks API endpoints
+@app.route('/api/attacks', methods=['GET'])
+def get_attacks():
+    """Get all attacks"""
+    return jsonify(attacks_manager.get_all_attacks())
+
+@app.route('/api/attacks/<attack_id>', methods=['GET'])
+def get_attack(attack_id):
+    """Get a specific attack"""
+    attack = attacks_manager.get_attack(attack_id)
+    if attack:
+        return jsonify(attack)
+    return jsonify({'error': 'Attack not found'}), 404
+
+@app.route('/api/attacks', methods=['POST'])
+def create_attack():
+    """Create a new attack"""
+    data = request.json
+    try:
+        attack_id = attacks_manager.create_attack(
+            name=data['name'],
+            description=data['description'],
+            log_type=data['log_type'],
+            example=data['example']
+        )
+        return jsonify({'success': True, 'attack_id': attack_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/attacks/<attack_id>', methods=['PUT'])
+def update_attack(attack_id):
+    """Update attack"""
+    data = request.json
+    try:
+        attacks_manager.update_attack(attack_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/attacks/<attack_id>', methods=['DELETE'])
+def delete_attack(attack_id):
+    """Delete an attack"""
+    try:
+        attacks_manager.delete_attack(attack_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/attacks/<attack_id>/clone', methods=['POST'])
+def clone_attack(attack_id):
+    """Clone an attack"""
+    try:
+        new_id = attacks_manager.clone_attack(attack_id)
+        return jsonify({'success': True, 'attack_id': new_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

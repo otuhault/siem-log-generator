@@ -16,6 +16,7 @@
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="senders">Senders</button>
             <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
+            <button class="tab-btn" data-tab="attacks">Attacks</button>
             <button class="tab-btn" data-tab="configurations">HEC Destinations</button>
         </nav>
 
@@ -350,6 +351,65 @@
                         <button id="closeLogExample" class="btn-close">×</button>
                     </div>
                     <div id="logExampleContent" class="log-example">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attacks Tab Content -->
+            <div id="attacksTab" class="tab-content">
+                <!-- Add Attack Button -->
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Attacks: <strong id="totalAttacks">0</strong></span>
+                    </div>
+                    <button id="addAttackBtn" class="btn btn-primary">+ Add Attack</button>
+                </div>
+
+                <!-- Create Attack Form (Hidden by default) -->
+                <div id="attackFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="attackFormTitle">Create New Attack</h2>
+                        <button id="closeAttackForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createAttackForm">
+                        <input type="hidden" id="attackId" name="id">
+                        <div class="form-group">
+                            <label for="attackName">Attack Name:</label>
+                            <input type="text" id="attackName" name="name" required placeholder="e.g., SSH Brute Force">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="attackDescription">Description:</label>
+                            <textarea id="attackDescription" name="description" required
+                                      placeholder="Describe what this attack simulates..."
+                                      style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit;"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="attackLogType">Log Type:</label>
+                            <select id="attackLogType" name="log_type" required>
+                                <option value="">Select a log type...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="attackExample">Attack Example (Log Sample):</label>
+                            <textarea id="attackExample" name="example" required
+                                      placeholder="Paste an example log line showing this attack..."
+                                      style="width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85em;"></textarea>
+                            <small>Example log entry that demonstrates this attack pattern</small>
+                        </div>
+
+                        <button type="submit" id="submitAttackBtn" class="btn btn-primary">Create Attack</button>
+                        <button type="button" id="cancelAttackForm" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+
+                <!-- Attacks Table -->
+                <div class="card">
+                    <h2>Attack Patterns</h2>
+                    <div id="attacksContainer">
+                        <p class="no-senders">No attacks created yet. Click "Add Attack" to create one!</p>
                     </div>
                 </div>
             </div>

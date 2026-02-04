@@ -580,6 +580,23 @@ header p {
     line-height: 1.5;
 }
 
+/* Attack example row in table */
+.attack-example-row {
+    background: var(--bg-color);
+}
+
+.attack-example-row td {
+    padding: 0 !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.attack-example-row .inline-log-example {
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    border-top: 1px dashed var(--border-color);
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 1.8em;
