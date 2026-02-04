@@ -1,77 +1,20 @@
 {
-  "1f125dae-d0d4-4039-b938-3aac338974c4": {
-    "id": "1f125dae-d0d4-4039-b938-3aac338974c4",
-    "name": "Windows Security Logs",
-    "log_type": "windows_security",
-    "destination": "/Users/ratelon/Documents/Dev/SLG/windows_security.log",
+  "0d50fbc4-68ba-44d5-b1ff-249631dbf838": {
+    "id": "0d50fbc4-68ba-44d5-b1ff-249631dbf838",
+    "name": "pan:log",
+    "log_type": "paloalto",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "207c004f-6bca-440b-a40b-f2049c9a3f6c",
     "frequency": 5,
     "enabled": false,
-    "created_at": "2026-02-02T20:44:30.423061",
-    "logs_generated": 13
-  },
-  "98fde93b-28bc-4e03-bee0-6b2ddd666512": {
-    "id": "98fde93b-28bc-4e03-bee0-6b2ddd666512",
-    "name": "Windows Classic",
-    "log_type": "windows_security",
-    "destination": "/Users/ratelon/Documents/Dev/SLG/windows_classic.log",
-    "frequency": 10,
-    "enabled": false,
-    "created_at": "2026-02-02T22:15:30.802081",
-    "logs_generated": 39,
-    "options": {
-      "render_format": "classic"
-    }
-  },
-  "cc3c4640-8b31-4850-aa97-82697b96e4e2": {
-    "id": "cc3c4640-8b31-4850-aa97-82697b96e4e2",
-    "name": "Apache access",
-    "log_type": "apache",
-    "destination": "/Users/ratelon/Documents/Dev/SLG/access.log",
-    "frequency": 10,
-    "enabled": false,
-    "created_at": "2026-02-03T10:26:36.804303",
-    "logs_generated": 57,
+    "created_at": "2026-02-04T18:17:55.193312",
+    "logs_generated": 238,
     "options": {
       "log_types": [
-        "access"
-      ]
-    }
-  },
-  "f9ef972a-8dee-414a-9b57-6ab48b6c021f": {
-    "id": "f9ef972a-8dee-414a-9b57-6ab48b6c021f",
-    "name": "Test HEC Access Logs",
-    "log_type": "apache",
-    "destination": null,
-    "destination_type": "configuration",
-    "configuration_id": "207c004f-6bca-440b-a40b-f2049c9a3f6c",
-    "frequency": 3,
-    "enabled": false,
-    "created_at": "2026-02-04T16:03:25.314168",
-    "logs_generated": 614,
-    "options": {
-      "log_types": [
-        "access",
-        "error",
-        "combined"
-      ]
-    }
-  },
-  "240afd4c-3e99-44e2-bab4-9eaaeb59da1e": {
-    "id": "240afd4c-3e99-44e2-bab4-9eaaeb59da1e",
-    "name": "Test HEC Access_Combined Logs",
-    "log_type": "apache",
-    "destination": null,
-    "destination_type": "configuration",
-    "configuration_id": "207c004f-6bca-440b-a40b-f2049c9a3f6c",
-    "frequency": 3,
-    "enabled": false,
-    "created_at": "2026-02-04T16:06:21.937255",
-    "logs_generated": 91,
-    "options": {
-      "log_types": [
-        "access",
-        "error",
-        "combined"
+        "traffic",
+        "threat",
+        "system"
       ]
     }
   }

@@ -76,6 +76,7 @@ function setupEventListeners() {
         const windowsSourcesGroup = document.getElementById('windowsSourcesGroup');
         const apacheLogTypesGroup = document.getElementById('apacheLogTypesGroup');
         const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
+        const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
 
         if (selectedType && logTypes[selectedType]) {
             description.textContent = logTypes[selectedType].description;
@@ -87,6 +88,7 @@ function setupEventListeners() {
                 renderFormatGroup.style.display = 'block';
                 apacheLogTypesGroup.style.display = 'none';
                 sshEventCategoriesGroup.style.display = 'none';
+                paloaltoLogTypesGroup.style.display = 'none';
             }
             // Show Apache-specific options
             else if (selectedType === 'apache') {
@@ -94,6 +96,7 @@ function setupEventListeners() {
                 windowsSourcesGroup.style.display = 'none';
                 renderFormatGroup.style.display = 'none';
                 sshEventCategoriesGroup.style.display = 'none';
+                paloaltoLogTypesGroup.style.display = 'none';
             }
             // Show SSH-specific options
             else if (selectedType === 'ssh') {
@@ -101,12 +104,22 @@ function setupEventListeners() {
                 windowsSourcesGroup.style.display = 'none';
                 renderFormatGroup.style.display = 'none';
                 apacheLogTypesGroup.style.display = 'none';
+                paloaltoLogTypesGroup.style.display = 'none';
+            }
+            // Show Palo Alto-specific options
+            else if (selectedType === 'paloalto') {
+                paloaltoLogTypesGroup.style.display = 'block';
+                windowsSourcesGroup.style.display = 'none';
+                renderFormatGroup.style.display = 'none';
+                apacheLogTypesGroup.style.display = 'none';
+                sshEventCategoriesGroup.style.display = 'none';
             }
             else {
                 windowsSourcesGroup.style.display = 'none';
                 renderFormatGroup.style.display = 'none';
                 apacheLogTypesGroup.style.display = 'none';
                 sshEventCategoriesGroup.style.display = 'none';
+                paloaltoLogTypesGroup.style.display = 'none';
             }
         } else {
             description.classList.remove('show');
@@ -114,6 +127,7 @@ function setupEventListeners() {
             renderFormatGroup.style.display = 'none';
             apacheLogTypesGroup.style.display = 'none';
             sshEventCategoriesGroup.style.display = 'none';
+            paloaltoLogTypesGroup.style.display = 'none';
         }
     });
 }
@@ -129,6 +143,7 @@ function closeSenderForm() {
     document.getElementById('renderFormatGroup').style.display = 'none';
     document.getElementById('apacheLogTypesGroup').style.display = 'none';
     document.getElementById('sshEventCategoriesGroup').style.display = 'none';
+    document.getElementById('paloaltoLogTypesGroup').style.display = 'none';
 
     // Reset destination type to file
     document.querySelector('input[name="destination_type"][value="file"]').checked = true;
@@ -145,6 +160,9 @@ function closeSenderForm() {
 
     // Reset all SSH event category checkboxes to checked by default
     document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => cb.checked = true);
+
+    // Reset all Palo Alto log type checkboxes to checked by default
+    document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => cb.checked = true);
 }
 
 function closeConfigurationForm() {
@@ -251,6 +269,7 @@ async function loadSourcetypes() {
                 type.sources.forEach(source => {
                     const subItem = document.createElement('div');
                     subItem.className = 'sourcetype-subitem';
+                    subItem.dataset.sourceId = source.id;
 
                     const subName = document.createElement('div');
                     subName.className = 'sourcetype-subname';
@@ -263,10 +282,10 @@ async function loadSourcetypes() {
                     subItem.appendChild(subName);
                     subItem.appendChild(subDesc);
 
-                    // Add click event to show source-specific example
+                    // Add click event to show source-specific example inline
                     subItem.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        showLogExample(key, type, source.id);
+                        toggleInlineLogExample(subItem, key, type, source.id);
                     });
 
                     subList.appendChild(subItem);
@@ -282,8 +301,8 @@ async function loadSourcetypes() {
                     item.classList.toggle('expanded', !isExpanded);
                 });
             } else {
-                // For non-Windows types, show example directly
-                item.addEventListener('click', () => showLogExample(key, type));
+                // For non-Windows types, show example directly inline
+                item.addEventListener('click', () => toggleInlineLogExample(item, key, type));
             }
 
             listDiv.appendChild(item);
@@ -294,6 +313,52 @@ async function loadSourcetypes() {
     } catch (error) {
         console.error('Error loading sourcetypes:', error);
         document.getElementById('sourcetypesContainer').innerHTML = '<p class="error">Error loading sourcetypes</p>';
+    }
+}
+
+async function toggleInlineLogExample(parentElement, typeKey, type, sourceId = null) {
+    try {
+        // Check if example already exists and is visible
+        const existingExample = parentElement.querySelector('.inline-log-example');
+
+        if (existingExample) {
+            // Toggle visibility
+            if (existingExample.style.display === 'none') {
+                existingExample.style.display = 'block';
+            } else {
+                existingExample.style.display = 'none';
+            }
+            return;
+        }
+
+        // Create new inline example
+        const exampleDiv = document.createElement('div');
+        exampleDiv.className = 'inline-log-example';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'inline-example-title';
+        if (sourceId) {
+            titleDiv.textContent = `Example Log - ${sourceId}`;
+        } else {
+            titleDiv.textContent = 'Example Log';
+        }
+
+        const contentDiv = document.createElement('pre');
+        contentDiv.className = 'inline-example-content';
+
+        // Generate or fetch example log
+        const example = await fetchLogExample(typeKey, sourceId);
+        contentDiv.textContent = example;
+
+        exampleDiv.appendChild(titleDiv);
+        exampleDiv.appendChild(contentDiv);
+
+        // Insert after the parent element
+        parentElement.appendChild(exampleDiv);
+
+    } catch (error) {
+        console.error('Error showing log example:', error);
+        showNotification('Error loading log example', 'error');
     }
 }
 
@@ -400,6 +465,11 @@ async function fetchLogExample(typeKey, sourceId = null) {
     <Data Name="Description">Service State Change</Data>
   </EventData>
 </Event>`
+        },
+        'paloalto': {
+            'traffic': '<14>Feb 04 2026 12:34:56 pa-fw-01 1,2026/02/04 12:34:56,012345678901234,TRAFFIC,end,2049,2026/02/04 12:34:56,192.168.1.10,8.8.8.8,0.0.0.0,0.0.0.0,allow-web,,,web-browsing,vsys1,trust,untrust,ethernet1/1,ethernet1/2,ForwardToSplunk,2026/02/04 12:34:56,12345,1,54321,443,0,0,0x0,tcp,allow,15234,8192,7042,42,2026/02/04 12:34:50,6,any,0,987654321,0x8000000000000000,Internal,United States,0,24,18,aged-out,123,456,789,0,vsys1-name,pa-fw-01,from-policy,,,0,,0,,2026/02/04 12:34:50,0,N/A,0,0,0,0,0x0,,,,,,,,,,,,0,0,0,0,0,0,0,any,any,0,2026-02-04T12:34:56.789Z,0',
+            'threat': '<14>Feb 04 2026 13:45:22 pa-fw-01 1,2026/02/04 13:45:22,012345678901234,THREAT,vulnerability,2049,2026/02/04 13:45:22,185.220.101.45,192.168.1.100,0.0.0.0,0.0.0.0,block-malicious,,,web-browsing,vsys1,untrust,trust,ethernet1/2,ethernet1/1,ForwardToSplunk,2026/02/04 13:45:22,54321,1,80,54321,0,0,0x80000000,tcp,reset-both,"malware-site.com/payload.exe",(41001),malware,high,client-to-server,987654321,0x8000000000000000,Germany,Internal,0,application/octet-stream,0,abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890,WildFireCloud,0,Mozilla/5.0,exe,,,,,report-12345,123,456,789,0,vsys1-name,pa-fw-01,,,,GET,1234567890,,999,2026/02/04 13:45:00,,malware,content-ver-1234,0,,,,,rule-uuid-123,0,,,,,,,,,,,,,,,,,,,,,,,,,,,2026-02-04T13:45:22.890Z,,0,,,,5,,,,1,1,,',
+            'system': '<14>Feb 04 2026 14:56:33 pa-fw-01 1,2026/02/04 14:56:33,012345678901234,SYSTEM,auth,0,2026/02/04 14:56:33,vsys1,auth-fail,admin-user,0,0,auth,medium,"Authentication failed for user \'admin-user\' from 192.168.1.50",987654321,0x8000000000000000,123,456,789,0,vsys1-name,pa-fw-01,0,0,2026-02-04T14:56:33.901Z'
         }
     };
 
@@ -416,6 +486,11 @@ async function fetchLogExample(typeKey, sourceId = null) {
     // Handle Windows with specific source
     if (typeKey === 'windows' && sourceId) {
         return examples.windows[sourceId] || 'No example available for this source.';
+    }
+
+    // Handle Palo Alto with specific log type
+    if (typeKey === 'paloalto' && sourceId) {
+        return examples.paloalto[sourceId] || 'No example available for this log type.';
     }
 
     // Handle regular log types (fallback)
@@ -668,6 +743,23 @@ async function handleCreateSender(e) {
             event_categories: selectedCategories
         };
     }
+    // Add options for Palo Alto logs
+    else if (logType === 'paloalto') {
+        // Get selected log types
+        const selectedLogTypes = Array.from(
+            document.querySelectorAll('input[name="paloalto_log_types"]:checked')
+        ).map(cb => cb.value);
+
+        // Validate at least one log type is selected
+        if (selectedLogTypes.length === 0) {
+            showNotification('Please select at least one Palo Alto log type', 'error');
+            return;
+        }
+
+        data.options = {
+            log_types: selectedLogTypes
+        };
+    }
 
     try {
         let response;
@@ -787,6 +879,13 @@ async function editSender(senderId) {
                 if (sender.options.event_categories) {
                     document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => {
                         cb.checked = sender.options.event_categories.includes(cb.value);
+                    });
+                }
+            } else if (sender.log_type === 'paloalto' && sender.options) {
+                // Set Palo Alto log types
+                if (sender.options.log_types) {
+                    document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => {
+                        cb.checked = sender.options.log_types.includes(cb.value);
                     });
                 }
             }

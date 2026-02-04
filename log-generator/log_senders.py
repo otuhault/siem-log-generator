@@ -11,6 +11,7 @@ from pathlib import Path
 from log_generators.apache import ApacheLogGenerator
 from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
+from log_generators.paloalto import PaloAltoLogGenerator
 from hec_sender import HECSender
 
 class SSHMultiCategoryGenerator:
@@ -68,6 +69,22 @@ class WindowsMultiSourceGenerator:
         generator = random.choice(self.generators)
         return generator.generate()
 
+
+class PaloAltoMultiTypeGenerator:
+    """Wrapper that generates logs from multiple Palo Alto log types"""
+
+    def __init__(self, log_types):
+        """
+        Initialize with multiple log types
+        log_types: list of type names like ['traffic', 'threat', 'system']
+        """
+        self.generator = PaloAltoLogGenerator(log_types=log_types)
+        self.log_types = log_types
+
+    def generate(self):
+        """Generate a log from the configured types"""
+        return self.generator.generate()
+
 class SenderManager:
     """Manages log senders and their lifecycle"""
     
@@ -82,6 +99,7 @@ class SenderManager:
             'apache': ApacheLogGenerator,
             'windows': WindowsEventLogGenerator,
             'ssh': SSHAuthLogGenerator,
+            'paloalto': PaloAltoLogGenerator,
         }
     
     def load_config(self):
@@ -210,6 +228,13 @@ class SenderManager:
 
             # Create a multi-category generator wrapper
             generator = SSHMultiCategoryGenerator(event_categories)
+        # Handle Palo Alto Log generators
+        elif sender['log_type'] == 'paloalto':
+            # Get selected log types (default to all if none specified)
+            log_types = options.get('log_types', ['traffic', 'threat', 'system'])
+
+            # Create a multi-type generator wrapper
+            generator = PaloAltoMultiTypeGenerator(log_types)
         else:
             # Other log types
             generator = generator_class()
@@ -381,6 +406,28 @@ class SenderManager:
                         'id': 'System',
                         'name': 'System',
                         'description': 'Service management, system events (6005, 7036, 7034, etc.)'
+                    }
+                ]
+            },
+            'paloalto': {
+                'name': 'Palo Alto Firewall',
+                'description': 'Palo Alto Networks PAN-OS firewall logs in syslog CSV format',
+                'example': 'Traffic, Threat, and System logs',
+                'sources': [
+                    {
+                        'id': 'traffic',
+                        'name': 'Traffic',
+                        'description': 'Network traffic logs (sessions, bytes, packets, actions)'
+                    },
+                    {
+                        'id': 'threat',
+                        'name': 'Threat',
+                        'description': 'Security threat logs (vulnerabilities, malware, spyware, URLs)'
+                    },
+                    {
+                        'id': 'system',
+                        'name': 'System',
+                        'description': 'System events (authentication, configuration, HA, upgrades)'
                     }
                 ]
             }

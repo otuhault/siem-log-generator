@@ -161,6 +161,34 @@
                             <small>XML format is standard Windows Event XML. Classic format is the text format displayed in Event Viewer.</small>
                         </div>
 
+                        <!-- Palo Alto Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="paloaltoLogTypesGroup" style="display: none;">
+                            <label>Log Types Palo Alto:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="traffic" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Traffic</strong>
+                                        <small>Network traffic logs (sessions, bytes, packets, actions)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="threat" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Threat</strong>
+                                        <small>Security threat logs (vulnerabilities, malware, spyware, URLs)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System</strong>
+                                        <small>System events (authentication, configuration, HA, upgrades)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Destination Type:</label>
                             <div style="display: flex; gap: 20px; margin-top: 8px;">
