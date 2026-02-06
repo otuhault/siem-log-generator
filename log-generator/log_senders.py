@@ -114,9 +114,13 @@ class SenderManager:
             json.dump(self.senders, f, indent=2)
     
     def create_sender(self, name, log_type, frequency, enabled=False, options=None,
-                      destination=None, destination_type='file', configuration_id=None):
+                      destination=None, destination_type='file', configuration_id=None,
+                      attack_status=None):
         """Create a new sender"""
-        if log_type not in self.log_generators:
+        # Check if it's an attack type
+        is_attack = log_type and log_type.startswith('attack:')
+
+        if not is_attack and log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
 
         sender_id = str(uuid.uuid4())
@@ -131,7 +135,8 @@ class SenderManager:
             'enabled': enabled,
             'created_at': datetime.now().isoformat(),
             'logs_generated': 0,
-            'options': options or {}  # Store log type specific options
+            'options': options or {},  # Store log type specific options
+            'attack_status': attack_status if is_attack else None  # Attack status (Disabled/Running/Done)
         }
         self.save_config()
 
@@ -168,15 +173,34 @@ class SenderManager:
         """Enable or disable a sender"""
         if sender_id not in self.senders:
             raise ValueError(f"Sender {sender_id} not found")
-        
-        enabled = not self.senders[sender_id]['enabled']
-        self.senders[sender_id]['enabled'] = enabled
-        self.save_config()
-        
-        if enabled:
-            self.start_sender(sender_id)
+
+        sender = self.senders[sender_id]
+        is_attack = sender['log_type'] and sender['log_type'].startswith('attack:')
+
+        # For attacks, toggle means restart the attack
+        if is_attack:
+            current_status = sender.get('attack_status', 'Disabled')
+            if current_status == 'Running':
+                # Stop the running attack
+                self.senders[sender_id]['enabled'] = False
+                self.senders[sender_id]['attack_status'] = 'Disabled'
+                self.save_config()
+                self.stop_sender(sender_id)
+            else:
+                # Start/restart the attack
+                self.senders[sender_id]['enabled'] = True
+                self.save_config()
+                self.start_sender(sender_id)
         else:
-            self.stop_sender(sender_id)
+            # Normal sender toggle
+            enabled = not self.senders[sender_id]['enabled']
+            self.senders[sender_id]['enabled'] = enabled
+            self.save_config()
+
+            if enabled:
+                self.start_sender(sender_id)
+            else:
+                self.stop_sender(sender_id)
     
     def clone_sender(self, sender_id):
         """Clone a sender"""
@@ -201,13 +225,31 @@ class SenderManager:
             return  # Already running
 
         sender = self.senders[sender_id]
-        generator_class = self.log_generators[sender['log_type']]
+        log_type = sender['log_type']
 
         # Pass options to generator if available
         options = sender.get('options', {})
 
+        # Handle attack types
+        if log_type and log_type.startswith('attack:'):
+            # Update attack status to Running
+            self.senders[sender_id]['attack_status'] = 'Running'
+            self.save_config()
+
+            stop_event = threading.Event()
+            thread = threading.Thread(
+                target=self._execute_attack,
+                args=(sender_id, sender, stop_event),
+                daemon=True
+            )
+            self.threads[sender_id] = {'thread': thread, 'stop_event': stop_event}
+            thread.start()
+            return
+
+        generator_class = self.log_generators[log_type]
+
         # Handle Windows Event Log generators
-        if sender['log_type'] == 'windows':
+        if log_type == 'windows':
             # Get selected sources (default to Security if none specified)
             sources = options.get('sources', ['Security'])
             render_format = options.get('render_format', 'xml')
@@ -215,21 +257,21 @@ class SenderManager:
             # Create a multi-source generator wrapper
             generator = WindowsMultiSourceGenerator(sources, render_format)
         # Handle Apache Log generators
-        elif sender['log_type'] == 'apache':
+        elif log_type == 'apache':
             # Get selected log types (default to combined if none specified)
             log_types = options.get('log_types', ['combined'])
 
             # Create a multi-source generator wrapper
             generator = ApacheMultiSourceGenerator(log_types)
         # Handle SSH Log generators
-        elif sender['log_type'] == 'ssh':
+        elif log_type == 'ssh':
             # Get selected event categories (default to all if none specified)
             event_categories = options.get('event_categories', ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'])
 
             # Create a multi-category generator wrapper
             generator = SSHMultiCategoryGenerator(event_categories)
         # Handle Palo Alto Log generators
-        elif sender['log_type'] == 'paloalto':
+        elif log_type == 'paloalto':
             # Get selected log types (default to all if none specified)
             log_types = options.get('log_types', ['traffic', 'threat', 'system'])
 
@@ -238,7 +280,7 @@ class SenderManager:
         else:
             # Other log types
             generator = generator_class()
-        
+
         stop_event = threading.Event()
         thread = threading.Thread(
             target=self._generate_logs,
@@ -256,6 +298,139 @@ class SenderManager:
             self.threads[sender_id]['thread'].join(timeout=2)
             del self.threads[sender_id]
     
+    def _execute_attack(self, sender_id, sender_config, stop_event):
+        """Execute an attack with finite events over a duration"""
+        from attacks_manager import AttacksManager
+        from attack_generators import AttackGeneratorFactory
+
+        log_type = sender_config['log_type']
+        attack_id = log_type.replace('attack:', '')
+        options = sender_config.get('options', {})
+
+        # Get attack configuration
+        events_count = options.get('attack_events_count', 100)
+        duration = options.get('attack_duration', 60)
+
+        # Calculate interval between events
+        interval = duration / events_count if events_count > 0 else 1.0
+
+        print(f"[Attack] Starting attack {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
+
+        # Get attack definition
+        attacks_mgr = AttacksManager()
+        attack = attacks_mgr.get_attack(attack_id)
+        if not attack:
+            print(f"[Attack] Error: Attack {attack_id} not found")
+            self.senders[sender_id]['attack_status'] = 'Error: Attack not found'
+            self.senders[sender_id]['enabled'] = False
+            self.save_config()
+            if sender_id in self.threads:
+                del self.threads[sender_id]
+            return
+
+        # Check if this attack has a dynamic generator
+        attack_type = attack.get('attack_type')
+        attack_options = attack.get('attack_options', {}).copy()  # Copy to avoid modifying original
+        generator = None
+
+        # Override attack options with sender-specific options (e.g., SSH brute force mode)
+        sender_ssh_mode = options.get('ssh_bruteforce_mode')
+        if sender_ssh_mode and attack_type == 'ssh_bruteforce':
+            attack_options['mode'] = sender_ssh_mode
+            print(f"[Attack] Using sender-specified SSH brute force mode: {sender_ssh_mode}")
+
+        if attack_type:
+            generator = AttackGeneratorFactory.get_generator(attack_type, attack_options)
+            print(f"[Attack] Using dynamic generator: {attack_type} with options {attack_options}")
+
+        # Fallback to static example if no generator
+        static_log = attack.get('example', '')
+
+        destination_type = sender_config.get('destination_type', 'file')
+
+        try:
+            events_sent = 0
+
+            if destination_type == 'file':
+                destination = sender_config['destination']
+                dest_path = Path(destination)
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(destination, 'a') as f:
+                    while not stop_event.is_set() and events_sent < events_count:
+                        # Use dynamic generator if available, otherwise use static log
+                        log_line = generator.generate() if generator else static_log
+                        f.write(log_line + '\n')
+                        f.flush()
+                        events_sent += 1
+                        self.senders[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
+
+            elif destination_type == 'configuration':
+                from configuration_manager import ConfigurationManager
+                config_mgr = ConfigurationManager()
+
+                config_id = sender_config.get('configuration_id')
+                if not config_id:
+                    print(f"[Attack] Error: No configuration_id specified for sender {sender_id}")
+                    self.senders[sender_id]['attack_status'] = 'Error: No configuration'
+                    self.senders[sender_id]['enabled'] = False
+                    self.save_config()
+                    if sender_id in self.threads:
+                        del self.threads[sender_id]
+                    return
+
+                hec_config = config_mgr.get_configuration(config_id)
+                if not hec_config:
+                    print(f"[Attack] Error: Configuration {config_id} not found")
+                    self.senders[sender_id]['attack_status'] = 'Error: Config not found'
+                    self.senders[sender_id]['enabled'] = False
+                    self.save_config()
+                    if sender_id in self.threads:
+                        del self.threads[sender_id]
+                    return
+
+                hec_sender = HECSender(
+                    url=hec_config['url'],
+                    port=hec_config['port'],
+                    token=hec_config['token'],
+                    index=hec_config.get('index'),
+                    sourcetype=hec_config.get('sourcetype'),
+                    host=hec_config.get('host'),
+                    source=hec_config.get('source')
+                )
+
+                try:
+                    while not stop_event.is_set() and events_sent < events_count:
+                        # Use dynamic generator if available, otherwise use static log
+                        log_line = generator.generate() if generator else static_log
+                        success = hec_sender.send_event(log_line)
+                        if success:
+                            events_sent += 1
+                            self.senders[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
+                finally:
+                    hec_sender.close()
+
+            # Attack completed - update status
+            print(f"[Attack] Completed: {events_sent}/{events_count} events sent")
+            completion_time = datetime.now().strftime('%m/%d %H:%M:%S')
+            self.senders[sender_id]['attack_status'] = f'Done ({completion_time})'
+            self.senders[sender_id]['enabled'] = False
+            self.save_config()
+            print(f"[Attack] Status updated to Done ({completion_time})")
+
+        except Exception as e:
+            print(f"[Attack] Exception: {str(e)}")
+            self.senders[sender_id]['attack_status'] = f'Error: {str(e)}'
+            self.senders[sender_id]['enabled'] = False
+            self.save_config()
+        finally:
+            # Clean up thread reference
+            if sender_id in self.threads:
+                del self.threads[sender_id]
+            print(f"[Attack] Thread cleaned up for {sender_id}")
+
     def _generate_logs(self, sender_id, generator, sender_config, stop_event):
         """Generate logs at specified frequency"""
         frequency = sender_config['frequency']

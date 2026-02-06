@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Generator - SIEM Testing Tool</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260203f">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260206a">
 </head>
 <body>
     <div class="container">
@@ -47,11 +47,19 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="logType">Log Type:</label>
+                            <label for="logType">Sourcetype or Attack:</label>
                             <select id="logType" name="log_type" required>
-                                <option value="">Select a log type...</option>
+                                <option value="">Select a sourcetype or attack...</option>
                             </select>
                             <div id="logTypeDescription" class="description"></div>
+                        </div>
+
+                        <!-- Frequency for sourcetypes (hidden by default) -->
+                        <div class="form-group" id="frequencyGroup" style="display: none;">
+                            <label for="frequency">Frequency (logs per second):</label>
+                            <input type="number" id="frequency" name="frequency"
+                                   min="1" max="1000" value="10">
+                            <small>Number of log entries to generate per second</small>
                         </div>
 
                         <!-- Apache Log Types Selection (hidden by default) -->
@@ -190,6 +198,59 @@
                             </div>
                         </div>
 
+                        <!-- Attack-specific options (hidden by default) -->
+                        <div class="form-group" id="attackOptionsGroup" style="display: none;">
+                            <label>Attack Configuration:</label>
+                            <div style="display: flex; gap: 15px; margin-top: 8px;">
+                                <div style="flex: 1;">
+                                    <label for="attackEventsCount" style="font-size: 0.9em; font-weight: normal;">Number of Events:</label>
+                                    <input type="number" id="attackEventsCount" name="attack_events_count"
+                                           min="1" max="10000" value="100" style="width: 100%;">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label for="attackDuration" style="font-size: 0.9em; font-weight: normal;">Duration (seconds):</label>
+                                    <input type="number" id="attackDuration" name="attack_duration"
+                                           min="1" max="3600" value="60" style="width: 100%;">
+                                </div>
+                            </div>
+                            <small>Generate the specified number of events over the given duration</small>
+                        </div>
+
+                        <!-- SSH Brute Force Mode in Sender (hidden by default) -->
+                        <div class="form-group" id="senderSshBruteForceOptions" style="display: none;">
+                            <label>SSH Brute Force Mode:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="radio" name="sender_ssh_bruteforce_mode" value="diff_user_same_ip" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Different users, same source IP</strong>
+                                        <small>Single attacker trying multiple usernames</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="radio" name="sender_ssh_bruteforce_mode" value="same_user_same_ip">
+                                    <span class="checkbox-text">
+                                        <strong>Same user, same source IP</strong>
+                                        <small>Single attacker targeting one account</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="radio" name="sender_ssh_bruteforce_mode" value="same_user_diff_ip">
+                                    <span class="checkbox-text">
+                                        <strong>Same user, different source IPs</strong>
+                                        <small>Distributed attack (botnet) targeting one account</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="radio" name="sender_ssh_bruteforce_mode" value="diff_user_diff_ip">
+                                    <span class="checkbox-text">
+                                        <strong>Different users, different source IPs</strong>
+                                        <small>Distributed attack with credential stuffing</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Destination Type:</label>
                             <div style="display: flex; gap: 20px; margin-top: 8px;">
@@ -219,13 +280,6 @@
                                 <option value="">Select a configuration...</option>
                             </select>
                             <small>Choose a pre-configured HEC destination</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="frequency">Frequency (logs per second):</label>
-                            <input type="number" id="frequency" name="frequency" required
-                                   min="1" max="1000" value="10">
-                            <small>Number of log entries to generate per second</small>
                         </div>
 
                         <div class="form-group">
@@ -397,7 +451,16 @@
                             <textarea id="attackExample" name="example" required
                                       placeholder="Paste an example log line showing this attack..."
                                       style="width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85em;"></textarea>
-                            <small>Example log entry that demonstrates this attack pattern</small>
+                            <small>Example log entry that demonstrates this attack pattern (used as fallback if no generator available)</small>
+                        </div>
+
+                        <!-- Attack Type Selector -->
+                        <div class="form-group">
+                            <label for="attackType">Attack Type (Optional):</label>
+                            <select id="attackType" name="attack_type">
+                                <option value="">Static (use example log only)</option>
+                            </select>
+                            <small>Select a dynamic attack generator for realistic log variations. Mode options will be available when creating a Sender.</small>
                         </div>
 
                         <button type="submit" id="submitAttackBtn" class="btn btn-primary">Create Attack</button>

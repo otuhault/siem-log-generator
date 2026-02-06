@@ -27,7 +27,8 @@ class AttacksManager:
         with open(self.config_file, 'w') as f:
             json.dump(self.attacks, f, indent=2)
 
-    def create_attack(self, name, description, log_type, example):
+    def create_attack(self, name, description, log_type, example,
+                      attack_type=None, attack_options=None):
         """Create a new attack pattern"""
         attack_id = str(uuid.uuid4())
         self.attacks[attack_id] = {
@@ -36,6 +37,8 @@ class AttacksManager:
             'description': description,
             'log_type': log_type,
             'example': example,
+            'attack_type': attack_type,  # e.g., 'ssh_bruteforce'
+            'attack_options': attack_options or {},  # e.g., {'mode': 'diff_user_same_ip'}
             'created_at': datetime.now().isoformat()
         }
         self.save_config()

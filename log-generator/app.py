@@ -182,11 +182,19 @@ def create_attack():
             name=data['name'],
             description=data['description'],
             log_type=data['log_type'],
-            example=data['example']
+            example=data['example'],
+            attack_type=data.get('attack_type'),
+            attack_options=data.get('attack_options')
         )
         return jsonify({'success': True, 'attack_id': attack_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/attack-types', methods=['GET'])
+def get_attack_types():
+    """Get available attack types with their options"""
+    from attack_generators import AttackGeneratorFactory
+    return jsonify(AttackGeneratorFactory.get_available_attack_types())
 
 @app.route('/api/attacks/<attack_id>', methods=['PUT'])
 def update_attack(attack_id):

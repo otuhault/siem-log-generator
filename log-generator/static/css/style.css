@@ -597,6 +597,65 @@ header p {
     border-top: 1px dashed var(--border-color);
 }
 
+/* Attack modes list in Attacks tab */
+.attack-options-section {
+    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+.attack-modes-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.attack-mode-item {
+    background: var(--bg-color);
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.attack-mode-item strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+
+.attack-mode-item .mode-desc {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8em;
+}
+
+/* Attack sender rows - purple background */
+.attack-sender-row {
+    background: rgba(147, 51, 234, 0.1) !important;
+}
+
+.attack-sender-row:hover {
+    background: rgba(147, 51, 234, 0.15) !important;
+}
+
+/* Attack status styling */
+.status-running {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.status-done {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.status-disabled {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 1.8em;

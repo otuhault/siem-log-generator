@@ -3,6 +3,7 @@
 let logTypes = {};
 let configurations = [];
 let attacks = [];
+let attackTypes = {};
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -10,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSenders();
     loadConfigurations();
     loadAttacks();
+    loadAttackTypes();
     setupEventListeners();
     setupTabs();
 
@@ -48,11 +50,14 @@ function setupEventListeners() {
     document.getElementById('addAttackBtn').addEventListener('click', function() {
         document.getElementById('attackFormCard').style.display = 'block';
         populateAttackLogTypes();
+        populateAttackTypeSelect();
     });
 
     // Close/Cancel attack form
     document.getElementById('closeAttackForm').addEventListener('click', closeAttackForm);
     document.getElementById('cancelAttackForm').addEventListener('click', closeAttackForm);
+
+    // Attack type selection - no mode options needed here, they are in the Sender form
 
     // Destination type radio buttons
     document.querySelectorAll('input[name="destination_type"]').forEach(radio => {
@@ -92,10 +97,78 @@ function setupEventListeners() {
         const apacheLogTypesGroup = document.getElementById('apacheLogTypesGroup');
         const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
         const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
+        const frequencyGroup = document.getElementById('frequencyGroup');
+        const attackOptionsGroup = document.getElementById('attackOptionsGroup');
+        const senderSshBruteForceOptions = document.getElementById('senderSshBruteForceOptions');
+        const frequencyInput = document.getElementById('frequency');
 
-        if (selectedType && logTypes[selectedType]) {
+        // Hide all specific options by default
+        const hideAllOptions = () => {
+            windowsSourcesGroup.style.display = 'none';
+            renderFormatGroup.style.display = 'none';
+            apacheLogTypesGroup.style.display = 'none';
+            sshEventCategoriesGroup.style.display = 'none';
+            paloaltoLogTypesGroup.style.display = 'none';
+            senderSshBruteForceOptions.style.display = 'none';
+        };
+
+        // Check if it's an attack
+        if (selectedType && selectedType.startsWith('attack:')) {
+            const attackId = selectedType.replace('attack:', '');
+            const attack = attacks.find(a => a.id === attackId);
+            if (attack) {
+                description.textContent = attack.description;
+                description.classList.add('show');
+
+                // Set default values based on attack type
+                const eventsInput = document.getElementById('attackEventsCount');
+                const durationInput = document.getElementById('attackDuration');
+
+                // Default values for different attack types (based on log_type of attack)
+                if (attack.log_type === 'ssh') {
+                    eventsInput.value = 50;  // SSH brute force typically has many attempts
+                    durationInput.value = 30; // Over 30 seconds
+                } else if (attack.log_type === 'paloalto') {
+                    eventsInput.value = 20;
+                    durationInput.value = 60;
+                } else {
+                    eventsInput.value = 100;
+                    durationInput.value = 60;
+                }
+
+                // Show SSH brute force mode options if this attack uses the ssh_bruteforce generator
+                if (attack.attack_type === 'ssh_bruteforce') {
+                    senderSshBruteForceOptions.style.display = 'block';
+                    // Pre-select the mode defined in the attack if available
+                    if (attack.attack_options && attack.attack_options.mode) {
+                        const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${attack.attack_options.mode}"]`);
+                        if (modeRadio) {
+                            modeRadio.checked = true;
+                        }
+                    }
+                } else {
+                    senderSshBruteForceOptions.style.display = 'none';
+                }
+            }
+            hideAllOptions();
+            // Re-show SSH options if it's an SSH brute force attack (hideAllOptions hides it)
+            if (attack && attack.attack_type === 'ssh_bruteforce') {
+                senderSshBruteForceOptions.style.display = 'block';
+            }
+
+            // Show attack options, hide frequency for attacks
+            attackOptionsGroup.style.display = 'block';
+            frequencyGroup.style.display = 'none';
+        }
+        // Check if it's a sourcetype
+        else if (selectedType && logTypes[selectedType]) {
             description.textContent = logTypes[selectedType].description;
             description.classList.add('show');
+
+            // Hide attack options, show frequency for sourcetypes
+            attackOptionsGroup.style.display = 'none';
+            frequencyGroup.style.display = 'block';
+            frequencyInput.disabled = false;
 
             // Show Windows-specific options
             if (selectedType === 'windows') {
@@ -130,19 +203,15 @@ function setupEventListeners() {
                 sshEventCategoriesGroup.style.display = 'none';
             }
             else {
-                windowsSourcesGroup.style.display = 'none';
-                renderFormatGroup.style.display = 'none';
-                apacheLogTypesGroup.style.display = 'none';
-                sshEventCategoriesGroup.style.display = 'none';
-                paloaltoLogTypesGroup.style.display = 'none';
+                hideAllOptions();
             }
         } else {
             description.classList.remove('show');
-            windowsSourcesGroup.style.display = 'none';
-            renderFormatGroup.style.display = 'none';
-            apacheLogTypesGroup.style.display = 'none';
-            sshEventCategoriesGroup.style.display = 'none';
-            paloaltoLogTypesGroup.style.display = 'none';
+            hideAllOptions();
+
+            // Reset to default state - hide both frequency and attack options
+            attackOptionsGroup.style.display = 'none';
+            frequencyGroup.style.display = 'none';
         }
     });
 }
@@ -159,6 +228,20 @@ function closeSenderForm() {
     document.getElementById('apacheLogTypesGroup').style.display = 'none';
     document.getElementById('sshEventCategoriesGroup').style.display = 'none';
     document.getElementById('paloaltoLogTypesGroup').style.display = 'none';
+
+    // Reset attack options and frequency
+    document.getElementById('attackOptionsGroup').style.display = 'none';
+    document.getElementById('frequencyGroup').style.display = 'none';
+    document.getElementById('frequency').disabled = false;
+    document.getElementById('attackEventsCount').value = 100;
+    document.getElementById('attackDuration').value = 60;
+
+    // Reset sender SSH brute force options
+    document.getElementById('senderSshBruteForceOptions').style.display = 'none';
+    const defaultSenderMode = document.querySelector('input[name="sender_ssh_bruteforce_mode"][value="diff_user_same_ip"]');
+    if (defaultSenderMode) {
+        defaultSenderMode.checked = true;
+    }
 
     // Reset destination type to file
     document.querySelector('input[name="destination_type"][value="file"]').checked = true;
@@ -194,6 +277,9 @@ function closeAttackForm() {
     document.getElementById('attackId').value = '';
     document.getElementById('attackFormTitle').textContent = 'Create New Attack';
     document.getElementById('submitAttackBtn').textContent = 'Create Attack';
+
+    // Reset attack type selector
+    document.getElementById('attackType').value = '';
 }
 
 function populateAttackLogTypes() {
@@ -204,6 +290,28 @@ function populateAttackLogTypes() {
         const option = document.createElement('option');
         option.value = key;
         option.textContent = logTypes[key].name;
+        select.appendChild(option);
+    });
+}
+
+async function loadAttackTypes() {
+    try {
+        const response = await fetch('/api/attack-types');
+        attackTypes = await response.json();
+    } catch (error) {
+        console.error('Error loading attack types:', error);
+    }
+}
+
+function populateAttackTypeSelect() {
+    const select = document.getElementById('attackType');
+    select.innerHTML = '<option value="">Static (use example log only)</option>';
+
+    Object.keys(attackTypes).forEach(key => {
+        const type = attackTypes[key];
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = type.name;
         select.appendChild(option);
     });
 }
@@ -237,19 +345,44 @@ function setupTabs() {
 
 async function loadLogTypes() {
     try {
-        const response = await fetch('/api/log-types');
-        logTypes = await response.json();
+        // Fetch both log types and attacks
+        const [logTypesResponse, attacksResponse] = await Promise.all([
+            fetch('/api/log-types'),
+            fetch('/api/attacks')
+        ]);
 
-        // Populate log type select
+        logTypes = await logTypesResponse.json();
+        attacks = await attacksResponse.json();
+
+        // Populate log type select with optgroups
         const select = document.getElementById('logType');
-        select.innerHTML = '<option value="">Select a log type...</option>';
+        select.innerHTML = '<option value="">Select a sourcetype or attack...</option>';
+
+        // Add Sourcetypes optgroup
+        const sourcetypesGroup = document.createElement('optgroup');
+        sourcetypesGroup.label = 'Sourcetypes';
 
         Object.keys(logTypes).sort().forEach(key => {
             const option = document.createElement('option');
             option.value = key;
             option.textContent = logTypes[key].name;
-            select.appendChild(option);
+            sourcetypesGroup.appendChild(option);
         });
+        select.appendChild(sourcetypesGroup);
+
+        // Add Attacks optgroup if there are attacks
+        if (attacks.length > 0) {
+            const attacksGroup = document.createElement('optgroup');
+            attacksGroup.label = 'Attacks';
+
+            attacks.forEach(attack => {
+                const option = document.createElement('option');
+                option.value = 'attack:' + attack.id;
+                option.textContent = attack.name;
+                attacksGroup.appendChild(option);
+            });
+            select.appendChild(attacksGroup);
+        }
     } catch (error) {
         console.error('Error loading log types:', error);
     }
@@ -595,6 +728,12 @@ function createSenderRow(sender) {
     const row = document.createElement('tr');
     row.dataset.senderId = sender.id;
 
+    // Check if this is an attack
+    const isAttack = sender.log_type && sender.log_type.startsWith('attack:');
+    if (isAttack) {
+        row.classList.add('attack-sender-row');
+    }
+
     // Name
     const nameCell = document.createElement('td');
     nameCell.textContent = sender.name;
@@ -609,7 +748,19 @@ function createSenderRow(sender) {
 
     // Status
     const statusCell = document.createElement('td');
-    statusCell.textContent = sender.enabled ? 'Running' : 'Stopped';
+    if (isAttack) {
+        // Attack-specific status: Running / Done (timestamp) / Disabled
+        const attackStatus = sender.attack_status || 'Disabled';
+        if (attackStatus === 'Running') {
+            statusCell.innerHTML = '<span class="status-running">Running</span>';
+        } else if (attackStatus.startsWith('Done')) {
+            statusCell.innerHTML = `<span class="status-done">${attackStatus}</span>`;
+        } else {
+            statusCell.innerHTML = '<span class="status-disabled">Disabled</span>';
+        }
+    } else {
+        statusCell.textContent = sender.enabled ? 'Running' : 'Stopped';
+    }
     statusCell.className = 'sender-status';
     row.appendChild(statusCell);
 
@@ -625,9 +776,15 @@ function createSenderRow(sender) {
     destCell.className = 'sender-destination';
     row.appendChild(destCell);
 
-    // Frequency
+    // Frequency (or events/duration for attacks)
     const freqCell = document.createElement('td');
-    freqCell.textContent = `${sender.frequency} logs/sec`;
+    if (isAttack && sender.options) {
+        const events = sender.options.attack_events_count || 0;
+        const duration = sender.options.attack_duration || 0;
+        freqCell.textContent = `${events} events / ${duration}s`;
+    } else {
+        freqCell.textContent = `${sender.frequency} logs/sec`;
+    }
     row.appendChild(freqCell);
 
     // Logs Generated
@@ -685,6 +842,16 @@ function createSenderRow(sender) {
 }
 
 function getLogTypeName(logType) {
+    // Handle attack types
+    if (logType && logType.startsWith('attack:')) {
+        const attackId = logType.replace('attack:', '');
+        const attack = attacks.find(a => a.id === attackId);
+        if (attack) {
+            return '⚔ ' + attack.name;
+        }
+        return 'Attack';
+    }
+    // Handle sourcetypes
     if (logTypes[logType]) {
         return logTypes[logType].name;
     }
@@ -796,6 +963,31 @@ async function handleCreateSender(e) {
         data.options = {
             log_types: selectedLogTypes
         };
+    }
+    // Add options for attacks
+    else if (logType && logType.startsWith('attack:')) {
+        const eventsCount = parseInt(document.getElementById('attackEventsCount').value);
+        const duration = parseInt(document.getElementById('attackDuration').value);
+
+        data.options = {
+            attack_events_count: eventsCount,
+            attack_duration: duration
+        };
+
+        // Add SSH brute force mode if applicable
+        const attackId = logType.replace('attack:', '');
+        const attack = attacks.find(a => a.id === attackId);
+        if (attack && attack.attack_type === 'ssh_bruteforce') {
+            const sshMode = formData.get('sender_ssh_bruteforce_mode');
+            if (sshMode) {
+                data.options.ssh_bruteforce_mode = sshMode;
+            }
+        }
+
+        // Override frequency to 0 for attacks (it's computed from events/duration)
+        data.frequency = 0;
+        // Attacks start as 'Disabled' status (never launched)
+        data.attack_status = 'Disabled';
     }
 
     try {
@@ -924,6 +1116,26 @@ async function editSender(senderId) {
                     document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => {
                         cb.checked = sender.options.log_types.includes(cb.value);
                     });
+                }
+            } else if (sender.log_type && sender.log_type.startsWith('attack:') && sender.options) {
+                // Set attack options
+                if (sender.options.attack_events_count) {
+                    document.getElementById('attackEventsCount').value = sender.options.attack_events_count;
+                }
+                if (sender.options.attack_duration) {
+                    document.getElementById('attackDuration').value = sender.options.attack_duration;
+                }
+                // Set SSH brute force mode if applicable
+                if (sender.options.ssh_bruteforce_mode) {
+                    const attackId = sender.log_type.replace('attack:', '');
+                    const attack = attacks.find(a => a.id === attackId);
+                    if (attack && attack.attack_type === 'ssh_bruteforce') {
+                        document.getElementById('senderSshBruteForceOptions').style.display = 'block';
+                        const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${sender.options.ssh_bruteforce_mode}"]`);
+                        if (modeRadio) {
+                            modeRadio.checked = true;
+                        }
+                    }
                 }
             }
 
@@ -1342,6 +1554,7 @@ async function loadAttacks() {
                 <th>Name</th>
                 <th>Description</th>
                 <th>Log Type</th>
+                <th>Generator</th>
                 <th>Created</th>
                 <th>Actions</th>
             </tr>
@@ -1388,6 +1601,18 @@ function createAttackRow(attack) {
     const logTypeCell = document.createElement('td');
     logTypeCell.textContent = getLogTypeName(attack.log_type);
     row.appendChild(logTypeCell);
+
+    // Generator (Attack Type)
+    const generatorCell = document.createElement('td');
+    if (attack.attack_type && attackTypes[attack.attack_type]) {
+        const attackType = attackTypes[attack.attack_type];
+        generatorCell.textContent = attackType.name;
+        generatorCell.style.color = '#22c55e'; // Green for dynamic
+    } else {
+        generatorCell.textContent = 'Static';
+        generatorCell.style.color = '#6b7280'; // Gray for static
+    }
+    row.appendChild(generatorCell);
 
     // Created
     const createdCell = document.createElement('td');
@@ -1453,16 +1678,45 @@ function toggleAttackExample(row, attack) {
         return;
     }
 
+    // Build options HTML based on attack type
+    let optionsHtml = '';
+    if (attack.attack_type === 'ssh_bruteforce') {
+        optionsHtml = `
+            <div class="attack-options-section">
+                <div class="inline-example-title" style="margin-top: 15px;">Available Modes</div>
+                <div class="attack-modes-list">
+                    <div class="attack-mode-item">
+                        <strong>Different users, same source IP</strong>
+                        <span class="mode-desc">Single attacker trying multiple usernames (~100 common usernames)</span>
+                    </div>
+                    <div class="attack-mode-item">
+                        <strong>Same user, same source IP</strong>
+                        <span class="mode-desc">Single attacker targeting one account with password attempts</span>
+                    </div>
+                    <div class="attack-mode-item">
+                        <strong>Same user, different source IPs</strong>
+                        <span class="mode-desc">Distributed attack (botnet) targeting one account (~50 attacker IPs)</span>
+                    </div>
+                    <div class="attack-mode-item">
+                        <strong>Different users, different source IPs</strong>
+                        <span class="mode-desc">Distributed credential stuffing attack</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     // Create new example row
     const exampleRow = document.createElement('tr');
     exampleRow.className = 'attack-example-row';
 
     const exampleCell = document.createElement('td');
-    exampleCell.colSpan = 5;
+    exampleCell.colSpan = 6;
     exampleCell.innerHTML = `
         <div class="inline-log-example">
-            <div class="inline-example-title">Attack Example - ${attack.name}</div>
+            <div class="inline-example-title">Example Log</div>
             <pre class="inline-example-content">${escapeHtml(attack.example)}</pre>
+            ${optionsHtml}
         </div>
     `;
 
@@ -1488,6 +1742,12 @@ async function handleCreateAttack(e) {
         log_type: formData.get('log_type'),
         example: formData.get('example')
     };
+
+    // Add attack type if selected (mode is configured in Sender, not here)
+    const attackType = formData.get('attack_type');
+    if (attackType) {
+        data.attack_type = attackType;
+    }
 
     try {
         let response;
@@ -1541,6 +1801,11 @@ async function editAttack(attackId) {
             document.getElementById('attackLogType').value = attack.log_type;
 
             document.getElementById('attackExample').value = attack.example;
+
+            // Populate attack types and select the right one
+            populateAttackTypeSelect();
+            const attackType = attack.attack_type || '';
+            document.getElementById('attackType').value = attackType;
 
             // Update form title and button
             document.getElementById('attackFormTitle').textContent = 'Edit Attack';

@@ -5,6 +5,8 @@
     "description": "Multiple failed SSH login attempts from same IP",
     "log_type": "ssh",
     "example": "Feb  3 17:32:15 vmi829310 sshd[813270]: Failed password for invalid user admin from 195.211.191.206 port 20090 ssh2",
+    "attack_type": "ssh_bruteforce",
+    "attack_options": {},
     "created_at": "2026-02-04T20:09:48.251464"
   }
 }
