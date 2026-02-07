@@ -154,6 +154,36 @@ def clone_configuration(config_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/api/configurations/test', methods=['POST'])
+def test_configuration():
+    """Test a HEC configuration connection"""
+    data = request.json
+    try:
+        from hec_sender import HECSender
+
+        # Create a temporary HEC sender with the provided config
+        hec_sender = HECSender(
+            url=data['url'],
+            port=data['port'],
+            token=data['token'],
+            index=data.get('index'),
+            sourcetype=data.get('sourcetype'),
+            host=data.get('host'),
+            source=data.get('source')
+        )
+
+        # Send a test event
+        test_event = "Log Generator - HEC Connection Test"
+        success = hec_sender.send_event(test_event)
+        hec_sender.close()
+
+        if success:
+            return jsonify({'success': True, 'message': 'Connection successful! Test event sent.'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to send test event. Check your HEC configuration.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
 @app.route('/api/log-types', methods=['GET'])
 def get_log_types():
     """Get available log types"""

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Generator - SIEM Testing Tool</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260206a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260207c">
 </head>
 <body>
     <div class="container">
@@ -43,12 +43,12 @@
                         <input type="hidden" id="senderId" name="id">
                         <div class="form-group">
                             <label for="senderName">Sender Name:</label>
-                            <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs">
+                            <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs" data-field-name="Sender name">
                         </div>
 
                         <div class="form-group">
                             <label for="logType">Sourcetype or Attack:</label>
-                            <select id="logType" name="log_type" required>
+                            <select id="logType" name="log_type" required data-field-name="Log type">
                                 <option value="">Select a sourcetype or attack...</option>
                             </select>
                             <div id="logTypeDescription" class="description"></div>
@@ -58,7 +58,7 @@
                         <div class="form-group" id="frequencyGroup" style="display: none;">
                             <label for="frequency">Frequency (logs per second):</label>
                             <input type="number" id="frequency" name="frequency"
-                                   min="1" max="1000" value="10">
+                                   min="1" max="1000" value="10" data-field-name="Frequency">
                             <small>Number of log entries to generate per second</small>
                         </div>
 
@@ -205,12 +205,12 @@
                                 <div style="flex: 1;">
                                     <label for="attackEventsCount" style="font-size: 0.9em; font-weight: normal;">Number of Events:</label>
                                     <input type="number" id="attackEventsCount" name="attack_events_count"
-                                           min="1" max="10000" value="100" style="width: 100%;">
+                                           min="1" max="10000" value="100" style="width: 100%;" data-field-name="Number of events">
                                 </div>
                                 <div style="flex: 1;">
                                     <label for="attackDuration" style="font-size: 0.9em; font-weight: normal;">Duration (seconds):</label>
                                     <input type="number" id="attackDuration" name="attack_duration"
-                                           min="1" max="3600" value="60" style="width: 100%;">
+                                           min="1" max="3600" value="60" style="width: 100%;" data-field-name="Duration">
                                 </div>
                             </div>
                             <small>Generate the specified number of events over the given duration</small>
@@ -269,14 +269,14 @@
                         <div class="form-group" id="fileDestinationGroup">
                             <label for="destination">Destination File Path:</label>
                             <input type="text" id="destination" name="destination"
-                                   placeholder="/tmp/logs/apache_access.log">
+                                   placeholder="/tmp/logs/apache_access.log" data-field-name="Destination path">
                             <small>Full path where logs will be written</small>
                         </div>
 
                         <!-- Configuration Destination -->
                         <div class="form-group" id="configurationDestinationGroup" style="display: none;">
                             <label for="configurationSelect">Select Configuration:</label>
-                            <select id="configurationSelect" name="configuration_id">
+                            <select id="configurationSelect" name="configuration_id" data-field-name="HEC configuration">
                                 <option value="">Select a configuration...</option>
                             </select>
                             <small>Choose a pre-configured HEC destination</small>
@@ -323,34 +323,34 @@
                         <input type="hidden" id="configurationId" name="id">
                         <div class="form-group">
                             <label for="configurationName">Destination Name:</label>
-                            <input type="text" id="configurationName" name="name" required placeholder="e.g., Splunk HEC Production">
+                            <input type="text" id="configurationName" name="name" required placeholder="e.g., Splunk HEC Production" data-field-name="Destination name">
                         </div>
 
                         <div class="form-group">
                             <label for="configurationUrl">URL:</label>
                             <input type="text" id="configurationUrl" name="url" required
-                                   placeholder="https://splunk.example.com:8088">
+                                   placeholder="https://splunk.example.com:8088" data-field-name="URL">
                             <small>Full URL of the Splunk HEC endpoint</small>
                         </div>
 
                         <div class="form-group">
                             <label for="configurationPort">Port:</label>
                             <input type="number" id="configurationPort" name="port" required
-                                   min="1" max="65535" value="8088">
+                                   min="1" max="65535" value="8088" data-field-name="Port">
                             <small>HEC port (default: 8088)</small>
                         </div>
 
                         <div class="form-group">
                             <label for="configurationToken">HEC Token:</label>
                             <input type="text" id="configurationToken" name="token" required
-                                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-field-name="HEC token">
                             <small>Splunk HTTP Event Collector token</small>
                         </div>
 
                         <div class="form-group">
                             <label for="configurationIndex">Index (Optional):</label>
                             <input type="text" id="configurationIndex" name="index"
-                                   placeholder="main">
+                                   placeholder="main" data-field-name="Index">
                             <small>Splunk index name (leave empty to use default)</small>
                         </div>
 
@@ -375,8 +375,11 @@
                             <small>Custom source value for events (leave empty to use default)</small>
                         </div>
 
-                        <button type="submit" id="submitConfigurationBtn" class="btn btn-primary">Create HEC Destination</button>
-                        <button type="button" id="cancelConfigurationForm" class="btn btn-secondary">Cancel</button>
+                        <div class="form-actions">
+                            <button type="submit" id="submitConfigurationBtn" class="btn btn-primary">Create HEC Destination</button>
+                            <button type="button" id="testConnectionBtn" class="btn btn-secondary">Test Connection</button>
+                            <button type="button" id="cancelConfigurationForm" class="btn btn-secondary">Cancel</button>
+                        </div>
                     </form>
                 </div>
 
@@ -429,19 +432,20 @@
                         <input type="hidden" id="attackId" name="id">
                         <div class="form-group">
                             <label for="attackName">Attack Name:</label>
-                            <input type="text" id="attackName" name="name" required placeholder="e.g., SSH Brute Force">
+                            <input type="text" id="attackName" name="name" required placeholder="e.g., SSH Brute Force" data-field-name="Attack name">
                         </div>
 
                         <div class="form-group">
                             <label for="attackDescription">Description:</label>
                             <textarea id="attackDescription" name="description" required
                                       placeholder="Describe what this attack simulates..."
-                                      style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit;"></textarea>
+                                      style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit;"
+                                      data-field-name="Description"></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="attackLogType">Log Type:</label>
-                            <select id="attackLogType" name="log_type" required>
+                            <select id="attackLogType" name="log_type" required data-field-name="Log type">
                                 <option value="">Select a log type...</option>
                             </select>
                         </div>
@@ -450,7 +454,8 @@
                             <label for="attackExample">Attack Example (Log Sample):</label>
                             <textarea id="attackExample" name="example" required
                                       placeholder="Paste an example log line showing this attack..."
-                                      style="width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85em;"></textarea>
+                                      style="width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85em;"
+                                      data-field-name="Log example"></textarea>
                             <small>Example log entry that demonstrates this attack pattern (used as fallback if no generator available)</small>
                         </div>
 
@@ -479,6 +484,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <script type="module" src="/static/js/app.js?v=20260207c"></script>
 </body>
 </html>
