@@ -292,16 +292,14 @@ export async function editSender(senderId) {
                 if (sender.options.attack_duration) {
                     document.getElementById('attackDuration').value = sender.options.attack_duration;
                 }
-                if (sender.options.ssh_bruteforce_mode) {
-                    const attackId = sender.log_type.replace('attack:', '');
-                    const attack = state.attacks.find(a => a.id === attackId);
-                    if (attack && attack.attack_type === 'ssh_bruteforce') {
-                        document.getElementById('senderSshBruteForceOptions').style.display = 'block';
-                        const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${sender.options.ssh_bruteforce_mode}"]`);
-                        if (modeRadio) {
-                            modeRadio.checked = true;
-                        }
-                    }
+            }
+
+            // Always handle SSH brute force mode for attack senders (after change event)
+            if (sender.log_type && sender.log_type.startsWith('attack:') && sender.options && sender.options.ssh_bruteforce_mode) {
+                document.getElementById('senderSshBruteForceOptions').style.display = 'block';
+                const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${sender.options.ssh_bruteforce_mode}"]`);
+                if (modeRadio) {
+                    modeRadio.checked = true;
                 }
             }
 

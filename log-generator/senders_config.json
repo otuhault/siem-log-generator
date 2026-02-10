@@ -1,21 +1,40 @@
 {
   "0d50fbc4-68ba-44d5-b1ff-249631dbf838": {
     "id": "0d50fbc4-68ba-44d5-b1ff-249631dbf838",
-    "name": "pan:log",
-    "log_type": "paloalto",
+    "name": "attack",
+    "log_type": "attack:60b4cab5-93ef-4a37-98ef-0d7b36843b7c",
     "destination": null,
     "destination_type": "configuration",
     "configuration_id": "207c004f-6bca-440b-a40b-f2049c9a3f6c",
-    "frequency": 5,
+    "frequency": 0,
     "enabled": false,
     "created_at": "2026-02-04T18:17:55.193312",
     "logs_generated": 238,
+    "options": {
+      "attack_events_count": 50,
+      "attack_duration": 30,
+      "ssh_bruteforce_mode": "diff_user_same_ip"
+    },
+    "attack_status": "Disabled"
+  },
+  "b8236743-7ee2-4004-822c-93770977f574": {
+    "id": "b8236743-7ee2-4004-822c-93770977f574",
+    "name": "pan:all",
+    "log_type": "paloalto",
+    "destination": "/Users/ratelon/Documents/Dev/SLG/test.log",
+    "destination_type": "file",
+    "configuration_id": null,
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-10T19:17:40.513407",
+    "logs_generated": 0,
     "options": {
       "log_types": [
         "traffic",
         "threat",
         "system"
       ]
-    }
+    },
+    "attack_status": null
   }
 }
