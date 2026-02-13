@@ -86,28 +86,6 @@ export const ConfigurationsApi = {
 // ============== Attacks API ==============
 
 export const AttacksApi = {
-    getAll: () => fetchApi('/attacks'),
-
-    get: (id) => fetchApi(`/attacks/${id}`),
-
-    create: (data) => fetchApi('/attacks', {
-        method: 'POST',
-        body: JSON.stringify(data)
-    }),
-
-    update: (id, data) => fetchApi(`/attacks/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-    }),
-
-    delete: (id) => fetchApi(`/attacks/${id}`, {
-        method: 'DELETE'
-    }),
-
-    clone: (id) => fetchApi(`/attacks/${id}/clone`, {
-        method: 'POST'
-    }),
-
     getTypes: () => fetchApi('/attack-types')
 };
 

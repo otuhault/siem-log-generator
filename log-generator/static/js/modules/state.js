@@ -6,7 +6,6 @@
 export const state = {
     logTypes: {},
     configurations: [],
-    attacks: [],
     attackTypes: {}
 };
 
@@ -27,14 +26,6 @@ export function setConfigurations(configs) {
 }
 
 /**
- * Update attacks in state
- * @param {array} attacksList - Attacks array
- */
-export function setAttacks(attacksList) {
-    state.attacks = attacksList;
-}
-
-/**
  * Update attack types in state
  * @param {object} types - Attack types object
  */
@@ -44,22 +35,21 @@ export function setAttackTypes(types) {
 
 /**
  * Get log type name from key
- * @param {string} logType - Log type key (can be 'attack:id' format)
+ * @param {string} logType - Log type key
  * @returns {string} Human-readable name
  */
 export function getLogTypeName(logType) {
-    // Handle attack types
-    if (logType && logType.startsWith('attack:')) {
-        const attackId = logType.replace('attack:', '');
-        const attack = state.attacks.find(a => a.id === attackId);
-        if (attack) {
-            return '⚔ ' + attack.name;
-        }
-        return 'Attack';
+    // Handle attack types (direct key lookup)
+    if (state.attackTypes[logType]) {
+        return state.attackTypes[logType].name;
     }
     // Handle sourcetypes
     if (state.logTypes[logType]) {
         return state.logTypes[logType].name;
+    }
+    // Backward compat: old attack:UUID format
+    if (logType && logType.startsWith('attack:')) {
+        return 'Attack (legacy)';
     }
     return logType;
 }

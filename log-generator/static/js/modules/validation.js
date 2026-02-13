@@ -442,60 +442,6 @@ export function validateConfigurationForm(form) {
 }
 
 /**
- * Validate the Attack form
- * @param {HTMLFormElement} form - The attack form
- * @returns {object} { isValid: boolean, errors: string[] }
- */
-export function validateAttackForm(form) {
-    clearFormErrors(form);
-    const errors = [];
-    let isValid = true;
-
-    // Attack Name
-    const nameField = form.querySelector('#attackName');
-    if (!validateField(nameField, [
-        { type: 'required' },
-        { type: 'minLength', value: 3 },
-        { type: 'maxLength', value: 100 }
-    ])) {
-        isValid = false;
-        errors.push('Invalid attack name');
-    }
-
-    // Description
-    const descField = form.querySelector('#attackDescription');
-    if (!validateField(descField, [
-        { type: 'required' },
-        { type: 'minLength', value: 10 },
-        { type: 'maxLength', value: 500 }
-    ])) {
-        isValid = false;
-        errors.push('Invalid description');
-    }
-
-    // Log Type
-    const logTypeField = form.querySelector('#attackLogType');
-    if (!validateField(logTypeField, [
-        { type: 'required' }
-    ])) {
-        isValid = false;
-        errors.push('Please select a log type');
-    }
-
-    // Example
-    const exampleField = form.querySelector('#attackExample');
-    if (!validateField(exampleField, [
-        { type: 'required' },
-        { type: 'minLength', value: 20 }
-    ])) {
-        isValid = false;
-        errors.push('Please provide a valid log example');
-    }
-
-    return { isValid, errors };
-}
-
-/**
  * Setup real-time validation on form fields
  * @param {HTMLFormElement} form - The form to setup
  * @param {Function} validateFn - The validation function to use

@@ -84,63 +84,127 @@ TARGET_HOSTNAMES = [
     'bastion-01', 'gateway-01', 'mail-server', 'file-server', 'backup-srv'
 ]
 
+# Field defaults for SSH attacks
+SSH_FIELD_DEFAULTS = {
+    'user': lambda: random.choice(COMMON_USERNAMES),
+    'src_ip': lambda: random.choice(ATTACKER_IPS),
+    'hostname': lambda: random.choice(TARGET_HOSTNAMES),
+    'port': lambda: random.randint(30000, 65535),
+}
+
+# SSH attack types with metadata and field behaviors
+SSH_ATTACK_TYPES = {
+    'ssh_bruteforce': {
+        'name': 'SSH Brute Force',
+        'description': 'Single attacker targeting one account with repeated password attempts',
+        'log_type': 'ssh',
+        'field_behaviors': {
+            'user': 'fixed', 'src_ip': 'fixed', 'hostname': 'fixed', 'port': 'rotating'
+        },
+        'sample_logs': [
+            'Feb 10 14:23:01 vmi829310 sshd[12345]: Failed password for root from 185.220.101.45 port 43210 ssh2',
+            'Feb 10 14:23:02 vmi829310 sshd[12346]: Failed password for root from 185.220.101.45 port 43211 ssh2',
+            'Feb 10 14:23:03 vmi829310 sshd[12347]: Failed password for root from 185.220.101.45 port 43212 ssh2',
+        ]
+    },
+    'ssh_password_spraying': {
+        'name': 'SSH Password Spraying',
+        'description': 'Single attacker trying multiple usernames from one IP',
+        'log_type': 'ssh',
+        'field_behaviors': {
+            'user': 'rotating', 'src_ip': 'fixed', 'hostname': 'fixed', 'port': 'rotating'
+        },
+        'sample_logs': [
+            'Feb 10 14:23:01 vmi829310 sshd[12345]: Failed password for admin from 91.240.118.10 port 52100 ssh2',
+            'Feb 10 14:23:02 vmi829310 sshd[12346]: Failed password for invalid user oracle from 91.240.118.10 port 52101 ssh2',
+            'Feb 10 14:23:03 vmi829310 sshd[12347]: Failed password for root from 91.240.118.10 port 52102 ssh2',
+        ]
+    },
+    'ssh_credential_stuffing': {
+        'name': 'SSH Credential Stuffing',
+        'description': 'Distributed attack with rotating users and IPs (leaked credentials)',
+        'log_type': 'ssh',
+        'field_behaviors': {
+            'user': 'rotating', 'src_ip': 'rotating', 'hostname': 'fixed', 'port': 'rotating'
+        },
+        'sample_logs': [
+            'Feb 10 14:23:01 vmi829310 sshd[12345]: Failed password for admin from 218.92.0.100 port 39400 ssh2',
+            'Feb 10 14:23:02 vmi829310 sshd[12346]: Failed password for invalid user jsmith from 89.248.167.131 port 41200 ssh2',
+            'Feb 10 14:23:03 vmi829310 sshd[12347]: Failed password for root from 175.45.176.10 port 55300 ssh2',
+        ]
+    },
+    'ssh_distributed_bruteforce': {
+        'name': 'SSH Distributed Brute Force',
+        'description': 'Botnet targeting one account from multiple source IPs',
+        'log_type': 'ssh',
+        'field_behaviors': {
+            'user': 'fixed', 'src_ip': 'rotating', 'hostname': 'fixed', 'port': 'rotating'
+        },
+        'sample_logs': [
+            'Feb 10 14:23:01 vmi829310 sshd[12345]: Failed password for admin from 185.220.101.45 port 43210 ssh2',
+            'Feb 10 14:23:02 vmi829310 sshd[12346]: Failed password for admin from 61.177.172.51 port 38100 ssh2',
+            'Feb 10 14:23:03 vmi829310 sshd[12347]: Failed password for admin from 141.98.10.50 port 44500 ssh2',
+        ]
+    },
+}
+
+# Backward compatibility: old mode names -> new attack types
+MODE_TO_ATTACK_TYPE = {
+    'same_user_same_ip': 'ssh_bruteforce',
+    'diff_user_same_ip': 'ssh_password_spraying',
+    'diff_user_diff_ip': 'ssh_credential_stuffing',
+    'same_user_diff_ip': 'ssh_distributed_bruteforce',
+}
+
 
 class SSHBruteForceGenerator:
-    """Generate SSH brute force attack logs"""
+    """Generate SSH brute force attack logs (behavior-driven)"""
 
-    MODES = {
-        'same_user_same_ip': 'Same user, same source IP',
-        'same_user_diff_ip': 'Same user, different source IPs',
-        'diff_user_same_ip': 'Different users, same source IP',
-        'diff_user_diff_ip': 'Different users, different source IPs'
-    }
-
-    def __init__(self, mode='diff_user_same_ip', target_user=None, target_ip=None):
+    def __init__(self, field_behaviors, options=None):
         """
         Initialize the SSH brute force generator
 
         Args:
-            mode: One of 'same_user_same_ip', 'same_user_diff_ip',
-                  'diff_user_same_ip', 'diff_user_diff_ip'
-            target_user: Fixed username (for same_user modes)
-            target_ip: Fixed source IP (for same_ip modes)
+            field_behaviors: Dict mapping field names to 'fixed' or 'rotating'
+            options: Optional dict with overrides (target_user, target_ip, etc.)
         """
-        self.mode = mode
+        options = options or {}
+        self.field_behaviors = field_behaviors
 
-        # For "same" modes, pick a fixed value if not provided
-        self.fixed_user = target_user or random.choice(COMMON_USERNAMES)
-        self.fixed_ip = target_ip or random.choice(ATTACKER_IPS)
+        # Initialize fixed values (cached for the entire attack session)
+        self._fixed_values = {}
+        for field_name, behavior in field_behaviors.items():
+            if behavior == 'fixed':
+                # Use provided override or generate default
+                override_key = f'target_{field_name}'
+                if override_key in options and options[override_key]:
+                    self._fixed_values[field_name] = options[override_key]
+                else:
+                    self._fixed_values[field_name] = SSH_FIELD_DEFAULTS[field_name]()
 
-        self.hostname = random.choice(TARGET_HOSTNAMES)
         self.pid_base = random.randint(10000, 99999)
         self.event_count = 0
+
+    def _get_field_value(self, field_name):
+        """Get field value based on behavior (fixed returns cached, rotating generates new)"""
+        if self.field_behaviors.get(field_name) == 'fixed':
+            return self._fixed_values[field_name]
+        return SSH_FIELD_DEFAULTS[field_name]()
 
     def generate(self):
         """Generate a single SSH brute force log entry"""
         self.event_count += 1
 
-        # Determine user and IP based on mode
-        if self.mode == 'same_user_same_ip':
-            user = self.fixed_user
-            src_ip = self.fixed_ip
-        elif self.mode == 'same_user_diff_ip':
-            user = self.fixed_user
-            src_ip = random.choice(ATTACKER_IPS)
-        elif self.mode == 'diff_user_same_ip':
-            user = random.choice(COMMON_USERNAMES)
-            src_ip = self.fixed_ip
-        else:  # diff_user_diff_ip
-            user = random.choice(COMMON_USERNAMES)
-            src_ip = random.choice(ATTACKER_IPS)
+        user = self._get_field_value('user')
+        src_ip = self._get_field_value('src_ip')
+        hostname = self._get_field_value('hostname')
+        port = self._get_field_value('port')
 
         # Generate timestamp
         timestamp = datetime.now().strftime('%b %d %H:%M:%S')
 
         # Vary the PID slightly
         pid = self.pid_base + (self.event_count % 100)
-
-        # Generate random port
-        port = random.randint(30000, 65535)
 
         # Vary the message type for realism
         message_types = [
@@ -155,7 +219,7 @@ class SSHBruteForceGenerator:
         weights = [0.4, 0.3, 0.15, 0.1, 0.05]
         message = random.choices(message_types, weights=weights)[0]
 
-        return f"{timestamp} {self.hostname} sshd[{pid}]: {message}"
+        return f"{timestamp} {hostname} sshd[{pid}]: {message}"
 
 
 class AttackGeneratorFactory:
@@ -167,7 +231,7 @@ class AttackGeneratorFactory:
         Get an attack generator based on type
 
         Args:
-            attack_type: Type of attack (e.g., 'ssh_bruteforce')
+            attack_type: Type of attack (e.g., 'ssh_bruteforce', 'ssh_password_spraying')
             options: Dict of options for the generator
 
         Returns:
@@ -175,30 +239,35 @@ class AttackGeneratorFactory:
         """
         options = options or {}
 
-        if attack_type == 'ssh_bruteforce':
-            return SSHBruteForceGenerator(
-                mode=options.get('mode', 'diff_user_same_ip'),
-                target_user=options.get('target_user'),
-                target_ip=options.get('target_ip')
-            )
+        # Backward compat: if old mode is passed, remap to new attack type
+        if attack_type == 'ssh_bruteforce' and 'mode' in options:
+            old_mode = options.pop('mode')
+            attack_type = MODE_TO_ATTACK_TYPE.get(old_mode, attack_type)
+
+        # All SSH attack types use the same generator with different field_behaviors
+        if attack_type in SSH_ATTACK_TYPES:
+            field_behaviors = SSH_ATTACK_TYPES[attack_type]['field_behaviors']
+            return SSHBruteForceGenerator(field_behaviors, options)
 
         return None
 
     @staticmethod
     def get_available_attack_types():
-        """Get list of available attack types with their options"""
-        return {
-            'ssh_bruteforce': {
-                'name': 'SSH Brute Force',
-                'description': 'Simulates SSH brute force login attempts',
-                'log_type': 'ssh',
-                'options': {
-                    'mode': {
-                        'type': 'select',
-                        'label': 'Attack Mode',
-                        'choices': SSHBruteForceGenerator.MODES,
-                        'default': 'diff_user_same_ip'
-                    }
+        """Get list of available attack types with their metadata"""
+        result = {}
+        for key, type_def in SSH_ATTACK_TYPES.items():
+            overridable_fields = {}
+            for field_name, behavior in type_def['field_behaviors'].items():
+                overridable_fields[field_name] = {
+                    'label': field_name.replace('_', ' ').title(),
+                    'behavior': behavior
                 }
+            result[key] = {
+                'name': type_def['name'],
+                'description': type_def['description'],
+                'log_type': type_def['log_type'],
+                'field_behaviors': type_def['field_behaviors'],
+                'overridable_fields': overridable_fields,
+                'sample_logs': type_def.get('sample_logs', [])
             }
-        }
+        return result

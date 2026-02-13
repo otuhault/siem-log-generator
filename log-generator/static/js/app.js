@@ -9,7 +9,7 @@ import { state } from './modules/state.js';
 import { initNotificationStyles } from './modules/utils.js';
 import { loadSenders, handleCreateSender, closeSenderForm } from './modules/senders.js';
 import { loadConfigurations, handleCreateConfiguration, closeConfigurationForm, testConnection } from './modules/configurations.js';
-import { loadAttacks, loadAttackTypes, handleCreateAttack, closeAttackForm, populateAttackLogTypes, populateAttackTypeSelect } from './modules/attacks.js';
+import { loadAttackTypesView } from './modules/attacks.js';
 import { loadLogTypes, loadSourcetypes } from './modules/sourcetypes.js';
 
 /**
@@ -23,8 +23,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadLogTypes();
     loadSenders();
     loadConfigurations();
-    loadAttacks();
-    loadAttackTypes();
 
     // Setup event listeners and tabs
     setupEventListeners();
@@ -41,7 +39,6 @@ function setupEventListeners() {
     // Form submissions
     document.getElementById('createSenderForm').addEventListener('submit', handleCreateSender);
     document.getElementById('createConfigurationForm').addEventListener('submit', handleCreateConfiguration);
-    document.getElementById('createAttackForm').addEventListener('submit', handleCreateAttack);
 
     // Add Sender button
     document.getElementById('addSenderBtn').addEventListener('click', function() {
@@ -64,17 +61,6 @@ function setupEventListeners() {
 
     // Test connection button
     document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
-
-    // Add Attack button
-    document.getElementById('addAttackBtn').addEventListener('click', function() {
-        document.getElementById('attackFormCard').style.display = 'block';
-        populateAttackLogTypes();
-        populateAttackTypeSelect();
-    });
-
-    // Close/Cancel attack form
-    document.getElementById('closeAttackForm').addEventListener('click', closeAttackForm);
-    document.getElementById('cancelAttackForm').addEventListener('click', closeAttackForm);
 
     // Destination type radio buttons
     setupDestinationTypeListeners();
@@ -131,7 +117,6 @@ function setupLogTypeListener() {
         const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
         const frequencyGroup = document.getElementById('frequencyGroup');
         const attackOptionsGroup = document.getElementById('attackOptionsGroup');
-        const senderSshBruteForceOptions = document.getElementById('senderSshBruteForceOptions');
         const frequencyInput = document.getElementById('frequency');
 
         // Hide all specific options by default
@@ -141,50 +126,27 @@ function setupLogTypeListener() {
             apacheLogTypesGroup.style.display = 'none';
             sshEventCategoriesGroup.style.display = 'none';
             paloaltoLogTypesGroup.style.display = 'none';
-            senderSshBruteForceOptions.style.display = 'none';
         };
 
-        // Check if it's an attack
-        if (selectedType && selectedType.startsWith('attack:')) {
-            const attackId = selectedType.replace('attack:', '');
-            const attack = state.attacks.find(a => a.id === attackId);
-            if (attack) {
-                description.textContent = attack.description;
-                description.classList.add('show');
+        // Check if it's an attack type
+        if (selectedType && state.attackTypes[selectedType]) {
+            const attackType = state.attackTypes[selectedType];
+            description.textContent = attackType.description;
+            description.classList.add('show');
 
-                // Set default values based on attack type
-                const eventsInput = document.getElementById('attackEventsCount');
-                const durationInput = document.getElementById('attackDuration');
+            // Set default values based on log type
+            const eventsInput = document.getElementById('attackEventsCount');
+            const durationInput = document.getElementById('attackDuration');
 
-                if (attack.log_type === 'ssh') {
-                    eventsInput.value = 50;
-                    durationInput.value = 30;
-                } else if (attack.log_type === 'paloalto') {
-                    eventsInput.value = 20;
-                    durationInput.value = 60;
-                } else {
-                    eventsInput.value = 100;
-                    durationInput.value = 60;
-                }
-
-                // Show SSH brute force mode options if applicable
-                if (attack.attack_type === 'ssh_bruteforce') {
-                    senderSshBruteForceOptions.style.display = 'block';
-                    if (attack.attack_options && attack.attack_options.mode) {
-                        const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${attack.attack_options.mode}"]`);
-                        if (modeRadio) {
-                            modeRadio.checked = true;
-                        }
-                    }
-                } else {
-                    senderSshBruteForceOptions.style.display = 'none';
-                }
+            if (attackType.log_type === 'ssh') {
+                eventsInput.value = 50;
+                durationInput.value = 30;
+            } else {
+                eventsInput.value = 100;
+                durationInput.value = 60;
             }
+
             hideAllOptions();
-            // Re-show SSH options if it's an SSH brute force attack
-            if (attack && attack.attack_type === 'ssh_bruteforce') {
-                senderSshBruteForceOptions.style.display = 'block';
-            }
 
             // Show attack options, hide frequency for attacks
             attackOptionsGroup.style.display = 'block';
@@ -263,7 +225,7 @@ function setupTabs() {
             } else if (tabName === 'configurations') {
                 loadConfigurations();
             } else if (tabName === 'attacks') {
-                loadAttacks();
+                loadAttackTypesView();
             }
         });
     });

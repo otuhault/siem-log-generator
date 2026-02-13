@@ -13,6 +13,7 @@ from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
 from log_generators.paloalto import PaloAltoLogGenerator
 from hec_sender import HECSender
+from attack_generators import SSH_ATTACK_TYPES
 
 class SSHMultiCategoryGenerator:
     """Wrapper that generates logs from multiple SSH event categories"""
@@ -117,8 +118,8 @@ class SenderManager:
                       destination=None, destination_type='file', configuration_id=None,
                       attack_status=None):
         """Create a new sender"""
-        # Check if it's an attack type
-        is_attack = log_type and log_type.startswith('attack:')
+        # Check if it's an attack type (direct key or legacy attack:UUID)
+        is_attack = log_type in SSH_ATTACK_TYPES or (log_type and log_type.startswith('attack:'))
 
         if not is_attack and log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
@@ -175,7 +176,7 @@ class SenderManager:
             raise ValueError(f"Sender {sender_id} not found")
 
         sender = self.senders[sender_id]
-        is_attack = sender['log_type'] and sender['log_type'].startswith('attack:')
+        is_attack = sender['log_type'] in SSH_ATTACK_TYPES or (sender['log_type'] and sender['log_type'].startswith('attack:'))
 
         # For attacks, toggle means restart the attack
         if is_attack:
@@ -230,8 +231,8 @@ class SenderManager:
         # Pass options to generator if available
         options = sender.get('options', {})
 
-        # Handle attack types
-        if log_type and log_type.startswith('attack:'):
+        # Handle attack types (direct key or legacy attack:UUID)
+        if log_type in SSH_ATTACK_TYPES or (log_type and log_type.startswith('attack:')):
             # Update attack status to Running
             self.senders[sender_id]['attack_status'] = 'Running'
             self.save_config()
@@ -300,11 +301,9 @@ class SenderManager:
     
     def _execute_attack(self, sender_id, sender_config, stop_event):
         """Execute an attack with finite events over a duration"""
-        from attacks_manager import AttacksManager
         from attack_generators import AttackGeneratorFactory
 
         log_type = sender_config['log_type']
-        attack_id = log_type.replace('attack:', '')
         options = sender_config.get('options', {})
 
         # Get attack configuration
@@ -316,35 +315,45 @@ class SenderManager:
 
         print(f"[Attack] Starting attack {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
 
-        # Get attack definition
-        attacks_mgr = AttacksManager()
-        attack = attacks_mgr.get_attack(attack_id)
-        if not attack:
-            print(f"[Attack] Error: Attack {attack_id} not found")
-            self.senders[sender_id]['attack_status'] = 'Error: Attack not found'
+        # Determine attack_type: direct key or legacy attack:UUID
+        if log_type in SSH_ATTACK_TYPES:
+            attack_type = log_type
+        elif log_type.startswith('attack:'):
+            # Legacy: lookup via AttacksManager
+            attack_id = log_type.replace('attack:', '')
+            from attacks_manager import AttacksManager
+            attacks_mgr = AttacksManager()
+            attack = attacks_mgr.get_attack(attack_id)
+            if not attack:
+                print(f"[Attack] Error: Attack {attack_id} not found")
+                self.senders[sender_id]['attack_status'] = 'Error: Attack not found'
+                self.senders[sender_id]['enabled'] = False
+                self.save_config()
+                if sender_id in self.threads:
+                    del self.threads[sender_id]
+                return
+            attack_type = attack.get('attack_type')
+        else:
+            print(f"[Attack] Error: Unknown attack type {log_type}")
+            self.senders[sender_id]['attack_status'] = 'Error: Unknown type'
             self.senders[sender_id]['enabled'] = False
             self.save_config()
             if sender_id in self.threads:
                 del self.threads[sender_id]
             return
 
-        # Check if this attack has a dynamic generator
-        attack_type = attack.get('attack_type')
-        attack_options = attack.get('attack_options', {}).copy()  # Copy to avoid modifying original
-        generator = None
+        # Create generator
+        generator = AttackGeneratorFactory.get_generator(attack_type, {})
+        if not generator:
+            print(f"[Attack] Error: No generator for attack_type {attack_type}")
+            self.senders[sender_id]['attack_status'] = 'Error: No generator'
+            self.senders[sender_id]['enabled'] = False
+            self.save_config()
+            if sender_id in self.threads:
+                del self.threads[sender_id]
+            return
 
-        # Override attack options with sender-specific options (e.g., SSH brute force mode)
-        sender_ssh_mode = options.get('ssh_bruteforce_mode')
-        if sender_ssh_mode and attack_type == 'ssh_bruteforce':
-            attack_options['mode'] = sender_ssh_mode
-            print(f"[Attack] Using sender-specified SSH brute force mode: {sender_ssh_mode}")
-
-        if attack_type:
-            generator = AttackGeneratorFactory.get_generator(attack_type, attack_options)
-            print(f"[Attack] Using dynamic generator: {attack_type} with options {attack_options}")
-
-        # Fallback to static example if no generator
-        static_log = attack.get('example', '')
+        print(f"[Attack] Using generator: {attack_type}")
 
         destination_type = sender_config.get('destination_type', 'file')
 
@@ -358,8 +367,7 @@ class SenderManager:
 
                 with open(destination, 'a') as f:
                     while not stop_event.is_set() and events_sent < events_count:
-                        # Use dynamic generator if available, otherwise use static log
-                        log_line = generator.generate() if generator else static_log
+                        log_line = generator.generate()
                         f.write(log_line + '\n')
                         f.flush()
                         events_sent += 1
@@ -402,8 +410,7 @@ class SenderManager:
 
                 try:
                     while not stop_event.is_set() and events_sent < events_count:
-                        # Use dynamic generator if available, otherwise use static log
-                        log_line = generator.generate() if generator else static_log
+                        log_line = generator.generate()
                         success = hec_sender.send_event(log_line)
                         if success:
                             events_sent += 1

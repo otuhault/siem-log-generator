@@ -75,8 +75,8 @@ function createSenderRow(sender) {
     const row = document.createElement('tr');
     row.dataset.senderId = sender.id;
 
-    // Check if this is an attack
-    const isAttack = sender.log_type && sender.log_type.startsWith('attack:');
+    // Check if this is an attack type
+    const isAttack = !!(sender.log_type && state.attackTypes[sender.log_type]);
     if (isAttack) {
         row.classList.add('attack-sender-row');
     }
@@ -127,20 +127,7 @@ function createSenderRow(sender) {
         const events = sender.options.attack_events_count || 0;
         const duration = sender.options.attack_duration || 0;
 
-        // Check for SSH brute force mode
-        const sshMode = sender.options.ssh_bruteforce_mode;
-        if (sshMode) {
-            const modeLabels = {
-                'same_user_same_ip': 'Same user/IP',
-                'same_user_diff_ip': 'Same user, diff IPs',
-                'diff_user_same_ip': 'Diff users, same IP',
-                'diff_user_diff_ip': 'Diff users/IPs'
-            };
-            const modeLabel = modeLabels[sshMode] || sshMode;
-            freqCell.innerHTML = `${events} events / ${duration}s<br><span class="sender-mode">${modeLabel}</span>`;
-        } else {
-            freqCell.textContent = `${events} events / ${duration}s`;
-        }
+        freqCell.textContent = `${events} events / ${duration}s`;
     } else {
         freqCell.textContent = `${sender.frequency} logs/sec`;
     }
@@ -285,21 +272,12 @@ export async function editSender(senderId) {
                         cb.checked = sender.options.log_types.includes(cb.value);
                     });
                 }
-            } else if (sender.log_type && sender.log_type.startsWith('attack:') && sender.options) {
+            } else if (sender.log_type && state.attackTypes[sender.log_type] && sender.options) {
                 if (sender.options.attack_events_count) {
                     document.getElementById('attackEventsCount').value = sender.options.attack_events_count;
                 }
                 if (sender.options.attack_duration) {
                     document.getElementById('attackDuration').value = sender.options.attack_duration;
-                }
-            }
-
-            // Always handle SSH brute force mode for attack senders (after change event)
-            if (sender.log_type && sender.log_type.startsWith('attack:') && sender.options && sender.options.ssh_bruteforce_mode) {
-                document.getElementById('senderSshBruteForceOptions').style.display = 'block';
-                const modeRadio = document.querySelector(`input[name="sender_ssh_bruteforce_mode"][value="${sender.options.ssh_bruteforce_mode}"]`);
-                if (modeRadio) {
-                    modeRadio.checked = true;
                 }
             }
 
@@ -458,7 +436,7 @@ export async function handleCreateSender(e) {
         };
     }
     // Add options for attacks
-    else if (logType && logType.startsWith('attack:')) {
+    else if (logType && state.attackTypes[logType]) {
         const eventsCount = parseInt(document.getElementById('attackEventsCount').value);
         const duration = parseInt(document.getElementById('attackDuration').value);
 
@@ -466,16 +444,6 @@ export async function handleCreateSender(e) {
             attack_events_count: eventsCount,
             attack_duration: duration
         };
-
-        // Add SSH brute force mode if applicable
-        const attackId = logType.replace('attack:', '');
-        const attack = state.attacks.find(a => a.id === attackId);
-        if (attack && attack.attack_type === 'ssh_bruteforce') {
-            const sshMode = formData.get('sender_ssh_bruteforce_mode');
-            if (sshMode) {
-                data.options.ssh_bruteforce_mode = sshMode;
-            }
-        }
 
         data.frequency = 0;
         data.attack_status = 'Disabled';
@@ -529,13 +497,6 @@ export function closeSenderForm() {
     document.getElementById('frequency').disabled = false;
     document.getElementById('attackEventsCount').value = 100;
     document.getElementById('attackDuration').value = 60;
-
-    // Reset sender SSH brute force options
-    document.getElementById('senderSshBruteForceOptions').style.display = 'none';
-    const defaultSenderMode = document.querySelector('input[name="sender_ssh_bruteforce_mode"][value="diff_user_same_ip"]');
-    if (defaultSenderMode) {
-        defaultSenderMode.checked = true;
-    }
 
     // Reset destination type to file
     document.querySelector('input[name="destination_type"][value="file"]').checked = true;

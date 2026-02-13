@@ -3,7 +3,7 @@
  */
 
 import { LogTypesApi, AttacksApi } from './api.js';
-import { state, setLogTypes, setAttacks } from './state.js';
+import { state, setLogTypes, setAttackTypes } from './state.js';
 import { showNotification } from './utils.js';
 
 /**
@@ -11,14 +11,14 @@ import { showNotification } from './utils.js';
  */
 export async function loadLogTypes() {
     try {
-        // Fetch both log types and attacks
-        const [logTypes, attacks] = await Promise.all([
+        // Fetch both log types and attack types
+        const [logTypes, attackTypes] = await Promise.all([
             LogTypesApi.getAll(),
-            AttacksApi.getAll()
+            AttacksApi.getTypes()
         ]);
 
         setLogTypes(logTypes);
-        setAttacks(attacks);
+        setAttackTypes(attackTypes);
 
         // Populate log type select with optgroups
         const select = document.getElementById('logType');
@@ -36,15 +36,15 @@ export async function loadLogTypes() {
         });
         select.appendChild(sourcetypesGroup);
 
-        // Add Attacks optgroup if there are attacks
-        if (attacks.length > 0) {
+        // Add Attacks optgroup with built-in attack types
+        if (Object.keys(attackTypes).length > 0) {
             const attacksGroup = document.createElement('optgroup');
             attacksGroup.label = 'Attacks';
 
-            attacks.forEach(attack => {
+            Object.entries(attackTypes).forEach(([key, type]) => {
                 const option = document.createElement('option');
-                option.value = 'attack:' + attack.id;
-                option.textContent = attack.name;
+                option.value = key;
+                option.textContent = `${type.name} — ${type.description}`;
                 attacksGroup.appendChild(option);
             });
             select.appendChild(attacksGroup);

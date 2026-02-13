@@ -821,15 +821,65 @@ header p {
     min-width: 140px;
 }
 
-/* ============== Sender Mode Display ============== */
+/* ============== Field Behavior Badges ============== */
 
-.sender-mode {
+.field-behavior-badge {
     display: inline-block;
-    font-size: 0.75em;
-    color: #a855f7;
-    background: rgba(168, 85, 247, 0.1);
+    font-size: 0.7em;
     padding: 2px 6px;
     border-radius: 3px;
-    margin-top: 3px;
+    margin-left: 6px;
     font-weight: 500;
+}
+
+.behavior-fixed {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+}
+
+.behavior-rotating {
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.1);
+}
+
+/* ============== Attack Type Info (in form) ============== */
+
+.attack-type-fields {
+    margin-top: 10px;
+    padding: 12px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.attack-type-fields-title {
+    font-weight: 600;
+    font-size: 0.85em;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.attack-type-field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 0.85em;
+}
+
+.attack-type-field-name {
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+.attack-type-samples {
+    margin-top: 10px;
+}
+
+.attack-type-samples .inline-example-content {
+    font-size: 0.75em;
+    padding: 10px;
+    line-height: 1.6;
 }
