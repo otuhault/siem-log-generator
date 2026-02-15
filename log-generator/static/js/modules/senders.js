@@ -234,7 +234,6 @@ export async function editSender(senderId) {
                 document.getElementById('configurationDestinationGroup').style.display = 'block';
                 document.getElementById('destination').required = false;
                 document.getElementById('configurationSelect').required = true;
-                document.getElementById('configurationSelect').value = sender.configuration_id;
             } else {
                 document.querySelector('input[name="destination_type"][value="file"]').checked = true;
                 document.getElementById('fileDestinationGroup').style.display = 'block';
@@ -291,6 +290,11 @@ export async function editSender(senderId) {
             // Import and call loadConfigurations to populate dropdown
             const { loadConfigurations } = await import('./configurations.js');
             await loadConfigurations();
+
+            // Set configuration select value AFTER loadConfigurations rebuilds the dropdown
+            if (sender.destination_type === 'configuration' && sender.configuration_id) {
+                document.getElementById('configurationSelect').value = sender.configuration_id;
+            }
         }
     } catch (error) {
         showNotification('Error loading sender: ' + error.message, 'error');

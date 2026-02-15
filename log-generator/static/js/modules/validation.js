@@ -3,6 +3,8 @@
  * Provides reusable validation functions and form validation utilities
  */
 
+import { state } from './state.js';
+
 /**
  * Validation rules with error messages
  */
@@ -268,7 +270,7 @@ export function validateSenderForm(form) {
     }
 
     const logType = logTypeField.value;
-    const isAttack = logType && logType.startsWith('attack:');
+    const isAttack = !!(logType && state.attackTypes[logType]);
 
     // Frequency (only for non-attacks)
     if (!isAttack) {

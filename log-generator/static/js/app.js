@@ -148,9 +148,10 @@ function setupLogTypeListener() {
 
             hideAllOptions();
 
-            // Show attack options, hide frequency for attacks
+            // Show attack options, hide and disable frequency for attacks
             attackOptionsGroup.style.display = 'block';
             frequencyGroup.style.display = 'none';
+            frequencyInput.disabled = true;
         }
         // Check if it's a sourcetype
         else if (selectedType && state.logTypes[selectedType]) {
