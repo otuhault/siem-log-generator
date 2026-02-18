@@ -137,13 +137,30 @@ function setupLogTypeListener() {
             // Set default values based on log type
             const eventsInput = document.getElementById('attackEventsCount');
             const durationInput = document.getElementById('attackDuration');
+            const ipOverrides = document.getElementById('attackIpOverrides');
+
+            const fieldOverrides = document.getElementById('attackFieldOverrides');
+            const srcIpGroup = document.getElementById('attackSrcIpGroup');
+            const destIpGroup = document.getElementById('attackDestIpGroup');
+            const destPortGroup = document.getElementById('attackDestPortGroup');
 
             if (attackType.log_type === 'ssh') {
                 eventsInput.value = 50;
                 durationInput.value = 30;
+                fieldOverrides.style.display = 'none';
+            } else if (attackType.log_type === 'paloalto') {
+                eventsInput.value = 300;
+                durationInput.value = 60;
+                // Show override fields only for fixed behaviors
+                const fb = attackType.field_behaviors || {};
+                srcIpGroup.style.display = fb.src_ip === 'fixed' ? 'block' : 'none';
+                destIpGroup.style.display = fb.dest_ip === 'fixed' ? 'block' : 'none';
+                destPortGroup.style.display = fb.dest_port === 'fixed' ? 'block' : 'none';
+                fieldOverrides.style.display = 'block';
             } else {
                 eventsInput.value = 100;
                 durationInput.value = 60;
+                fieldOverrides.style.display = 'none';
             }
 
             hideAllOptions();

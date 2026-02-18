@@ -214,6 +214,34 @@
                                 </div>
                             </div>
                             <small>Generate the specified number of events over the given duration</small>
+
+                            <!-- Port scan field overrides (shown dynamically based on fixed fields) -->
+                            <div id="attackFieldOverrides" style="display: none; margin-top: 12px;">
+                                <div style="display: flex; gap: 15px;">
+                                    <div id="attackSrcIpGroup" style="flex: 1; display: none;">
+                                        <label for="attackSrcIp" style="font-size: 0.9em; font-weight: normal;">Source IP:</label>
+                                        <input type="text" id="attackSrcIp" name="attack_src_ip"
+                                               placeholder="Random" style="width: 100%;"
+                                               pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                                               title="Enter a valid IPv4 address (e.g. 10.0.1.50)">
+                                    </div>
+                                    <div id="attackDestIpGroup" style="flex: 1; display: none;">
+                                        <label for="attackDestIp" style="font-size: 0.9em; font-weight: normal;">Destination IP:</label>
+                                        <input type="text" id="attackDestIp" name="attack_dest_ip"
+                                               placeholder="Random" style="width: 100%;"
+                                               pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                                               title="Enter a valid IPv4 address (e.g. 192.168.1.100)">
+                                    </div>
+                                    <div id="attackDestPortGroup" style="flex: 1; display: none;">
+                                        <label for="attackDestPort" style="font-size: 0.9em; font-weight: normal;">Destination Port:</label>
+                                        <input type="number" id="attackDestPort" name="attack_dest_port"
+                                               placeholder="Random" style="width: 100%;"
+                                               min="1" max="65535"
+                                               title="Enter a port number (1-65535, e.g. 445)">
+                                    </div>
+                                </div>
+                                <small>Leave empty for random values, or enter specific values for the attack</small>
+                            </div>
                         </div>
 
                         <div class="form-group">

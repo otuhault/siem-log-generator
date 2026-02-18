@@ -36,18 +36,29 @@ export async function loadLogTypes() {
         });
         select.appendChild(sourcetypesGroup);
 
-        // Add Attacks optgroup with built-in attack types
+        // Add Attacks optgroups grouped by category
         if (Object.keys(attackTypes).length > 0) {
-            const attacksGroup = document.createElement('optgroup');
-            attacksGroup.label = 'Attacks';
-
+            const categories = {};
             Object.entries(attackTypes).forEach(([key, type]) => {
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = `${type.name} — ${type.description}`;
-                attacksGroup.appendChild(option);
+                const category = type.category || type.log_type.toUpperCase();
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push({ key, ...type });
             });
-            select.appendChild(attacksGroup);
+
+            Object.keys(categories).sort().forEach(category => {
+                const group = document.createElement('optgroup');
+                group.label = `Attacks — ${category}`;
+
+                categories[category].forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.key;
+                    option.textContent = `${type.name} — ${type.description}`;
+                    group.appendChild(option);
+                });
+                select.appendChild(group);
+            });
         }
     } catch (error) {
         console.error('Error loading log types:', error);

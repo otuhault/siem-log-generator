@@ -20,29 +20,29 @@ export async function loadAttackTypesView() {
             setAttackTypes(attackTypes);
         }
 
-        // Group attack types by log_type
+        // Group attack types by category
         const groups = {};
         Object.entries(state.attackTypes).forEach(([key, type]) => {
-            const logType = type.log_type || 'other';
-            if (!groups[logType]) {
-                groups[logType] = [];
+            const category = type.category || type.log_type.toUpperCase();
+            if (!groups[category]) {
+                groups[category] = [];
             }
-            groups[logType].push({ key, ...type });
+            groups[category].push({ key, ...type });
         });
 
         // Create attack types list
         const listDiv = document.createElement('div');
         listDiv.className = 'sourcetype-list';
 
-        Object.keys(groups).sort().forEach(logType => {
+        Object.keys(groups).sort().forEach(category => {
             // Add group header
             const groupHeader = document.createElement('div');
             groupHeader.className = 'sourcetype-group-header';
-            groupHeader.textContent = logType.toUpperCase();
+            groupHeader.textContent = category;
             listDiv.appendChild(groupHeader);
 
             // Add each attack type in the group
-            groups[logType].forEach(type => {
+            groups[category].forEach(type => {
                 const item = document.createElement('div');
                 item.className = 'sourcetype-item';
                 item.dataset.type = type.key;

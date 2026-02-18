@@ -13,7 +13,7 @@ from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
 from log_generators.paloalto import PaloAltoLogGenerator
 from hec_sender import HECSender
-from attack_generators import SSH_ATTACK_TYPES
+from attack_generators import ALL_ATTACK_TYPES
 
 class SSHMultiCategoryGenerator:
     """Wrapper that generates logs from multiple SSH event categories"""
@@ -119,7 +119,7 @@ class SenderManager:
                       attack_status=None):
         """Create a new sender"""
         # Check if it's an attack type (direct key or legacy attack:UUID)
-        is_attack = log_type in SSH_ATTACK_TYPES or (log_type and log_type.startswith('attack:'))
+        is_attack = log_type in ALL_ATTACK_TYPES or (log_type and log_type.startswith('attack:'))
 
         if not is_attack and log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
@@ -176,7 +176,7 @@ class SenderManager:
             raise ValueError(f"Sender {sender_id} not found")
 
         sender = self.senders[sender_id]
-        is_attack = sender['log_type'] in SSH_ATTACK_TYPES or (sender['log_type'] and sender['log_type'].startswith('attack:'))
+        is_attack = sender['log_type'] in ALL_ATTACK_TYPES or (sender['log_type'] and sender['log_type'].startswith('attack:'))
 
         # For attacks, toggle means restart the attack
         if is_attack:
@@ -232,7 +232,7 @@ class SenderManager:
         options = sender.get('options', {})
 
         # Handle attack types (direct key or legacy attack:UUID)
-        if log_type in SSH_ATTACK_TYPES or (log_type and log_type.startswith('attack:')):
+        if log_type in ALL_ATTACK_TYPES or (log_type and log_type.startswith('attack:')):
             # Update attack status to Running
             self.senders[sender_id]['attack_status'] = 'Running'
             self.save_config()
@@ -306,9 +306,9 @@ class SenderManager:
         log_type = sender_config['log_type']
         options = sender_config.get('options', {})
 
-        # Get attack configuration
-        events_count = options.get('attack_events_count', 100)
-        duration = options.get('attack_duration', 60)
+        # Get attack configuration with safety limits
+        events_count = min(max(int(options.get('attack_events_count', 100)), 1), 10000)
+        duration = min(max(int(options.get('attack_duration', 60)), 1), 3600)
 
         # Calculate interval between events
         interval = duration / events_count if events_count > 0 else 1.0
@@ -316,7 +316,7 @@ class SenderManager:
         print(f"[Attack] Starting attack {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
 
         # Determine attack_type: direct key or legacy attack:UUID
-        if log_type in SSH_ATTACK_TYPES:
+        if log_type in ALL_ATTACK_TYPES:
             attack_type = log_type
         elif log_type.startswith('attack:'):
             # Legacy: lookup via AttacksManager
@@ -342,8 +342,8 @@ class SenderManager:
                 del self.threads[sender_id]
             return
 
-        # Create generator
-        generator = AttackGeneratorFactory.get_generator(attack_type, {})
+        # Create generator with sender options (includes target_src_ip, target_dest_ip, etc.)
+        generator = AttackGeneratorFactory.get_generator(attack_type, options)
         if not generator:
             print(f"[Attack] Error: No generator for attack_type {attack_type}")
             self.senders[sender_id]['attack_status'] = 'Error: No generator'
