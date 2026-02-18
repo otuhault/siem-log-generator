@@ -29,12 +29,13 @@
     "frequency": 0,
     "enabled": false,
     "created_at": "2026-02-12T22:28:05.258248",
-    "logs_generated": 100,
+    "logs_generated": 205,
     "options": {
-      "attack_events_count": 100,
-      "attack_duration": 60
+      "attack_events_count": 105,
+      "attack_duration": 60,
+      "target_src_ip": "192.168.1.25"
     },
-    "attack_status": "Done (02/18 14:25:13)"
+    "attack_status": "Done (02/18 19:13:38)"
   },
   "91d1a6f8-5de2-4e7a-b1fe-068c9faaa175": {
     "id": "91d1a6f8-5de2-4e7a-b1fe-068c9faaa175",
@@ -52,5 +53,64 @@
       "attack_duration": 60
     },
     "attack_status": "Done (02/18 15:13:43)"
+  },
+  "c2cca53d-6db3-4d04-a2c4-5620b59b7ada": {
+    "id": "c2cca53d-6db3-4d04-a2c4-5620b59b7ada",
+    "name": "lenovo_edge_processor_pan-logs_hec",
+    "log_type": "paloalto",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "db6df1be-30c0-42a2-8af7-7fe136035127",
+    "frequency": 5,
+    "enabled": false,
+    "created_at": "2026-02-18T16:30:50.726493",
+    "logs_generated": 92,
+    "options": {
+      "log_types": [
+        "traffic",
+        "threat",
+        "system"
+      ]
+    },
+    "attack_status": null
+  },
+  "e3c83677-7426-42b1-b960-419f052a9b42": {
+    "id": "e3c83677-7426-42b1-b960-419f052a9b42",
+    "name": "TOR Client Execution",
+    "log_type": "windows_tor_client_execution",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "9aa89a83-2d0f-415d-869a-9644a457256d",
+    "frequency": 0,
+    "enabled": false,
+    "created_at": "2026-02-18T21:00:11.638694",
+    "logs_generated": 20,
+    "options": {
+      "attack_events_count": 10,
+      "attack_duration": 60,
+      "target_user": "kevin"
+    },
+    "attack_status": "Done (02/18 21:42:03)"
+  },
+  "a3aca300-6985-4eaf-b193-645a13fa3281": {
+    "id": "a3aca300-6985-4eaf-b193-645a13fa3281",
+    "name": "All XmlWinEventLog",
+    "log_type": "windows",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "9aa89a83-2d0f-415d-869a-9644a457256d",
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-18T21:47:20.029822",
+    "logs_generated": 69,
+    "options": {
+      "sources": [
+        "Security",
+        "Application",
+        "System"
+      ],
+      "render_format": "xml"
+    },
+    "attack_status": null
   }
 }

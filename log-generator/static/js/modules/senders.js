@@ -278,7 +278,9 @@ export async function editSender(senderId) {
                 if (sender.options.attack_duration) {
                     document.getElementById('attackDuration').value = sender.options.attack_duration;
                 }
-                // Restore field overrides for paloalto attacks
+                // Restore field overrides for all attack types
+                document.getElementById('attackUser').value = sender.options.target_user || '';
+                document.getElementById('attackDest').value = sender.options.target_dest || '';
                 document.getElementById('attackSrcIp').value = sender.options.target_src_ip || '';
                 document.getElementById('attackDestIp').value = sender.options.target_dest_ip || '';
                 document.getElementById('attackDestPort').value = sender.options.target_dest_port || '';
@@ -453,16 +455,17 @@ export async function handleCreateSender(e) {
             attack_duration: duration
         };
 
-        // Add field overrides for paloalto attacks
-        const attackType = state.attackTypes[logType];
-        if (attackType.log_type === 'paloalto') {
-            const srcIp = document.getElementById('attackSrcIp').value.trim();
-            const destIp = document.getElementById('attackDestIp').value.trim();
-            const destPort = document.getElementById('attackDestPort').value.trim();
-            if (srcIp) data.options.target_src_ip = srcIp;
-            if (destIp) data.options.target_dest_ip = destIp;
-            if (destPort) data.options.target_dest_port = parseInt(destPort);
-        }
+        // Add field overrides for all attack types with fixed fields
+        const attackUser = document.getElementById('attackUser').value.trim();
+        const attackDest = document.getElementById('attackDest').value.trim();
+        const srcIp = document.getElementById('attackSrcIp').value.trim();
+        const destIp = document.getElementById('attackDestIp').value.trim();
+        const destPort = document.getElementById('attackDestPort').value.trim();
+        if (attackUser) data.options.target_user = attackUser;
+        if (attackDest) data.options.target_dest = attackDest;
+        if (srcIp) data.options.target_src_ip = srcIp;
+        if (destIp) data.options.target_dest_ip = destIp;
+        if (destPort) data.options.target_dest_port = parseInt(destPort);
 
         data.frequency = 0;
         data.attack_status = 'Disabled';
@@ -513,6 +516,8 @@ export function closeSenderForm() {
     // Reset attack options and frequency
     document.getElementById('attackOptionsGroup').style.display = 'none';
     document.getElementById('attackFieldOverrides').style.display = 'none';
+    document.getElementById('attackUserGroup').style.display = 'none';
+    document.getElementById('attackDestGroup').style.display = 'none';
     document.getElementById('attackSrcIpGroup').style.display = 'none';
     document.getElementById('attackDestIpGroup').style.display = 'none';
     document.getElementById('attackDestPortGroup').style.display = 'none';
@@ -520,6 +525,8 @@ export function closeSenderForm() {
     document.getElementById('frequency').disabled = false;
     document.getElementById('attackEventsCount').value = 100;
     document.getElementById('attackDuration').value = 60;
+    document.getElementById('attackUser').value = '';
+    document.getElementById('attackDest').value = '';
     document.getElementById('attackSrcIp').value = '';
     document.getElementById('attackDestIp').value = '';
     document.getElementById('attackDestPort').value = '';

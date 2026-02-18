@@ -215,24 +215,36 @@
                             </div>
                             <small>Generate the specified number of events over the given duration</small>
 
-                            <!-- Port scan field overrides (shown dynamically based on fixed fields) -->
+                            <!-- Attack field overrides (shown dynamically based on fixed fields) -->
                             <div id="attackFieldOverrides" style="display: none; margin-top: 12px;">
-                                <div style="display: flex; gap: 15px;">
-                                    <div id="attackSrcIpGroup" style="flex: 1; display: none;">
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <div id="attackUserGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackUser" style="font-size: 0.9em; font-weight: normal;">User:</label>
+                                        <input type="text" id="attackUser" name="attack_user"
+                                               placeholder="Random" style="width: 100%;"
+                                               title="Enter a username (e.g. jsmith)">
+                                    </div>
+                                    <div id="attackDestGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackDest" style="font-size: 0.9em; font-weight: normal;">Destination Host:</label>
+                                        <input type="text" id="attackDest" name="attack_dest"
+                                               placeholder="Random" style="width: 100%;"
+                                               title="Enter a hostname (e.g. DESKTOP-ABC123)">
+                                    </div>
+                                    <div id="attackSrcIpGroup" style="flex: 1; display: none; min-width: 140px;">
                                         <label for="attackSrcIp" style="font-size: 0.9em; font-weight: normal;">Source IP:</label>
                                         <input type="text" id="attackSrcIp" name="attack_src_ip"
                                                placeholder="Random" style="width: 100%;"
                                                pattern="^(\d{1,3}\.){3}\d{1,3}$"
                                                title="Enter a valid IPv4 address (e.g. 10.0.1.50)">
                                     </div>
-                                    <div id="attackDestIpGroup" style="flex: 1; display: none;">
+                                    <div id="attackDestIpGroup" style="flex: 1; display: none; min-width: 140px;">
                                         <label for="attackDestIp" style="font-size: 0.9em; font-weight: normal;">Destination IP:</label>
                                         <input type="text" id="attackDestIp" name="attack_dest_ip"
                                                placeholder="Random" style="width: 100%;"
                                                pattern="^(\d{1,3}\.){3}\d{1,3}$"
                                                title="Enter a valid IPv4 address (e.g. 192.168.1.100)">
                                     </div>
-                                    <div id="attackDestPortGroup" style="flex: 1; display: none;">
+                                    <div id="attackDestPortGroup" style="flex: 1; display: none; min-width: 140px;">
                                         <label for="attackDestPort" style="font-size: 0.9em; font-weight: normal;">Destination Port:</label>
                                         <input type="number" id="attackDestPort" name="attack_dest_port"
                                                placeholder="Random" style="width: 100%;"

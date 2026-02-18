@@ -251,8 +251,108 @@ PALOALTO_ATTACK_TYPES = {
     },
 }
 
+# ============================================================================
+# Windows Attack Types
+# ============================================================================
+
+# Windows workstation names
+WINDOWS_WORKSTATIONS = [
+    'DESKTOP-ABC123', 'DESKTOP-XYZ789', 'DESKTOP-QRS456', 'LAPTOP-DEV01',
+    'LAPTOP-MKT02', 'WKS-FIN01', 'WKS-HR02', 'WKS-ENG03', 'WKS-SEC01',
+    'DESKTOP-ADMIN1', 'LAPTOP-EXEC1', 'WKS-IT01', 'DESKTOP-LAB01',
+]
+
+# Windows domains
+WINDOWS_DOMAINS = ['CONTOSO', 'CORP', 'LAB', 'PROD', 'WORKGROUP']
+
+# Windows users for attacks
+WINDOWS_ATTACK_USERS = [
+    'jsmith', 'mdoe', 'admin', 'jdoe', 'bwilson', 'agarcia', 'clee',
+    'dmartin', 'ejohnson', 'ftaylor', 'sysadmin', 'developer', 'analyst',
+]
+
+# TOR-related process variations
+TOR_PROCESS_VARIANTS = [
+    # Standard TOR Browser bundle
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe',
+        'command_line': '"C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe"',
+        'parent_process_name': 'firefox.exe',
+        'parent_process_path': 'C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\firefox.exe',
+        'original_file_name': 'tor.exe',
+    },
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe',
+        'command_line': '"C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe" --defaults-torrc "C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Data\\Tor\\torrc-defaults" -f "C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Data\\Tor\\torrc"',
+        'parent_process_name': 'firefox.exe',
+        'parent_process_path': 'C:\\Users\\{user}\\Desktop\\Tor Browser\\Browser\\firefox.exe',
+        'original_file_name': 'tor.exe',
+    },
+    # TOR downloaded to AppData
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Users\\{user}\\AppData\\Local\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe',
+        'command_line': '"C:\\Users\\{user}\\AppData\\Local\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe"',
+        'parent_process_name': 'firefox.exe',
+        'parent_process_path': 'C:\\Users\\{user}\\AppData\\Local\\Tor Browser\\Browser\\firefox.exe',
+        'original_file_name': 'tor.exe',
+    },
+    # Brave Browser with TOR
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\tor-{tor_version}\\tor.exe',
+        'command_line': '"C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\tor-{tor_version}\\tor.exe" --SOCKSPort 9350',
+        'parent_process_name': 'brave.exe',
+        'parent_process_path': 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+        'original_file_name': 'tor.exe',
+    },
+    # Standalone tor.exe (suspicious - not from browser bundle)
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Users\\{user}\\Downloads\\tor.exe',
+        'command_line': 'C:\\Users\\{user}\\Downloads\\tor.exe',
+        'parent_process_name': 'cmd.exe',
+        'parent_process_path': 'C:\\Windows\\System32\\cmd.exe',
+        'original_file_name': 'tor.exe',
+    },
+    {
+        'process_name': 'tor.exe',
+        'process_path': 'C:\\Temp\\tor\\tor.exe',
+        'command_line': 'C:\\Temp\\tor\\tor.exe --SocksPort 9150 --DataDirectory C:\\Temp\\tor\\data',
+        'parent_process_name': 'powershell.exe',
+        'parent_process_path': 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+        'original_file_name': 'tor.exe',
+    },
+]
+
+TOR_VERSIONS = ['0.4.7.13', '0.4.7.16', '0.4.8.7', '0.4.8.10', '0.4.8.12']
+
+# Field defaults for Windows TOR attack
+WINDOWS_TOR_FIELD_DEFAULTS = {
+    'user': lambda: random.choice(WINDOWS_ATTACK_USERS),
+    'dest': lambda: random.choice(WINDOWS_WORKSTATIONS),
+}
+
+WINDOWS_ATTACK_TYPES = {
+    'windows_tor_client_execution': {
+        'name': 'Windows TOR Client Execution',
+        'description': 'TOR browser or client execution detected on Windows endpoint (T1090.003)',
+        'log_type': 'windows',
+        'category': 'Endpoint',
+        'field_behaviors': {
+            'user': 'fixed',
+            'dest': 'fixed',
+        },
+        'sample_logs': [
+            '''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" /><EventID>4688</EventID><Version>2</Version><Level>0</Level><Task>13312</Task><Opcode>0</Opcode><Keywords>0x8020000000000000</Keywords><TimeCreated SystemTime="2026-02-18T10:30:01.000Z" /><EventRecordID>456789</EventRecordID><Channel>Security</Channel><Computer>DESKTOP-ABC123</Computer></System><EventData><Data Name="SubjectUserName">jsmith</Data><Data Name="NewProcessName">C:\\Users\\jsmith\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe</Data><Data Name="ParentProcessName">C:\\Users\\jsmith\\Desktop\\Tor Browser\\Browser\\firefox.exe</Data><Data Name="CommandLine">"C:\\Users\\jsmith\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe"</Data></EventData></Event>''',
+        ]
+    },
+}
+
 # Combined dict for all attack types
-ALL_ATTACK_TYPES = {**SSH_ATTACK_TYPES, **PALOALTO_ATTACK_TYPES}
+ALL_ATTACK_TYPES = {**SSH_ATTACK_TYPES, **PALOALTO_ATTACK_TYPES, **WINDOWS_ATTACK_TYPES}
 
 
 class SSHBruteForceGenerator:
@@ -525,6 +625,114 @@ class PaloAltoPortScanGenerator:
         return f'{syslog_header} {",".join(fields)}'
 
 
+class WindowsTorClientGenerator:
+    """Generate Windows 4688 Process Creation logs for TOR client execution"""
+
+    def __init__(self, field_behaviors, options=None):
+        options = options or {}
+        self.field_behaviors = field_behaviors
+        self.event_count = 0
+
+        # Initialize fixed values with override support
+        self._fixed_values = {}
+        for field_name, behavior in field_behaviors.items():
+            if behavior == 'fixed':
+                override_key = f'target_{field_name}'
+                if override_key in options and options[override_key]:
+                    self._fixed_values[field_name] = options[override_key]
+                else:
+                    self._fixed_values[field_name] = WINDOWS_TOR_FIELD_DEFAULTS[field_name]()
+
+        # Fixed domain for the session
+        self._domain = random.choice(WINDOWS_DOMAINS)
+
+    def _get_field_value(self, field_name):
+        if self.field_behaviors.get(field_name) == 'fixed':
+            return self._fixed_values[field_name]
+        return WINDOWS_TOR_FIELD_DEFAULTS[field_name]()
+
+    def generate(self):
+        """Generate a single Windows 4688 event for TOR execution"""
+        self.event_count += 1
+
+        user = self._get_field_value('user')
+        dest = self._get_field_value('dest')
+
+        # Pick a random TOR process variant
+        variant = random.choice(TOR_PROCESS_VARIANTS)
+        tor_version = random.choice(TOR_VERSIONS)
+
+        process_path = variant['process_path'].format(user=user, tor_version=tor_version)
+        command_line = variant['command_line'].format(user=user, tor_version=tor_version)
+        parent_process_path = variant['parent_process_path'].format(user=user)
+        original_file_name = variant['original_file_name']
+
+        timestamp = datetime.now().isoformat()
+        sid_parts = f'S-1-5-21-{random.randint(1000000000, 9999999999)}-{random.randint(1000000000, 9999999999)}-{random.randint(1000000000, 9999999999)}-{random.randint(1000, 9999)}'
+        logon_id = f'0x{random.randint(100000, 999999):x}'
+        new_process_id = f'0x{random.randint(1000, 9999):x}'
+        parent_process_id = f'0x{random.randint(500, 5000):x}'
+        process_guid = f'{{{random.randint(10000000, 99999999):08X}-{random.randint(1000, 9999):04X}-{random.randint(1000, 9999):04X}-{random.randint(1000, 9999):04X}-{random.randint(100000000000, 999999999999):012X}}}'
+        parent_process_guid = f'{{{random.randint(10000000, 99999999):08X}-{random.randint(1000, 9999):04X}-{random.randint(1000, 9999):04X}-{random.randint(1000, 9999):04X}-{random.randint(100000000000, 999999999999):012X}}}'
+
+        # SHA256-like hash for process
+        process_hash = ''.join(random.choices('0123456789abcdef', k=64))
+
+        # Token elevation: %%1936 (Type 1 - Default), %%1937 (Elevated)
+        token_elevation = random.choice(['%%1936', '%%1937'])
+
+        # Process integrity level
+        integrity_levels = [
+            ('S-1-16-8192', 'Medium'),   # Most common for user processes
+            ('S-1-16-12288', 'High'),    # Elevated
+            ('S-1-16-4096', 'Low'),      # Sandboxed
+        ]
+        integrity_sid, _ = random.choices(integrity_levels, weights=[0.7, 0.2, 0.1])[0]
+
+        event_xml = f'''<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-A5BA-3E3B0328C30D}}" />
+    <EventID>4688</EventID>
+    <Version>2</Version>
+    <Level>0</Level>
+    <Task>13312</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="{timestamp}" />
+    <EventRecordID>{random.randint(100000, 999999)}</EventRecordID>
+    <Correlation />
+    <Execution ProcessID="{random.randint(500, 5000)}" ThreadID="{random.randint(1000, 9000)}" />
+    <Channel>Security</Channel>
+    <Computer>{dest}</Computer>
+    <Security />
+  </System>
+  <EventData>
+    <Data Name="SubjectUserSid">{sid_parts}</Data>
+    <Data Name="SubjectUserName">{user}</Data>
+    <Data Name="SubjectDomainName">{self._domain}</Data>
+    <Data Name="SubjectLogonId">{logon_id}</Data>
+    <Data Name="NewProcessId">{new_process_id}</Data>
+    <Data Name="NewProcessName">{process_path}</Data>
+    <Data Name="TokenElevationType">{token_elevation}</Data>
+    <Data Name="ProcessId">{parent_process_id}</Data>
+    <Data Name="CommandLine">{command_line}</Data>
+    <Data Name="TargetUserSid">S-1-0-0</Data>
+    <Data Name="TargetUserName">-</Data>
+    <Data Name="TargetDomainName">-</Data>
+    <Data Name="TargetLogonId">0x0</Data>
+    <Data Name="ParentProcessName">{parent_process_path}</Data>
+    <Data Name="MandatoryLabel">{integrity_sid}</Data>
+    <Data Name="ProcessGuid">{process_guid}</Data>
+    <Data Name="ParentProcessGuid">{parent_process_guid}</Data>
+    <Data Name="OriginalFileName">{original_file_name}</Data>
+    <Data Name="ProcessHash">SHA256={process_hash}</Data>
+    <Data Name="ProcessIntegrityLevel">{integrity_sid}</Data>
+  </EventData>
+</Event>'''
+
+        return event_xml.strip()
+
+
 class AttackGeneratorFactory:
     """Factory to create attack generators based on attack type"""
 
@@ -556,6 +764,11 @@ class AttackGeneratorFactory:
         if attack_type in PALOALTO_ATTACK_TYPES:
             field_behaviors = PALOALTO_ATTACK_TYPES[attack_type]['field_behaviors']
             return PaloAltoPortScanGenerator(field_behaviors, options)
+
+        # Windows attack types
+        if attack_type in WINDOWS_ATTACK_TYPES:
+            field_behaviors = WINDOWS_ATTACK_TYPES[attack_type]['field_behaviors']
+            return WindowsTorClientGenerator(field_behaviors, options)
 
         return None
 
