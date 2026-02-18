@@ -1,148 +1,173 @@
-# Log Generator - SIEM Testing Tool
+# SIEM Log Generator
 
-A powerful log generation tool for testing SIEM systems. Generate realistic logs from various sources including Apache web servers and Windows Security Event Logs.
+A log generation tool for testing SIEM systems. Generate realistic logs from multiple sources and simulate attack scenarios to validate detection rules.
 
 ## Features
 
-- 🎯 **Multiple Log Types**: Apache access logs, Windows Security Event Logs (with 12 common Event IDs)
-- 🎛️ **Easy Management**: Web-based UI to create, enable/disable, clone, and delete senders
-- ⚡ **Configurable Frequency**: Control how many logs per second each sender generates
-- 📊 **Real-time Monitoring**: See logs generated count in real-time
-- 🔄 **Multi-threaded**: Run multiple senders simultaneously without blocking
-- 📝 **Realistic Output**: Logs are identical to real server/endpoint output
+- **Multiple Log Sources**: Apache, Windows Security Event Logs, SSH, Palo Alto firewall
+- **Built-in Attack Simulations**: SSH brute force, port scans, TOR client execution, and more
+- **Dual Output**: Write to local files or send directly to Splunk via HEC (HTTP Event Collector)
+- **HEC Configurations**: Create, test, and reuse Splunk HEC connection profiles
+- **Web UI**: Create, edit, clone, enable/disable, and delete senders from a single dashboard
+- **Real-time Monitoring**: Live log count per sender
+- **Multi-threaded**: Run multiple senders and attacks simultaneously
 
 ## Installation
 
-1. Install Python dependencies:
 ```bash
+cd log-generator
 pip install -r requirements.txt
-```
-
-2. Run the application:
-```bash
 python app.py
 ```
 
-3. Open your browser to: `http://localhost:5000`
+Open your browser to `http://localhost:5001`
 
-## Usage
+## Log Sources (Sourcetypes)
 
-### Creating a Sender
-
-1. Open the web interface
-2. Fill in the form:
-   - **Sender Name**: A descriptive name (e.g., "Web Server Logs")
-   - **Log Type**: Choose Apache Access Log or Windows Security Event Log
-   - **Destination**: Full path where logs will be written (e.g., `/tmp/logs/apache.log`)
-   - **Frequency**: Logs per second (1-1000)
-   - **Start Immediately**: Check to enable right away
-
-3. Click "Create Sender"
-
-### Managing Senders
-
-Each sender card shows:
-- Current status (Running/Stopped)
-- Destination file
-- Frequency
-- Total logs generated
-- Creation timestamp
-
-Actions available:
-- **⏸️/▶️ Toggle**: Start/stop log generation
-- **📋 Clone**: Duplicate sender with same settings
-- **🗑️ Delete**: Remove sender permanently
-
-## Log Types
-
-### Apache Access Log
-Generates logs in Combined Log Format identical to real Apache/Nginx servers:
+### Apache
+Generates logs in Combined Log Format (access, error, combined):
 ```
-192.168.1.100 - - [02/Feb/2026:18:52:00 +0000] "GET /index.html HTTP/1.1" 200 1234 "https://www.google.com/" "Mozilla/5.0..."
+192.168.1.100 - - [18/Feb/2026:14:32:10 +0000] "GET /api/users HTTP/1.1" 200 1234 "https://www.google.com/" "Mozilla/5.0 ..."
 ```
-
-Features:
-- Realistic IP addresses
-- Varied HTTP methods (GET, POST)
-- Mix of status codes (200, 404, 403, 500)
-- Authentic user agents (Chrome, Firefox, Safari, Mobile)
-- Weighted request distribution
 
 ### Windows Security Event Log
-Generates authentic Windows Event Logs in XML format with 12 common Event IDs:
+Generates authentic Windows Event Logs in XML or Classic (text) format with 12 common Event IDs:
 
-- **4624**: Successful Logon
-- **4625**: Failed Logon
-- **4634**: Logoff
-- **4672**: Special Privileges Assigned
-- **4688**: Process Created
-- **4689**: Process Terminated
-- **4698**: Scheduled Task Created
-- **4699**: Scheduled Task Deleted
-- **4720**: User Account Created
-- **4726**: User Account Deleted
-- **4732**: Member Added to Security Group
-- **4756**: Member Added to Universal Security Group
+| Event ID | Description |
+|----------|-------------|
+| 4624 | Successful Logon |
+| 4625 | Failed Logon |
+| 4634 | Logoff |
+| 4672 | Special Privileges Assigned |
+| 4688 | Process Created |
+| 4689 | Process Terminated |
+| 4698 | Scheduled Task Created |
+| 4699 | Scheduled Task Deleted |
+| 4720 | User Account Created |
+| 4726 | User Account Deleted |
+| 4732 | Member Added to Security Group |
+| 4756 | Member Added to Universal Security Group |
 
-Each event includes:
-- Proper XML structure matching Windows Event Viewer
-- Realistic usernames, domains, workstations
-- Accurate process paths
-- Valid SIDs and Logon IDs
+### SSH
+Generates syslog-format SSH logs with configurable event categories:
+- Authentication (success/failure), sessions, connections, errors
+
+### Palo Alto Firewall
+Generates Palo Alto PAN-OS logs in CSV syslog format:
+- TRAFFIC, THREAT, SYSTEM subtypes
+
+## Attack Simulations
+
+Attacks generate a finite number of events over a configurable duration, designed to trigger specific SIEM detection rules.
+
+### SSH Attacks
+
+| Attack | Description | Field Behaviors |
+|--------|-------------|-----------------|
+| SSH Brute Force | Single attacker targeting one account with repeated password attempts | user: fixed, src_ip: fixed |
+| SSH Password Spraying | Single attacker trying multiple usernames from one IP | user: rotating, src_ip: fixed |
+| SSH Credential Stuffing | Distributed attack with rotating users and IPs (leaked credentials) | user: rotating, src_ip: rotating |
+| SSH Distributed Brute Force | Botnet targeting one account from multiple source IPs | user: fixed, src_ip: rotating |
+
+### Network Attacks
+
+| Attack | Description | Field Behaviors |
+|--------|-------------|-----------------|
+| Internal Horizontal Port Scan | Single source scanning many internal hosts on the same port (dc(dest_ip) >= 250) | src_ip: fixed, dest_ip: rotating, dest_port: fixed |
+| Internal Vertical Port Scan | Single source scanning many ports on one internal host (totalDestPortCount >= 500) | src_ip: fixed, dest_ip: fixed, dest_port: rotating |
+
+- Generates Palo Alto TRAFFIC CSV logs
+- Each event produces a unique rotating value (no duplicates)
+- Overridable fixed fields (src_ip, dest_ip, dest_port) via the sender form
+
+### Endpoint Attacks
+
+| Attack | Description | Field Behaviors |
+|--------|-------------|-----------------|
+| Windows TOR Client Execution | TOR browser or client execution detected on Windows endpoint (T1090.003 - Multi-hop Proxy) | user: fixed, dest: fixed |
+
+- Generates Windows 4688 (Process Creation) XML events
+- 6 TOR execution variants: Tor Browser bundle, AppData install, Brave Browser TOR, standalone from Downloads/Temp
+- Overridable user and destination hostname via the sender form
+
+### Attack Configuration
+
+- **Events Count**: Number of events to generate (1 - 10,000)
+- **Duration**: Time span over which events are spread (1 - 3,600 seconds)
+- **Field Overrides**: Fixed fields can be set to a specific value or left as "Random"
+
+## Output Destinations
+
+### File
+Write logs to a local file path (e.g., `/tmp/logs/apache.log`).
+
+### Splunk HEC
+Send logs to Splunk via HTTP Event Collector. Create a HEC configuration with:
+- URL and port
+- HEC token
+- Optional: index, sourcetype, host, source
+
+Test the connection before using it with senders.
 
 ## Project Structure
 
 ```
 log-generator/
-├── app.py                    # Flask web application
-├── log_senders.py           # Sender management and threading
+├── app.py                      # Flask web application (API routes)
+├── log_senders.py              # Sender management, threading, attack execution
+├── attack_generators.py        # Attack type definitions and generators
+├── configuration_manager.py    # HEC configuration CRUD
+├── hec_sender.py               # Splunk HEC client
 ├── log_generators/
-│   ├── apache.py            # Apache log generator
-│   └── windows.py           # Windows Event log generator
+│   ├── apache.py               # Apache log generator
+│   ├── ssh.py                  # SSH log generator
+│   ├── windows.py              # Windows Event Log generator
+│   └── paloalto.py             # Palo Alto PAN-OS log generator
 ├── templates/
-│   └── index.html           # Web UI
+│   └── index.html              # Web UI
 ├── static/
 │   ├── css/
-│   │   └── style.css        # Styling
+│   │   └── style.css
 │   └── js/
-│       └── app.js           # Frontend JavaScript
-└── requirements.txt
+│       ├── app.js              # Main app (tabs, event listeners)
+│       └── modules/
+│           ├── api.js           # API client
+│           ├── attacks.js       # Attacks tab view
+│           ├── configurations.js # HEC configurations management
+│           ├── senders.js       # Sender CRUD and table
+│           ├── sourcetypes.js   # Sourcetypes tab + dropdown
+│           ├── state.js         # Shared state
+│           ├── utils.js         # Notifications, helpers
+│           └── validation.js    # Form validation
+├── senders_config.json          # Persisted sender state
+├── configurations.json          # Persisted HEC configurations
+├── requirements.txt
+├── start.sh / stop.sh           # Convenience scripts
 ```
-
-## Future Enhancements
-
-Planned features:
-- More log types (Palo Alto, Cisco, AWS CloudTrail, etc.)
-- HTTP Event Collector (HEC) output for Splunk
-- Syslog output support
-- Benchmark mode for performance testing
-- Log filtering/customization options
-- Statistics and metrics dashboard
 
 ## Technical Details
 
-- **Backend**: Python 3 with Flask
-- **Threading**: Multi-threaded log generation using Python's threading module
-- **Storage**: JSON-based configuration (senders_config.json)
-- **Frontend**: Vanilla JavaScript with responsive CSS
+- **Backend**: Python 3 / Flask
+- **Frontend**: Vanilla JavaScript (ES modules), responsive CSS
+- **Threading**: Multi-threaded log generation with per-sender threads
+- **Storage**: JSON files for senders and HEC configurations
+- **Architecture**: Attack types are built-in constants with field behavior metadata; sourcetypes are discovered from generators
 
-## Contributing
+## Adding a New Attack Type
 
-To add a new log type:
+1. Define the attack type dict in `attack_generators.py` with `name`, `description`, `log_type`, `category`, `field_behaviors`, and `sample_logs`
+2. Create a generator class with `__init__(self, field_behaviors, options)` and `generate()` methods
+3. Add it to the combined `ALL_ATTACK_TYPES` dict
+4. Register it in `AttackGeneratorFactory.get_generator()`
 
-1. Create a new generator class in `log_generators/`
-2. Implement a `generate()` method that returns a single log line
-3. Register it in `SenderManager.log_generators` (log_senders.py)
-4. Add it to the dropdown in the frontend
+The frontend (dropdown, Attacks tab, field overrides) is fully dynamic and requires no changes.
 
-Example:
-```python
-class MyLogGenerator:
-    def generate(self):
-        # Your log generation logic
-        return "your log line here"
-```
+## Adding a New Log Source
+
+1. Create a generator class in `log_generators/` with a `generate()` method
+2. Register it in `SenderManager` (log_senders.py)
+3. Add it to the log types API response
 
 ## License
 
-MIT License - feel free to use and modify!
+MIT License
