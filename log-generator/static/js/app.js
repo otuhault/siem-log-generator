@@ -7,7 +7,7 @@
 
 import { state } from './modules/state.js';
 import { initNotificationStyles } from './modules/utils.js';
-import { loadSenders, handleCreateSender, closeSenderForm } from './modules/senders.js';
+import { loadSenders, handleCreateSender, closeSenderForm, restoreFormToOriginalPosition } from './modules/senders.js';
 import { loadConfigurations, handleCreateConfiguration, closeConfigurationForm, testConnection } from './modules/configurations.js';
 import { loadAttackTypesView } from './modules/attacks.js';
 import { loadLogTypes, loadSourcetypes } from './modules/sourcetypes.js';
@@ -42,6 +42,7 @@ function setupEventListeners() {
 
     // Add Sender button
     document.getElementById('addSenderBtn').addEventListener('click', function() {
+        restoreFormToOriginalPosition();
         document.getElementById('senderFormCard').style.display = 'block';
         loadConfigurations();
     });
@@ -115,6 +116,7 @@ function setupLogTypeListener() {
         const apacheLogTypesGroup = document.getElementById('apacheLogTypesGroup');
         const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
         const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
+        const adEventCategoriesGroup = document.getElementById('adEventCategoriesGroup');
         const frequencyGroup = document.getElementById('frequencyGroup');
         const attackOptionsGroup = document.getElementById('attackOptionsGroup');
         const frequencyInput = document.getElementById('frequency');
@@ -126,6 +128,7 @@ function setupLogTypeListener() {
             apacheLogTypesGroup.style.display = 'none';
             sshEventCategoriesGroup.style.display = 'none';
             paloaltoLogTypesGroup.style.display = 'none';
+            adEventCategoriesGroup.style.display = 'none';
         };
 
         // Check if it's an attack type
@@ -190,30 +193,18 @@ function setupLogTypeListener() {
             frequencyInput.disabled = false;
 
             // Show type-specific options
+            hideAllOptions();
             if (selectedType === 'windows') {
                 windowsSourcesGroup.style.display = 'block';
                 renderFormatGroup.style.display = 'block';
-                apacheLogTypesGroup.style.display = 'none';
-                sshEventCategoriesGroup.style.display = 'none';
-                paloaltoLogTypesGroup.style.display = 'none';
             } else if (selectedType === 'apache') {
                 apacheLogTypesGroup.style.display = 'block';
-                windowsSourcesGroup.style.display = 'none';
-                renderFormatGroup.style.display = 'none';
-                sshEventCategoriesGroup.style.display = 'none';
-                paloaltoLogTypesGroup.style.display = 'none';
             } else if (selectedType === 'ssh') {
                 sshEventCategoriesGroup.style.display = 'block';
-                windowsSourcesGroup.style.display = 'none';
-                renderFormatGroup.style.display = 'none';
-                apacheLogTypesGroup.style.display = 'none';
-                paloaltoLogTypesGroup.style.display = 'none';
             } else if (selectedType === 'paloalto') {
                 paloaltoLogTypesGroup.style.display = 'block';
-                windowsSourcesGroup.style.display = 'none';
-                renderFormatGroup.style.display = 'none';
-                apacheLogTypesGroup.style.display = 'none';
-                sshEventCategoriesGroup.style.display = 'none';
+            } else if (selectedType === 'active_directory') {
+                adEventCategoriesGroup.style.display = 'block';
             } else {
                 hideAllOptions();
             }

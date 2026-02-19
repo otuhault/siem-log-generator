@@ -12,6 +12,7 @@ from log_generators.apache import ApacheLogGenerator
 from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
 from log_generators.paloalto import PaloAltoLogGenerator
+from log_generators.active_directory import ActiveDirectoryLogGenerator
 from hec_sender import HECSender
 from attack_generators import ALL_ATTACK_TYPES
 
@@ -86,6 +87,16 @@ class PaloAltoMultiTypeGenerator:
         """Generate a log from the configured types"""
         return self.generator.generate()
 
+class ADMultiCategoryGenerator:
+    """Wrapper that generates logs from multiple AD event categories"""
+
+    def __init__(self, event_categories):
+        self.generator = ActiveDirectoryLogGenerator(event_categories=event_categories)
+
+    def generate(self):
+        return self.generator.generate()
+
+
 class SenderManager:
     """Manages log senders and their lifecycle"""
     
@@ -101,6 +112,7 @@ class SenderManager:
             'windows': WindowsEventLogGenerator,
             'ssh': SSHAuthLogGenerator,
             'paloalto': PaloAltoLogGenerator,
+            'active_directory': ActiveDirectoryLogGenerator,
         }
     
     def load_config(self):
@@ -278,6 +290,13 @@ class SenderManager:
 
             # Create a multi-type generator wrapper
             generator = PaloAltoMultiTypeGenerator(log_types)
+        # Handle Active Directory Log generators
+        elif log_type == 'active_directory':
+            event_categories = options.get('event_categories', [
+                'account_management', 'group_management', 'directory_service',
+                'authentication', 'computer_management'
+            ])
+            generator = ADMultiCategoryGenerator(event_categories)
         else:
             # Other log types
             generator = generator_class()
@@ -610,6 +629,38 @@ class SenderManager:
                         'id': 'system',
                         'name': 'System',
                         'description': 'System events (authentication, configuration, HA, upgrades)'
+                    }
+                ]
+            },
+            'active_directory': {
+                'name': 'Active Directory',
+                'description': 'Active Directory domain controller event logs (XmlWinEventLog)',
+                'example': 'Account management, group changes, Kerberos, directory service',
+                'sources': [
+                    {
+                        'id': 'account_management',
+                        'name': 'Account Management',
+                        'description': 'User account created, enabled, disabled, deleted, changed, locked out (4720, 4722, 4725, 4726, 4738, 4740, 4767)'
+                    },
+                    {
+                        'id': 'group_management',
+                        'name': 'Group Management',
+                        'description': 'Members added/removed from security groups (4728, 4729, 4732, 4733, 4756, 4757)'
+                    },
+                    {
+                        'id': 'directory_service',
+                        'name': 'Directory Service',
+                        'description': 'LDAP object modifications, creations, and access operations (5136, 5137, 4662)'
+                    },
+                    {
+                        'id': 'authentication',
+                        'name': 'Authentication',
+                        'description': 'Kerberos TGT/TGS requests, pre-auth failures, NTLM validation (4768, 4769, 4771, 4776)'
+                    },
+                    {
+                        'id': 'computer_management',
+                        'name': 'Computer Management',
+                        'description': 'Computer accounts created, changed, deleted (4741, 4742, 4743)'
                     }
                 ]
             }

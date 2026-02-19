@@ -112,5 +112,27 @@
       "render_format": "xml"
     },
     "attack_status": null
+  },
+  "a319fe5e-f206-4fe9-b457-43660152fa84": {
+    "id": "a319fe5e-f206-4fe9-b457-43660152fa84",
+    "name": "Active Directory All",
+    "log_type": "active_directory",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "9aa89a83-2d0f-415d-869a-9644a457256d",
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-19T21:24:18.420394",
+    "logs_generated": 102,
+    "options": {
+      "event_categories": [
+        "account_management",
+        "group_management",
+        "directory_service",
+        "authentication",
+        "computer_management"
+      ]
+    },
+    "attack_status": null
   }
 }

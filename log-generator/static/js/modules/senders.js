@@ -7,6 +7,73 @@ import { state, getLogTypeName } from './state.js';
 import { formatDate, showNotification } from './utils.js';
 import { validateSenderForm, clearFormErrors } from './validation.js';
 
+// Original position of the sender form in the DOM
+let originalFormParent = null;
+let originalFormNextSibling = null;
+
+/**
+ * Save the original DOM position of the sender form (called once)
+ */
+function saveOriginalFormPosition() {
+    if (!originalFormParent) {
+        const formCard = document.getElementById('senderFormCard');
+        originalFormParent = formCard.parentNode;
+        originalFormNextSibling = formCard.nextSibling;
+    }
+}
+
+/**
+ * Restore the sender form to its original position in the DOM
+ */
+export function restoreFormToOriginalPosition() {
+    saveOriginalFormPosition();
+    const formCard = document.getElementById('senderFormCard');
+
+    // Remove any existing inline form row
+    const existingFormRow = document.querySelector('tr.sender-form-row');
+    if (existingFormRow) {
+        existingFormRow.remove();
+    }
+
+    // Move form back to its original position
+    if (formCard.parentNode !== originalFormParent) {
+        originalFormParent.insertBefore(formCard, originalFormNextSibling);
+    }
+}
+
+/**
+ * Move the sender form inline below a specific sender row
+ */
+function moveFormBelowRow(senderId) {
+    saveOriginalFormPosition();
+    const formCard = document.getElementById('senderFormCard');
+    const senderRow = document.querySelector(`tr[data-sender-id="${senderId}"]`);
+
+    if (!senderRow) return;
+
+    // Remove any existing inline form row
+    const existingFormRow = document.querySelector('tr.sender-form-row');
+    if (existingFormRow) {
+        existingFormRow.remove();
+    }
+
+    // Create a new table row to hold the form
+    const formRow = document.createElement('tr');
+    formRow.className = 'sender-form-row';
+    const formCell = document.createElement('td');
+    formCell.colSpan = 8;
+    formCell.appendChild(formCard);
+    formRow.appendChild(formCell);
+
+    // Insert after the sender row
+    senderRow.after(formRow);
+
+    // Scroll into view
+    setTimeout(() => {
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+}
+
 /**
  * Load all senders and update the UI
  */
@@ -24,6 +91,35 @@ export async function loadSenders() {
         document.getElementById('totalSenders').textContent = totalSenders;
         document.getElementById('enabledSenders').textContent = enabledSenders;
         document.getElementById('disabledSenders').textContent = disabledSenders;
+
+        // Skip table rebuild if the inline edit form is open (to avoid destroying it)
+        if (document.querySelector('tr.sender-form-row')) {
+            // Still update log counts in existing rows
+            senders.forEach(sender => {
+                const row = document.querySelector(`tr[data-sender-id="${sender.id}"]`);
+                if (row) {
+                    const logsCell = row.querySelector('.sender-logs-count');
+                    if (logsCell) logsCell.textContent = (sender.logs_generated || 0).toLocaleString();
+                    const statusCell = row.querySelector('.sender-status');
+                    if (statusCell) {
+                        const isAttack = !!(sender.log_type && state.attackTypes[sender.log_type]);
+                        if (isAttack) {
+                            const attackStatus = sender.attack_status || 'Disabled';
+                            if (attackStatus === 'Running') {
+                                statusCell.innerHTML = '<span class="status-running">Running</span>';
+                            } else if (attackStatus.startsWith('Done')) {
+                                statusCell.innerHTML = `<span class="status-done">${attackStatus}</span>`;
+                            } else {
+                                statusCell.innerHTML = '<span class="status-disabled">Disabled</span>';
+                            }
+                        } else {
+                            statusCell.textContent = sender.enabled ? 'Running' : 'Stopped';
+                        }
+                    }
+                }
+            });
+            return;
+        }
 
         if (senders.length === 0) {
             container.innerHTML = '<p class="no-senders">No senders created yet. Click "Add Sender" to create one!</p>';
@@ -271,6 +367,12 @@ export async function editSender(senderId) {
                         cb.checked = sender.options.log_types.includes(cb.value);
                     });
                 }
+            } else if (sender.log_type === 'active_directory' && sender.options) {
+                if (sender.options.event_categories) {
+                    document.querySelectorAll('input[name="ad_event_categories"]').forEach(cb => {
+                        cb.checked = sender.options.event_categories.includes(cb.value);
+                    });
+                }
             } else if (sender.log_type && state.attackTypes[sender.log_type] && sender.options) {
                 if (sender.options.attack_events_count) {
                     document.getElementById('attackEventsCount').value = sender.options.attack_events_count;
@@ -290,7 +392,8 @@ export async function editSender(senderId) {
             document.getElementById('senderFormTitle').textContent = 'Edit Sender';
             document.getElementById('submitSenderBtn').textContent = 'Update Sender';
 
-            // Show the form
+            // Move form below the sender row and show it
+            moveFormBelowRow(senderId);
             document.getElementById('senderFormCard').style.display = 'block';
 
             // Import and call loadConfigurations to populate dropdown
@@ -445,6 +548,21 @@ export async function handleCreateSender(e) {
             log_types: selectedLogTypes
         };
     }
+    // Add options for Active Directory logs
+    else if (logType === 'active_directory') {
+        const selectedCategories = Array.from(
+            document.querySelectorAll('input[name="ad_event_categories"]:checked')
+        ).map(cb => cb.value);
+
+        if (selectedCategories.length === 0) {
+            showNotification('Please select at least one AD event category', 'error');
+            return;
+        }
+
+        data.options = {
+            event_categories: selectedCategories
+        };
+    }
     // Add options for attacks
     else if (logType && state.attackTypes[logType]) {
         const eventsCount = parseInt(document.getElementById('attackEventsCount').value);
@@ -501,6 +619,7 @@ export async function handleCreateSender(e) {
 export function closeSenderForm() {
     const form = document.getElementById('createSenderForm');
     document.getElementById('senderFormCard').style.display = 'none';
+    restoreFormToOriginalPosition();
     form.reset();
     clearFormErrors(form);
     document.getElementById('senderId').value = '';
@@ -512,6 +631,7 @@ export function closeSenderForm() {
     document.getElementById('apacheLogTypesGroup').style.display = 'none';
     document.getElementById('sshEventCategoriesGroup').style.display = 'none';
     document.getElementById('paloaltoLogTypesGroup').style.display = 'none';
+    document.getElementById('adEventCategoriesGroup').style.display = 'none';
 
     // Reset attack options and frequency
     document.getElementById('attackOptionsGroup').style.display = 'none';

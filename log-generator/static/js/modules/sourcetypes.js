@@ -309,6 +309,117 @@ async function fetchLogExample(typeKey, sourceId = null) {
             'traffic': '<14>Feb 04 2026 12:34:56 pa-fw-01 1,2026/02/04 12:34:56,012345678901234,TRAFFIC,end,2049,2026/02/04 12:34:56,192.168.1.10,8.8.8.8,0.0.0.0,0.0.0.0,allow-web,,,web-browsing,vsys1,trust,untrust,ethernet1/1,ethernet1/2,ForwardToSplunk,2026/02/04 12:34:56,12345,1,54321,443,0,0,0x0,tcp,allow,15234,8192,7042,42,2026/02/04 12:34:50,6,any,0,987654321,0x8000000000000000,Internal,United States,0,24,18,aged-out,123,456,789,0,vsys1-name,pa-fw-01,from-policy,,,0,,0,,2026/02/04 12:34:50,0,N/A,0,0,0,0,0x0,,,,,,,,,,,,0,0,0,0,0,0,0,any,any,0,2026-02-04T12:34:56.789Z,0',
             'threat': '<14>Feb 04 2026 13:45:22 pa-fw-01 1,2026/02/04 13:45:22,012345678901234,THREAT,vulnerability,2049,2026/02/04 13:45:22,185.220.101.45,192.168.1.100,0.0.0.0,0.0.0.0,block-malicious,,,web-browsing,vsys1,untrust,trust,ethernet1/2,ethernet1/1,ForwardToSplunk,2026/02/04 13:45:22,54321,1,80,54321,0,0,0x80000000,tcp,reset-both,"malware-site.com/payload.exe",(41001),malware,high,client-to-server,987654321,0x8000000000000000,Germany,Internal,0,application/octet-stream,0,abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890,WildFireCloud,0,Mozilla/5.0,exe,,,,,report-12345,123,456,789,0,vsys1-name,pa-fw-01,,,,GET,1234567890,,999,2026/02/04 13:45:00,,malware,content-ver-1234,0,,,,,rule-uuid-123,0,,,,,,,,,,,,,,,,,,,,,,,,,,,2026-02-04T13:45:22.890Z,,0,,,,5,,,,1,1,,',
             'system': '<14>Feb 04 2026 14:56:33 pa-fw-01 1,2026/02/04 14:56:33,012345678901234,SYSTEM,auth,0,2026/02/04 14:56:33,vsys1,auth-fail,admin-user,0,0,auth,medium,"Authentication failed for user \'admin-user\' from 192.168.1.50",987654321,0x8000000000000000,123,456,789,0,vsys1-name,pa-fw-01,0,0,2026-02-04T14:56:33.901Z'
+        },
+        'active_directory': {
+            'account_management': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>4720</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>13824</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-18T10:00:00.000Z" />
+    <Channel>Security</Channel>
+    <Computer>DC01.contoso.local</Computer>
+  </System>
+  <EventData>
+    <Data Name="SubjectUserName">dadmin</Data>
+    <Data Name="SubjectDomainName">CONTOSO</Data>
+    <Data Name="TargetUserName">new_employee</Data>
+    <Data Name="TargetDomainName">CONTOSO</Data>
+    <Data Name="SamAccountName">new_employee</Data>
+    <Data Name="UserPrincipalName">new_employee@contoso.local</Data>
+  </EventData>
+</Event>`,
+            'group_management': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>4728</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>13826</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-18T10:05:00.000Z" />
+    <Channel>Security</Channel>
+    <Computer>DC01.contoso.local</Computer>
+  </System>
+  <EventData>
+    <Data Name="SubjectUserName">dadmin</Data>
+    <Data Name="SubjectDomainName">CONTOSO</Data>
+    <Data Name="MemberName">CN=jsmith,OU=Employees,DC=contoso,DC=local</Data>
+    <Data Name="TargetUserName">Domain Admins</Data>
+    <Data Name="TargetDomainName">CONTOSO</Data>
+  </EventData>
+</Event>`,
+            'directory_service': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>5136</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>14081</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-18T10:10:00.000Z" />
+    <Channel>Security</Channel>
+    <Computer>DC01.contoso.local</Computer>
+  </System>
+  <EventData>
+    <Data Name="SubjectUserName">dadmin</Data>
+    <Data Name="SubjectDomainName">CONTOSO</Data>
+    <Data Name="DSName">contoso.local</Data>
+    <Data Name="ObjectDN">CN=jsmith,OU=Employees,DC=contoso,DC=local</Data>
+    <Data Name="ObjectClass">user</Data>
+    <Data Name="AttributeLDAPDisplayName">title</Data>
+    <Data Name="AttributeValue">Senior Engineer</Data>
+    <Data Name="OperationType">%%14674</Data>
+  </EventData>
+</Event>`,
+            'authentication': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>4768</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>14339</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-18T10:15:00.000Z" />
+    <Channel>Security</Channel>
+    <Computer>DC01.contoso.local</Computer>
+  </System>
+  <EventData>
+    <Data Name="TargetUserName">jsmith</Data>
+    <Data Name="TargetDomainName">contoso.local</Data>
+    <Data Name="ServiceName">krbtgt</Data>
+    <Data Name="TicketOptions">0x40810010</Data>
+    <Data Name="Status">0x0</Data>
+    <Data Name="TicketEncryptionType">0x12</Data>
+    <Data Name="IpAddress">::ffff:192.168.1.100</Data>
+    <Data Name="IpPort">52345</Data>
+  </EventData>
+</Event>`,
+            'computer_management': `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}" />
+    <EventID>4741</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>13825</Task>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2026-02-18T10:20:00.000Z" />
+    <Channel>Security</Channel>
+    <Computer>DC01.contoso.local</Computer>
+  </System>
+  <EventData>
+    <Data Name="SubjectUserName">dadmin</Data>
+    <Data Name="SubjectDomainName">CONTOSO</Data>
+    <Data Name="TargetUserName">DESKTOP-NEW01$</Data>
+    <Data Name="TargetDomainName">CONTOSO</Data>
+    <Data Name="SamAccountName">DESKTOP-NEW01$</Data>
+    <Data Name="DnsHostName">DESKTOP-NEW01.contoso.local</Data>
+    <Data Name="ServicePrincipalNames">HOST/DESKTOP-NEW01.contoso.local RestrictedKrbHost/DESKTOP-NEW01.contoso.local</Data>
+  </EventData>
+</Event>`
         }
     };
 
@@ -330,6 +441,11 @@ async function fetchLogExample(typeKey, sourceId = null) {
     // Handle Palo Alto with specific log type
     if (typeKey === 'paloalto' && sourceId) {
         return examples.paloalto[sourceId] || 'No example available for this log type.';
+    }
+
+    // Handle Active Directory with specific event category
+    if (typeKey === 'active_directory' && sourceId) {
+        return examples.active_directory[sourceId] || 'No example available for this category.';
     }
 
     // Handle regular log types (fallback)

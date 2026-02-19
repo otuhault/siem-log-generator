@@ -4,7 +4,7 @@ A log generation tool for testing SIEM systems. Generate realistic logs from mul
 
 ## Features
 
-- **Multiple Log Sources**: Apache, Windows Security Event Logs, SSH, Palo Alto firewall
+- **Multiple Log Sources**: Apache, Windows Security Event Logs, SSH, Palo Alto firewall, Active Directory
 - **Built-in Attack Simulations**: SSH brute force, port scans, TOR client execution, and more
 - **Dual Output**: Write to local files or send directly to Splunk via HEC (HTTP Event Collector)
 - **HEC Configurations**: Create, test, and reuse Splunk HEC connection profiles
@@ -55,6 +55,58 @@ Generates syslog-format SSH logs with configurable event categories:
 ### Palo Alto Firewall
 Generates Palo Alto PAN-OS logs in CSV syslog format:
 - TRAFFIC, THREAT, SYSTEM subtypes
+
+### Active Directory
+Generates XmlWinEventLog format domain controller logs with 22 event types across 5 configurable categories:
+
+**Account Management**
+
+| Event ID | Description |
+|----------|-------------|
+| 4720 | User Account Created |
+| 4722 | User Account Enabled |
+| 4725 | User Account Disabled |
+| 4726 | User Account Deleted |
+| 4738 | User Account Changed |
+| 4740 | User Account Locked Out |
+| 4767 | User Account Unlocked |
+| 4781 | Account Name Changed |
+
+**Group Management**
+
+| Event ID | Description |
+|----------|-------------|
+| 4728 | Member Added to Global Security Group |
+| 4729 | Member Removed from Global Security Group |
+| 4732 | Member Added to Local Security Group |
+| 4733 | Member Removed from Local Security Group |
+| 4756 | Member Added to Universal Security Group |
+| 4757 | Member Removed from Universal Security Group |
+
+**Directory Service**
+
+| Event ID | Description |
+|----------|-------------|
+| 4662 | Object Access (includes DCSync replication GUIDs) |
+| 5136 | Directory Service Object Modified (LDAP attributes) |
+| 5137 | Directory Service Object Created |
+
+**Authentication**
+
+| Event ID | Description |
+|----------|-------------|
+| 4768 | Kerberos TGT Request |
+| 4769 | Kerberos Service Ticket Request |
+| 4771 | Kerberos Pre-Authentication Failed |
+| 4776 | NTLM Credential Validation |
+
+**Computer Management**
+
+| Event ID | Description |
+|----------|-------------|
+| 4741 | Computer Account Created |
+| 4742 | Computer Account Changed |
+| 4743 | Computer Account Deleted |
 
 ## Attack Simulations
 
@@ -122,7 +174,8 @@ log-generator/
 │   ├── apache.py               # Apache log generator
 │   ├── ssh.py                  # SSH log generator
 │   ├── windows.py              # Windows Event Log generator
-│   └── paloalto.py             # Palo Alto PAN-OS log generator
+│   ├── paloalto.py             # Palo Alto PAN-OS log generator
+│   └── active_directory.py     # Active Directory log generator
 ├── templates/
 │   └── index.html              # Web UI
 ├── static/

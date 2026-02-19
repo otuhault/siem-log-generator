@@ -382,6 +382,21 @@ header p {
     border-bottom: none;
 }
 
+/* Inline edit form row inside senders table */
+tr.sender-form-row > td {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent;
+}
+
+tr.sender-form-row .card {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-top: 2px solid var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+}
+
 .sender-name {
     font-weight: 600;
     color: var(--text-primary);
