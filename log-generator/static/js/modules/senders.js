@@ -373,6 +373,12 @@ export async function editSender(senderId) {
                         cb.checked = sender.options.event_categories.includes(cb.value);
                     });
                 }
+            } else if (sender.log_type === 'cisco_ios' && sender.options) {
+                if (sender.options.event_categories) {
+                    document.querySelectorAll('input[name="cisco_ios_event_categories"]').forEach(cb => {
+                        cb.checked = sender.options.event_categories.includes(cb.value);
+                    });
+                }
             } else if (sender.log_type && state.attackTypes[sender.log_type] && sender.options) {
                 if (sender.options.attack_events_count) {
                     document.getElementById('attackEventsCount').value = sender.options.attack_events_count;
@@ -563,6 +569,21 @@ export async function handleCreateSender(e) {
             event_categories: selectedCategories
         };
     }
+    // Add options for Cisco IOS logs
+    else if (logType === 'cisco_ios') {
+        const selectedCategories = Array.from(
+            document.querySelectorAll('input[name="cisco_ios_event_categories"]:checked')
+        ).map(cb => cb.value);
+
+        if (selectedCategories.length === 0) {
+            showNotification('Please select at least one Cisco IOS event category', 'error');
+            return;
+        }
+
+        data.options = {
+            event_categories: selectedCategories
+        };
+    }
     // Add options for attacks
     else if (logType && state.attackTypes[logType]) {
         const eventsCount = parseInt(document.getElementById('attackEventsCount').value);
@@ -632,6 +653,7 @@ export function closeSenderForm() {
     document.getElementById('sshEventCategoriesGroup').style.display = 'none';
     document.getElementById('paloaltoLogTypesGroup').style.display = 'none';
     document.getElementById('adEventCategoriesGroup').style.display = 'none';
+    document.getElementById('ciscoIOSEventCategoriesGroup').style.display = 'none';
 
     // Reset attack options and frequency
     document.getElementById('attackOptionsGroup').style.display = 'none';
@@ -664,4 +686,6 @@ export function closeSenderForm() {
     document.querySelectorAll('input[name="apache_log_types"]').forEach(cb => cb.checked = true);
     document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => cb.checked = true);
     document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => cb.checked = true);
+    document.querySelectorAll('input[name="ad_event_categories"]').forEach(cb => cb.checked = true);
+    document.querySelectorAll('input[name="cisco_ios_event_categories"]').forEach(cb => cb.checked = true);
 }

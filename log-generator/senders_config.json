@@ -134,5 +134,30 @@
       ]
     },
     "attack_status": null
+  },
+  "d53d3fb4-8ffa-4024-9b2d-49d0c11cbd73": {
+    "id": "d53d3fb4-8ffa-4024-9b2d-49d0c11cbd73",
+    "name": "Cisco IOS",
+    "log_type": "cisco_ios",
+    "destination": null,
+    "destination_type": "configuration",
+    "configuration_id": "9b4f4ad8-516a-412d-aff9-eeead78f9d9f",
+    "frequency": 10,
+    "enabled": false,
+    "created_at": "2026-02-20T18:53:01.905270",
+    "logs_generated": 130,
+    "options": {
+      "event_categories": [
+        "interface",
+        "system",
+        "authentication",
+        "acl_security",
+        "routing",
+        "redundancy",
+        "spanning_tree",
+        "hardware"
+      ]
+    },
+    "attack_status": null
   }
 }

@@ -4,7 +4,7 @@ A log generation tool for testing SIEM systems. Generate realistic logs from mul
 
 ## Features
 
-- **Multiple Log Sources**: Apache, Windows Security Event Logs, SSH, Palo Alto firewall, Active Directory
+- **Multiple Log Sources**: Apache, Windows Security Event Logs, SSH, Palo Alto firewall, Active Directory, Cisco IOS
 - **Built-in Attack Simulations**: SSH brute force, port scans, TOR client execution, and more
 - **Dual Output**: Write to local files or send directly to Splunk via HEC (HTTP Event Collector)
 - **HEC Configurations**: Create, test, and reuse Splunk HEC connection profiles
@@ -108,6 +108,25 @@ Generates XmlWinEventLog format domain controller logs with 22 event types acros
 | 4742 | Computer Account Changed |
 | 4743 | Computer Account Deleted |
 
+### Cisco IOS
+Generates Cisco IOS syslog messages (`cisco:ios` sourcetype) with 8 configurable event categories:
+
+| Category | Facilities | Description |
+|----------|-----------|-------------|
+| Interface & Link Status | LINK, LINEPROTO | Interface and line protocol state changes |
+| System Events | SYS, PARSER | Configuration changes, restarts, memory/CPU |
+| Authentication & AAA | SEC_LOGIN, AAA, AUTHMGR | Login success/failed, user sessions, 802.1X |
+| ACL & Security | SEC, FW | Access list permit/deny, zone-based firewall sessions |
+| Routing Protocols | OSPF, BGP, DUAL (EIGRP) | Adjacency and neighbor changes |
+| HSRP/VRRP | STANDBY | Hot Standby Router Protocol state transitions |
+| Spanning Tree | SPANTREE | Topology changes, root guard, PVID inconsistency |
+| Hardware & Environment | SNMP, NTP, ENV, OIR | SNMP events, NTP sync, fan failures, card insert/remove |
+
+Format: `<seq>: <timestamp>: %<FACILITY>-<SEVERITY>-<MNEMONIC>: <message>`
+```
+000042: Feb 19 08:12:34.482: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up
+```
+
 ## Attack Simulations
 
 Attacks generate a finite number of events over a configurable duration, designed to trigger specific SIEM detection rules.
@@ -175,7 +194,8 @@ log-generator/
 │   ├── ssh.py                  # SSH log generator
 │   ├── windows.py              # Windows Event Log generator
 │   ├── paloalto.py             # Palo Alto PAN-OS log generator
-│   └── active_directory.py     # Active Directory log generator
+│   ├── active_directory.py     # Active Directory log generator
+│   └── cisco_ios.py            # Cisco IOS syslog generator
 ├── templates/
 │   └── index.html              # Web UI
 ├── static/

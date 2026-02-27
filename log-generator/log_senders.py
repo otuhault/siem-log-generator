@@ -13,6 +13,7 @@ from log_generators.windows import WindowsEventLogGenerator
 from log_generators.ssh import SSHAuthLogGenerator
 from log_generators.paloalto import PaloAltoLogGenerator
 from log_generators.active_directory import ActiveDirectoryLogGenerator
+from log_generators.cisco_ios import CiscoIOSLogGenerator
 from hec_sender import HECSender
 from attack_generators import ALL_ATTACK_TYPES
 
@@ -96,6 +97,15 @@ class ADMultiCategoryGenerator:
     def generate(self):
         return self.generator.generate()
 
+class CiscoIOSMultiCategoryGenerator:
+    """Wrapper that generates logs from multiple Cisco IOS event categories"""
+
+    def __init__(self, event_categories):
+        self.generator = CiscoIOSLogGenerator(event_categories=event_categories)
+
+    def generate(self):
+        return self.generator.generate()
+
 
 class SenderManager:
     """Manages log senders and their lifecycle"""
@@ -113,6 +123,7 @@ class SenderManager:
             'ssh': SSHAuthLogGenerator,
             'paloalto': PaloAltoLogGenerator,
             'active_directory': ActiveDirectoryLogGenerator,
+            'cisco_ios': CiscoIOSLogGenerator,
         }
     
     def load_config(self):
@@ -297,6 +308,13 @@ class SenderManager:
                 'authentication', 'computer_management'
             ])
             generator = ADMultiCategoryGenerator(event_categories)
+        # Handle Cisco IOS Log generators
+        elif log_type == 'cisco_ios':
+            event_categories = options.get('event_categories', [
+                'interface', 'system', 'authentication', 'acl_security',
+                'routing', 'redundancy', 'spanning_tree', 'hardware'
+            ])
+            generator = CiscoIOSMultiCategoryGenerator(event_categories)
         else:
             # Other log types
             generator = generator_class()
@@ -661,6 +679,53 @@ class SenderManager:
                         'id': 'computer_management',
                         'name': 'Computer Management',
                         'description': 'Computer accounts created, changed, deleted (4741, 4742, 4743)'
+                    }
+                ]
+            },
+            'cisco_ios': {
+                'name': 'Cisco IOS',
+                'description': 'Cisco IOS syslog messages (cisco:ios sourcetype)',
+                'example': 'Interface status, AAA authentication, ACL logs, routing protocols, HSRP, STP',
+                'sources': [
+                    {
+                        'id': 'interface',
+                        'name': 'Interface & Link Status',
+                        'description': 'Interface and line protocol state changes (LINK, LINEPROTO)'
+                    },
+                    {
+                        'id': 'system',
+                        'name': 'System Events',
+                        'description': 'Configuration changes, restarts, memory/CPU events (SYS, PARSER)'
+                    },
+                    {
+                        'id': 'authentication',
+                        'name': 'Authentication & AAA',
+                        'description': 'Login success/failed, user sessions, 802.1X (SEC_LOGIN, AAA, AUTHMGR)'
+                    },
+                    {
+                        'id': 'acl_security',
+                        'name': 'ACL & Security',
+                        'description': 'Access list permit/deny, zone-based firewall sessions (SEC, FW)'
+                    },
+                    {
+                        'id': 'routing',
+                        'name': 'Routing Protocols',
+                        'description': 'OSPF, BGP, EIGRP adjacency and neighbor changes'
+                    },
+                    {
+                        'id': 'redundancy',
+                        'name': 'HSRP/VRRP',
+                        'description': 'Hot Standby Router Protocol state transitions (STANDBY)'
+                    },
+                    {
+                        'id': 'spanning_tree',
+                        'name': 'Spanning Tree',
+                        'description': 'Topology changes, root guard, PVID inconsistency (SPANTREE)'
+                    },
+                    {
+                        'id': 'hardware',
+                        'name': 'Hardware & Environment',
+                        'description': 'SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)'
                     }
                 ]
             }

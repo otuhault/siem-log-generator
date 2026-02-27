@@ -45,5 +45,17 @@
     "host": "WindowsPC1",
     "source": null,
     "created_at": "2026-02-18T20:59:27.831997"
+  },
+  "9b4f4ad8-516a-412d-aff9-eeead78f9d9f": {
+    "id": "9b4f4ad8-516a-412d-aff9-eeead78f9d9f",
+    "name": "cisco:ios",
+    "url": "https://192.168.1.27",
+    "port": 8088,
+    "token": "13188e09-1da4-4059-ae6b-e948c82e4725",
+    "index": "test",
+    "sourcetype": "cisco:ios",
+    "host": "slg-cisco:ios",
+    "created_at": "2026-02-20T18:52:22.750675",
+    "source": "hec:slg"
   }
 }

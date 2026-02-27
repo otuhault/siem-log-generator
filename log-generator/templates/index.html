@@ -240,6 +240,69 @@
                             </div>
                         </div>
 
+                        <!-- Cisco IOS Event Categories Selection (hidden by default) -->
+                        <div class="form-group" id="ciscoIOSEventCategoriesGroup" style="display: none;">
+                            <label>Event Categories:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="interface" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Interface & Link Status</strong>
+                                        <small>Interface and line protocol state changes (LINK, LINEPROTO)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System Events</strong>
+                                        <small>Configuration changes, restarts, memory/CPU (SYS, PARSER)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="authentication" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication & AAA</strong>
+                                        <small>Login success/failed, user sessions, 802.1X (SEC_LOGIN, AAA, AUTHMGR)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="acl_security" checked>
+                                    <span class="checkbox-text">
+                                        <strong>ACL & Security</strong>
+                                        <small>Access list permit/deny, zone-based firewall sessions (SEC, FW)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="routing" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Routing Protocols</strong>
+                                        <small>OSPF, BGP, EIGRP adjacency and neighbor changes</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="redundancy" checked>
+                                    <span class="checkbox-text">
+                                        <strong>HSRP/VRRP</strong>
+                                        <small>Hot Standby Router Protocol state transitions (STANDBY)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="spanning_tree" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Spanning Tree</strong>
+                                        <small>Topology changes, root guard, PVID inconsistency (SPANTREE)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="hardware" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Hardware & Environment</strong>
+                                        <small>SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- Attack-specific options (hidden by default) -->
                         <div class="form-group" id="attackOptionsGroup" style="display: none;">
                             <label>Attack Configuration:</label>

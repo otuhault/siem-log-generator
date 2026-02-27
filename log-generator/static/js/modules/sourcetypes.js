@@ -420,6 +420,16 @@ async function fetchLogExample(typeKey, sourceId = null) {
     <Data Name="ServicePrincipalNames">HOST/DESKTOP-NEW01.contoso.local RestrictedKrbHost/DESKTOP-NEW01.contoso.local</Data>
   </EventData>
 </Event>`
+        },
+        'cisco_ios': {
+            'interface': '000042: Feb 19 08:12:34.482: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up',
+            'system': '000103: Feb 19 09:01:12.882: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (10.1.1.100)',
+            'authentication': '000050: Feb 19 10:15:33.201: %SEC_LOGIN-5-LOGIN_SUCCESS: Login Success [user: admin] [Source: 10.1.1.100] [localport: 22] at 10:15:33 UTC Thu Feb 19 2026',
+            'acl_security': '000110: Feb 19 16:00:01.110: %SEC-6-IPACCESSLOGP: list OUTSIDE-IN denied tcp 203.0.113.45(44231) -> 10.1.1.10(22), 1 packet',
+            'routing': '000070: Feb 19 12:00:01.110: %OSPF-5-ADJCHG: Process 1, Nbr 192.168.0.2 on GigabitEthernet0/1 from LOADING to FULL, Loading Done',
+            'redundancy': '000100: Feb 19 15:00:01.110: %STANDBY-6-STATECHANGE: Standby: 1: GigabitEthernet0/1 state Standby -> Active',
+            'spanning_tree': '000130: Feb 19 18:00:01.110: %SPANTREE-5-TOPOTRAP: Topology change trap for vlan 1',
+            'hardware': '000142: Feb 19 19:10:33.332: %SNMP-3-AUTHFAIL: Authentication failure for SNMP req from host 10.1.1.50'
         }
     };
 
@@ -446,6 +456,11 @@ async function fetchLogExample(typeKey, sourceId = null) {
     // Handle Active Directory with specific event category
     if (typeKey === 'active_directory' && sourceId) {
         return examples.active_directory[sourceId] || 'No example available for this category.';
+    }
+
+    // Handle Cisco IOS with specific event category
+    if (typeKey === 'cisco_ios' && sourceId) {
+        return examples.cisco_ios[sourceId] || 'No example available for this category.';
     }
 
     // Handle regular log types (fallback)

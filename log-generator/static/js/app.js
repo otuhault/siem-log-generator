@@ -117,6 +117,7 @@ function setupLogTypeListener() {
         const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
         const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
         const adEventCategoriesGroup = document.getElementById('adEventCategoriesGroup');
+        const ciscoIOSEventCategoriesGroup = document.getElementById('ciscoIOSEventCategoriesGroup');
         const frequencyGroup = document.getElementById('frequencyGroup');
         const attackOptionsGroup = document.getElementById('attackOptionsGroup');
         const frequencyInput = document.getElementById('frequency');
@@ -129,6 +130,7 @@ function setupLogTypeListener() {
             sshEventCategoriesGroup.style.display = 'none';
             paloaltoLogTypesGroup.style.display = 'none';
             adEventCategoriesGroup.style.display = 'none';
+            ciscoIOSEventCategoriesGroup.style.display = 'none';
         };
 
         // Check if it's an attack type
@@ -205,6 +207,8 @@ function setupLogTypeListener() {
                 paloaltoLogTypesGroup.style.display = 'block';
             } else if (selectedType === 'active_directory') {
                 adEventCategoriesGroup.style.display = 'block';
+            } else if (selectedType === 'cisco_ios') {
+                ciscoIOSEventCategoriesGroup.style.display = 'block';
             } else {
                 hideAllOptions();
             }
