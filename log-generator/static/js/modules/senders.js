@@ -6,6 +6,39 @@ import { SendersApi } from './api.js';
 import { state, getLogTypeName } from './state.js';
 import { formatDate, showNotification } from './utils.js';
 import { validateSenderForm, clearFormErrors } from './validation.js';
+import { SOURCETYPE_CONFIG } from './sourcetype-config.js';
+
+/**
+ * Helper: Get selected checkbox values
+ * @param {string} name - Checkbox group name attribute
+ * @returns {Array<string>} Selected values
+ */
+function getSelectedCheckboxes(name) {
+    return Array.from(
+        document.querySelectorAll(`input[name="${name}"]:checked`)
+    ).map(cb => cb.value);
+}
+
+/**
+ * Helper: Restore checkbox selections
+ * @param {string} name - Checkbox group name attribute
+ * @param {Array<string>} values - Values to select
+ */
+function restoreCheckboxes(name, values) {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
+        cb.checked = values.includes(cb.value);
+    });
+}
+
+/**
+ * Helper: Reset checkboxes to all checked
+ * @param {string} name - Checkbox group name attribute
+ */
+function resetCheckboxes(name) {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
+        cb.checked = true;
+    });
+}
 
 // Original position of the sender form in the DOM
 let originalFormParent = null;
@@ -81,20 +114,21 @@ export async function loadSenders() {
     try {
         const senders = await SendersApi.getAll();
 
-        const container = document.getElementById('sendersContainer');
+        const activeContainer = document.getElementById('activeSendersContainer');
+        const inactiveContainer = document.getElementById('inactiveSendersContainer');
+
+        // Split senders into active and inactive
+        const activeSenders = senders.filter(s => s.enabled);
+        const inactiveSenders = senders.filter(s => !s.enabled);
 
         // Update statistics
-        const totalSenders = senders.length;
-        const enabledSenders = senders.filter(s => s.enabled).length;
-        const disabledSenders = totalSenders - enabledSenders;
-
-        document.getElementById('totalSenders').textContent = totalSenders;
-        document.getElementById('enabledSenders').textContent = enabledSenders;
-        document.getElementById('disabledSenders').textContent = disabledSenders;
+        document.getElementById('totalSenders').textContent = senders.length;
+        document.getElementById('enabledSenders').textContent = activeSenders.length;
+        document.getElementById('disabledSenders').textContent = inactiveSenders.length;
 
         // Skip table rebuild if the inline edit form is open (to avoid destroying it)
         if (document.querySelector('tr.sender-form-row')) {
-            // Still update log counts in existing rows
+            // Still update log counts and status in existing rows
             senders.forEach(sender => {
                 const row = document.querySelector(`tr[data-sender-id="${sender.id}"]`);
                 if (row) {
@@ -121,45 +155,52 @@ export async function loadSenders() {
             return;
         }
 
-        if (senders.length === 0) {
-            container.innerHTML = '<p class="no-senders">No senders created yet. Click "Add Sender" to create one!</p>';
-            return;
-        }
+        // Render active senders table
+        renderSendersTable(activeContainer, activeSenders, 'No active senders.');
 
-        // Create table
-        const table = document.createElement('table');
-        table.className = 'senders-table';
-
-        // Create table header
-        const thead = document.createElement('thead');
-        thead.innerHTML = `
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Destination</th>
-                <th>Frequency</th>
-                <th>Logs Generated</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        `;
-        table.appendChild(thead);
-
-        // Create table body
-        const tbody = document.createElement('tbody');
-        senders.forEach(sender => {
-            tbody.appendChild(createSenderRow(sender));
-        });
-        table.appendChild(tbody);
-
-        // Clear container and add table
-        container.innerHTML = '';
-        container.appendChild(table);
+        // Render inactive senders table
+        renderSendersTable(inactiveContainer, inactiveSenders, 'No inactive senders.');
 
     } catch (error) {
         console.error('Error loading senders:', error);
     }
+}
+
+/**
+ * Render a senders table into a container
+ */
+function renderSendersTable(container, senders, emptyMessage) {
+    if (senders.length === 0) {
+        container.innerHTML = `<p class="no-senders">${emptyMessage}</p>`;
+        return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'senders-table';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Destination</th>
+            <th>Frequency</th>
+            <th>Logs Generated</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    senders.forEach(sender => {
+        tbody.appendChild(createSenderRow(sender));
+    });
+    table.appendChild(tbody);
+
+    container.innerHTML = '';
+    container.appendChild(table);
 }
 
 /**
@@ -339,44 +380,21 @@ export async function editSender(senderId) {
                 document.getElementById('destination').value = sender.destination;
             }
 
-            // Set options based on log type
-            if (sender.log_type === 'windows' && sender.options) {
-                if (sender.options.sources) {
-                    document.querySelectorAll('input[name="windows_sources"]').forEach(cb => {
-                        cb.checked = sender.options.sources.includes(cb.value);
-                    });
+            // Set options based on log type using configuration mapping
+            const config = SOURCETYPE_CONFIG[sender.log_type];
+            if (config && sender.options) {
+                // Restore checkbox selections
+                const optionValue = sender.options[config.optionKey];
+                if (optionValue) {
+                    restoreCheckboxes(config.checkboxGroup, optionValue);
                 }
-                if (sender.options.render_format) {
-                    document.getElementById('renderFormat').value = sender.options.render_format;
-                }
-            } else if (sender.log_type === 'apache' && sender.options) {
-                if (sender.options.log_types) {
-                    document.querySelectorAll('input[name="apache_log_types"]').forEach(cb => {
-                        cb.checked = sender.options.log_types.includes(cb.value);
-                    });
-                }
-            } else if (sender.log_type === 'ssh' && sender.options) {
-                if (sender.options.event_categories) {
-                    document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => {
-                        cb.checked = sender.options.event_categories.includes(cb.value);
-                    });
-                }
-            } else if (sender.log_type === 'paloalto' && sender.options) {
-                if (sender.options.log_types) {
-                    document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => {
-                        cb.checked = sender.options.log_types.includes(cb.value);
-                    });
-                }
-            } else if (sender.log_type === 'active_directory' && sender.options) {
-                if (sender.options.event_categories) {
-                    document.querySelectorAll('input[name="ad_event_categories"]').forEach(cb => {
-                        cb.checked = sender.options.event_categories.includes(cb.value);
-                    });
-                }
-            } else if (sender.log_type === 'cisco_ios' && sender.options) {
-                if (sender.options.event_categories) {
-                    document.querySelectorAll('input[name="cisco_ios_event_categories"]').forEach(cb => {
-                        cb.checked = sender.options.event_categories.includes(cb.value);
+
+                // Restore additional fields if any
+                if (config.additionalFields) {
+                    Object.entries(config.additionalFields).forEach(([optKey, elemId]) => {
+                        if (sender.options[optKey]) {
+                            document.getElementById(elemId).value = sender.options[optKey];
+                        }
                     });
                 }
             } else if (sender.log_type && state.attackTypes[sender.log_type] && sender.options) {
@@ -493,96 +511,30 @@ export async function handleCreateSender(e) {
         data.destination_type = 'configuration';
     }
 
-    // Add options for Windows logs
-    if (logType === 'windows') {
-        const selectedSources = Array.from(
-            document.querySelectorAll('input[name="windows_sources"]:checked')
-        ).map(cb => cb.value);
+    // Add options for log sourcetypes using configuration mapping
+    const config = SOURCETYPE_CONFIG[logType];
+    if (config) {
+        const selectedValues = getSelectedCheckboxes(config.checkboxGroup);
 
-        if (selectedSources.length === 0) {
-            showNotification('Please select at least one Windows source', 'error');
+        if (selectedValues.length === 0) {
+            const typeName = logType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            showNotification(`Please select at least one ${typeName} option`, 'error');
             return;
         }
 
         data.options = {
-            sources: selectedSources,
-            render_format: formData.get('render_format') || 'xml'
+            [config.optionKey]: selectedValues
         };
-    }
-    // Add options for Apache logs
-    else if (logType === 'apache') {
-        const selectedLogTypes = Array.from(
-            document.querySelectorAll('input[name="apache_log_types"]:checked')
-        ).map(cb => cb.value);
 
-        if (selectedLogTypes.length === 0) {
-            showNotification('Please select at least one Apache log type', 'error');
-            return;
+        // Add additional fields if configured
+        if (config.additionalFields) {
+            Object.entries(config.additionalFields).forEach(([optKey, elemId]) => {
+                const value = formData.get(elemId) || document.getElementById(elemId)?.value;
+                if (value) {
+                    data.options[optKey] = value;
+                }
+            });
         }
-
-        data.options = {
-            log_types: selectedLogTypes
-        };
-    }
-    // Add options for SSH logs
-    else if (logType === 'ssh') {
-        const selectedCategories = Array.from(
-            document.querySelectorAll('input[name="ssh_event_categories"]:checked')
-        ).map(cb => cb.value);
-
-        if (selectedCategories.length === 0) {
-            showNotification('Please select at least one SSH event category', 'error');
-            return;
-        }
-
-        data.options = {
-            event_categories: selectedCategories
-        };
-    }
-    // Add options for Palo Alto logs
-    else if (logType === 'paloalto') {
-        const selectedLogTypes = Array.from(
-            document.querySelectorAll('input[name="paloalto_log_types"]:checked')
-        ).map(cb => cb.value);
-
-        if (selectedLogTypes.length === 0) {
-            showNotification('Please select at least one Palo Alto log type', 'error');
-            return;
-        }
-
-        data.options = {
-            log_types: selectedLogTypes
-        };
-    }
-    // Add options for Active Directory logs
-    else if (logType === 'active_directory') {
-        const selectedCategories = Array.from(
-            document.querySelectorAll('input[name="ad_event_categories"]:checked')
-        ).map(cb => cb.value);
-
-        if (selectedCategories.length === 0) {
-            showNotification('Please select at least one AD event category', 'error');
-            return;
-        }
-
-        data.options = {
-            event_categories: selectedCategories
-        };
-    }
-    // Add options for Cisco IOS logs
-    else if (logType === 'cisco_ios') {
-        const selectedCategories = Array.from(
-            document.querySelectorAll('input[name="cisco_ios_event_categories"]:checked')
-        ).map(cb => cb.value);
-
-        if (selectedCategories.length === 0) {
-            showNotification('Please select at least one Cisco IOS event category', 'error');
-            return;
-        }
-
-        data.options = {
-            event_categories: selectedCategories
-        };
     }
     // Add options for attacks
     else if (logType && state.attackTypes[logType]) {
@@ -682,10 +634,7 @@ export function closeSenderForm() {
     document.getElementById('configurationSelect').required = false;
 
     // Reset all checkboxes to checked by default
-    document.querySelectorAll('input[name="windows_sources"]').forEach(cb => cb.checked = true);
-    document.querySelectorAll('input[name="apache_log_types"]').forEach(cb => cb.checked = true);
-    document.querySelectorAll('input[name="ssh_event_categories"]').forEach(cb => cb.checked = true);
-    document.querySelectorAll('input[name="paloalto_log_types"]').forEach(cb => cb.checked = true);
-    document.querySelectorAll('input[name="ad_event_categories"]').forEach(cb => cb.checked = true);
-    document.querySelectorAll('input[name="cisco_ios_event_categories"]').forEach(cb => cb.checked = true);
+    Object.values(SOURCETYPE_CONFIG).forEach(config => {
+        resetCheckboxes(config.checkboxGroup);
+    });
 }

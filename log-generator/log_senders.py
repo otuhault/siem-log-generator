@@ -6,6 +6,7 @@ import json
 import threading
 import time
 import uuid
+import random
 from datetime import datetime
 from pathlib import Path
 from log_generators.apache import ApacheLogGenerator
@@ -17,94 +18,31 @@ from log_generators.cisco_ios import CiscoIOSLogGenerator
 from hec_sender import HECSender
 from attack_generators import ALL_ATTACK_TYPES
 
-class SSHMultiCategoryGenerator:
-    """Wrapper that generates logs from multiple SSH event categories"""
 
-    def __init__(self, event_categories):
+class MultiSourceLogGenerator:
+    """
+    Universal wrapper for multi-source/category log generators
+    Handles both direct delegation and random selection patterns
+    """
+
+    def __init__(self, generator_or_list):
         """
-        Initialize with multiple event categories
-        event_categories: list of category names like ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors']
+        Args:
+            generator_or_list: Either a single generator instance, or a list of generator instances
         """
-        self.generator = SSHAuthLogGenerator(event_categories=event_categories)
-        self.event_categories = event_categories
+        if isinstance(generator_or_list, list):
+            self.generators = generator_or_list
+            self.is_multi = True
+        else:
+            self.generator = generator_or_list
+            self.is_multi = False
 
     def generate(self):
-        """Generate a log from the configured categories"""
-        return self.generator.generate()
-
-class ApacheMultiSourceGenerator:
-    """Wrapper that generates logs from multiple Apache log types"""
-
-    def __init__(self, log_types):
-        """
-        Initialize with multiple log types
-        log_types: list of type names like ['access', 'error', 'combined']
-        """
-        self.generators = [
-            ApacheLogGenerator(log_type=log_type)
-            for log_type in log_types
-        ]
-        self.log_types = log_types
-
-    def generate(self):
-        """Generate a log from a randomly selected type"""
-        import random
-        generator = random.choice(self.generators)
-        return generator.generate()
-
-class WindowsMultiSourceGenerator:
-    """Wrapper that generates logs from multiple Windows sources"""
-
-    def __init__(self, sources, render_format='xml'):
-        """
-        Initialize with multiple sources
-        sources: list of source names like ['Security', 'Application', 'System']
-        """
-        self.generators = [
-            WindowsEventLogGenerator(source=source, render_format=render_format)
-            for source in sources
-        ]
-        self.sources = sources
-
-    def generate(self):
-        """Generate a log from a randomly selected source"""
-        import random
-        generator = random.choice(self.generators)
-        return generator.generate()
-
-
-class PaloAltoMultiTypeGenerator:
-    """Wrapper that generates logs from multiple Palo Alto log types"""
-
-    def __init__(self, log_types):
-        """
-        Initialize with multiple log types
-        log_types: list of type names like ['traffic', 'threat', 'system']
-        """
-        self.generator = PaloAltoLogGenerator(log_types=log_types)
-        self.log_types = log_types
-
-    def generate(self):
-        """Generate a log from the configured types"""
-        return self.generator.generate()
-
-class ADMultiCategoryGenerator:
-    """Wrapper that generates logs from multiple AD event categories"""
-
-    def __init__(self, event_categories):
-        self.generator = ActiveDirectoryLogGenerator(event_categories=event_categories)
-
-    def generate(self):
-        return self.generator.generate()
-
-class CiscoIOSMultiCategoryGenerator:
-    """Wrapper that generates logs from multiple Cisco IOS event categories"""
-
-    def __init__(self, event_categories):
-        self.generator = CiscoIOSLogGenerator(event_categories=event_categories)
-
-    def generate(self):
-        return self.generator.generate()
+        """Generate a log from the configured generator(s)"""
+        if self.is_multi:
+            return random.choice(self.generators).generate()
+        else:
+            return self.generator.generate()
 
 
 class SenderManager:
@@ -141,8 +79,8 @@ class SenderManager:
                       destination=None, destination_type='file', configuration_id=None,
                       attack_status=None):
         """Create a new sender"""
-        # Check if it's an attack type (direct key or legacy attack:UUID)
-        is_attack = log_type in ALL_ATTACK_TYPES or (log_type and log_type.startswith('attack:'))
+        # Check if it's an attack type
+        is_attack = log_type in ALL_ATTACK_TYPES
 
         if not is_attack and log_type not in self.log_generators:
             raise ValueError(f"Unknown log type: {log_type}")
@@ -254,8 +192,8 @@ class SenderManager:
         # Pass options to generator if available
         options = sender.get('options', {})
 
-        # Handle attack types (direct key or legacy attack:UUID)
-        if log_type in ALL_ATTACK_TYPES or (log_type and log_type.startswith('attack:')):
+        # Handle attack types
+        if log_type in ALL_ATTACK_TYPES:
             # Update attack status to Running
             self.senders[sender_id]['attack_status'] = 'Running'
             self.save_config()
@@ -272,52 +210,66 @@ class SenderManager:
 
         generator_class = self.log_generators[log_type]
 
-        # Handle Windows Event Log generators
-        if log_type == 'windows':
-            # Get selected sources (default to Security if none specified)
-            sources = options.get('sources', ['Security'])
-            render_format = options.get('render_format', 'xml')
+        # Configuration for each sourcetype: how to create the generator(s)
+        sourcetype_configs = {
+            'windows': {
+                'param_key': 'sources',
+                'defaults': ['Security'],
+                'multi_instance': True,  # Create multiple generators, one per source
+                'single_param_name': 'source',  # Parameter name for single instance
+                'extra_params': {'render_format': options.get('render_format', 'xml')}
+            },
+            'apache': {
+                'param_key': 'log_types',
+                'defaults': ['combined'],
+                'multi_instance': True,  # Create multiple generators, one per log_type
+                'single_param_name': 'log_type'
+            },
+            'ssh': {
+                'param_key': 'event_categories',
+                'defaults': ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'],
+                'multi_instance': False  # Single generator handles multiple categories
+            },
+            'paloalto': {
+                'param_key': 'log_types',
+                'defaults': ['traffic', 'threat', 'system'],
+                'multi_instance': False
+            },
+            'active_directory': {
+                'param_key': 'event_categories',
+                'defaults': ['account_management', 'group_management', 'directory_service', 'authentication', 'computer_management'],
+                'multi_instance': False
+            },
+            'cisco_ios': {
+                'param_key': 'event_categories',
+                'defaults': ['interface', 'system', 'authentication', 'acl_security', 'routing', 'redundancy', 'spanning_tree', 'hardware'],
+                'multi_instance': False
+            }
+        }
 
-            # Create a multi-source generator wrapper
-            generator = WindowsMultiSourceGenerator(sources, render_format)
-        # Handle Apache Log generators
-        elif log_type == 'apache':
-            # Get selected log types (default to combined if none specified)
-            log_types = options.get('log_types', ['combined'])
+        # Create generator based on configuration
+        if log_type in sourcetype_configs:
+            config = sourcetype_configs[log_type]
+            param_value = options.get(config['param_key'], config['defaults'])
 
-            # Create a multi-source generator wrapper
-            generator = ApacheMultiSourceGenerator(log_types)
-        # Handle SSH Log generators
-        elif log_type == 'ssh':
-            # Get selected event categories (default to all if none specified)
-            event_categories = options.get('event_categories', ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'])
-
-            # Create a multi-category generator wrapper
-            generator = SSHMultiCategoryGenerator(event_categories)
-        # Handle Palo Alto Log generators
-        elif log_type == 'paloalto':
-            # Get selected log types (default to all if none specified)
-            log_types = options.get('log_types', ['traffic', 'threat', 'system'])
-
-            # Create a multi-type generator wrapper
-            generator = PaloAltoMultiTypeGenerator(log_types)
-        # Handle Active Directory Log generators
-        elif log_type == 'active_directory':
-            event_categories = options.get('event_categories', [
-                'account_management', 'group_management', 'directory_service',
-                'authentication', 'computer_management'
-            ])
-            generator = ADMultiCategoryGenerator(event_categories)
-        # Handle Cisco IOS Log generators
-        elif log_type == 'cisco_ios':
-            event_categories = options.get('event_categories', [
-                'interface', 'system', 'authentication', 'acl_security',
-                'routing', 'redundancy', 'spanning_tree', 'hardware'
-            ])
-            generator = CiscoIOSMultiCategoryGenerator(event_categories)
+            if config.get('multi_instance'):
+                # Create multiple generator instances (Apache, Windows)
+                extra_params = config.get('extra_params', {})
+                single_param = config['single_param_name']
+                generators = []
+                for value in param_value:
+                    gen_params = {single_param: value}
+                    gen_params.update(extra_params)
+                    generators.append(generator_class(**gen_params))
+                generator = MultiSourceLogGenerator(generators)
+            else:
+                # Single generator instance with list parameter (SSH, PaloAlto, AD, Cisco)
+                generator = MultiSourceLogGenerator(
+                    generator_class(**{config['param_key']: param_value})
+                )
         else:
-            # Other log types
-            generator = generator_class()
+            # Default: single generator with no special parameters
+            generator = MultiSourceLogGenerator(generator_class())
 
         stop_event = threading.Event()
         thread = threading.Thread(
@@ -352,25 +304,8 @@ class SenderManager:
 
         print(f"[Attack] Starting attack {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
 
-        # Determine attack_type: direct key or legacy attack:UUID
-        if log_type in ALL_ATTACK_TYPES:
-            attack_type = log_type
-        elif log_type.startswith('attack:'):
-            # Legacy: lookup via AttacksManager
-            attack_id = log_type.replace('attack:', '')
-            from attacks_manager import AttacksManager
-            attacks_mgr = AttacksManager()
-            attack = attacks_mgr.get_attack(attack_id)
-            if not attack:
-                print(f"[Attack] Error: Attack {attack_id} not found")
-                self.senders[sender_id]['attack_status'] = 'Error: Attack not found'
-                self.senders[sender_id]['enabled'] = False
-                self.save_config()
-                if sender_id in self.threads:
-                    del self.threads[sender_id]
-                return
-            attack_type = attack.get('attack_type')
-        else:
+        # Validate attack type
+        if log_type not in ALL_ATTACK_TYPES:
             print(f"[Attack] Error: Unknown attack type {log_type}")
             self.senders[sender_id]['attack_status'] = 'Error: Unknown type'
             self.senders[sender_id]['enabled'] = False
@@ -378,6 +313,8 @@ class SenderManager:
             if sender_id in self.threads:
                 del self.threads[sender_id]
             return
+
+        attack_type = log_type
 
         # Create generator with sender options (includes target_src_ip, target_dest_ip, etc.)
         generator = AttackGeneratorFactory.get_generator(attack_type, options)

@@ -152,14 +152,6 @@ SSH_ATTACK_TYPES = {
     },
 }
 
-# Backward compatibility: old mode names -> new attack types
-MODE_TO_ATTACK_TYPE = {
-    'same_user_same_ip': 'ssh_bruteforce',
-    'diff_user_same_ip': 'ssh_password_spraying',
-    'diff_user_diff_ip': 'ssh_credential_stuffing',
-    'same_user_diff_ip': 'ssh_distributed_bruteforce',
-}
-
 # ============================================================================
 # Palo Alto Port Scan Attack Types
 # ============================================================================
@@ -749,11 +741,6 @@ class AttackGeneratorFactory:
             Generator instance or None if type not supported
         """
         options = options or {}
-
-        # Backward compat: if old mode is passed, remap to new attack type
-        if attack_type == 'ssh_bruteforce' and 'mode' in options:
-            old_mode = options.pop('mode')
-            attack_type = MODE_TO_ATTACK_TYPE.get(old_mode, attack_type)
 
         # All SSH attack types use the same generator with different field_behaviors
         if attack_type in SSH_ATTACK_TYPES:

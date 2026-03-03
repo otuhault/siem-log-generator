@@ -11,6 +11,7 @@ import { loadSenders, handleCreateSender, closeSenderForm, restoreFormToOriginal
 import { loadConfigurations, handleCreateConfiguration, closeConfigurationForm, testConnection } from './modules/configurations.js';
 import { loadAttackTypesView } from './modules/attacks.js';
 import { loadLogTypes, loadSourcetypes } from './modules/sourcetypes.js';
+import { SOURCETYPE_CONFIG, getAllFormGroupIds } from './modules/sourcetype-config.js';
 
 /**
  * Initialize the application on page load
@@ -112,25 +113,16 @@ function setupLogTypeListener() {
         const description = document.getElementById('logTypeDescription');
         const selectedType = e.target.value;
         const renderFormatGroup = document.getElementById('renderFormatGroup');
-        const windowsSourcesGroup = document.getElementById('windowsSourcesGroup');
-        const apacheLogTypesGroup = document.getElementById('apacheLogTypesGroup');
-        const sshEventCategoriesGroup = document.getElementById('sshEventCategoriesGroup');
-        const paloaltoLogTypesGroup = document.getElementById('paloaltoLogTypesGroup');
-        const adEventCategoriesGroup = document.getElementById('adEventCategoriesGroup');
-        const ciscoIOSEventCategoriesGroup = document.getElementById('ciscoIOSEventCategoriesGroup');
         const frequencyGroup = document.getElementById('frequencyGroup');
         const attackOptionsGroup = document.getElementById('attackOptionsGroup');
         const frequencyInput = document.getElementById('frequency');
 
-        // Hide all specific options by default
+        // Hide all sourcetype-specific form groups
         const hideAllOptions = () => {
-            windowsSourcesGroup.style.display = 'none';
-            renderFormatGroup.style.display = 'none';
-            apacheLogTypesGroup.style.display = 'none';
-            sshEventCategoriesGroup.style.display = 'none';
-            paloaltoLogTypesGroup.style.display = 'none';
-            adEventCategoriesGroup.style.display = 'none';
-            ciscoIOSEventCategoriesGroup.style.display = 'none';
+            getAllFormGroupIds().forEach(groupId => {
+                const elem = document.getElementById(groupId);
+                if (elem) elem.style.display = 'none';
+            });
         };
 
         // Check if it's an attack type
@@ -194,23 +186,14 @@ function setupLogTypeListener() {
             frequencyGroup.style.display = 'block';
             frequencyInput.disabled = false;
 
-            // Show type-specific options
+            // Show type-specific options using configuration
             hideAllOptions();
-            if (selectedType === 'windows') {
-                windowsSourcesGroup.style.display = 'block';
-                renderFormatGroup.style.display = 'block';
-            } else if (selectedType === 'apache') {
-                apacheLogTypesGroup.style.display = 'block';
-            } else if (selectedType === 'ssh') {
-                sshEventCategoriesGroup.style.display = 'block';
-            } else if (selectedType === 'paloalto') {
-                paloaltoLogTypesGroup.style.display = 'block';
-            } else if (selectedType === 'active_directory') {
-                adEventCategoriesGroup.style.display = 'block';
-            } else if (selectedType === 'cisco_ios') {
-                ciscoIOSEventCategoriesGroup.style.display = 'block';
-            } else {
-                hideAllOptions();
+            const config = SOURCETYPE_CONFIG[selectedType];
+            if (config && config.formGroups) {
+                config.formGroups.forEach(groupId => {
+                    const elem = document.getElementById(groupId);
+                    if (elem) elem.style.display = 'block';
+                });
             }
         } else {
             description.classList.remove('show');

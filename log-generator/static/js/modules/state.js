@@ -47,9 +47,5 @@ export function getLogTypeName(logType) {
     if (state.logTypes[logType]) {
         return state.logTypes[logType].name;
     }
-    // Backward compat: old attack:UUID format
-    if (logType && logType.startsWith('attack:')) {
-        return 'Attack (legacy)';
-    }
     return logType;
 }
