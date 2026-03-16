@@ -996,3 +996,79 @@ tr.sender-form-row .card {
     color: #64748b;
     border: 1px solid #e2e8f0;
 }
+
+/* ─── Simulation — Subcategories ─────────────────────────────────────────── */
+
+.sim-sourcetype-block {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.sim-sourcetype-block .sim-sourcetype-row {
+    border: none;
+    border-radius: 0;
+    background: #f8fafc;
+}
+
+.sim-subcategories {
+    padding: 8px 12px 10px;
+    background: #fff;
+    border-top: 1px solid var(--border-color);
+}
+
+.sim-subcat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+}
+
+.sim-subcat-toggle-all {
+    font-size: 0.8em;
+    padding: 1px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #f1f5f9;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.sim-subcat-toggle-all:hover {
+    background: #e2e8f0;
+}
+
+.sim-subcat-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.sim-subcat-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82em;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 2px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: #f8fafc;
+    transition: background 0.15s;
+}
+
+.sim-subcat-label:has(input:checked) {
+    background: #e0f2fe;
+    border-color: #bae6fd;
+    color: #0369a1;
+}
+
+.sim-subcat-label input {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    cursor: pointer;
+}

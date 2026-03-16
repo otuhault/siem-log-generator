@@ -54,7 +54,7 @@ class SimulationManager:
         Create a simulation.
 
         sourcetypes: list of dicts:
-            { 'log_type': str, 'volume_gb': float }
+            { 'log_type': str, 'volume_gb': float, 'options': dict }
         """
         sim_id = str(uuid.uuid4())
         duration_seconds = duration_hours * 3600
@@ -70,6 +70,7 @@ class SimulationManager:
                 'log_type': log_type,
                 'volume_gb': volume_gb,
                 'frequency': freq,
+                'options': st.get('options', {}),
                 'sender_id': None,
             })
 
@@ -108,7 +109,7 @@ class SimulationManager:
                 log_type=log_type,
                 frequency=freq,
                 enabled=True,
-                options={},
+                options=entry.get('options', {}),
                 destination=sim.get('destination'),
                 destination_type=sim['destination_type'],
                 configuration_id=sim.get('configuration_id'),

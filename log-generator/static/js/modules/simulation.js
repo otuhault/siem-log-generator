@@ -5,6 +5,7 @@
 
 import { SimulationsApi, ConfigurationsApi, LogTypesApi } from './api.js';
 import { showNotification } from './utils.js';
+import { SOURCETYPE_CONFIG } from './sourcetype-config.js';
 
 let logTypes = {};  // populated from /api/log-types
 
@@ -42,8 +43,13 @@ export function initSimulation() {
         });
     });
 
-    // Live summary update when volumes change
-    document.getElementById('simSourcetypesGrid').addEventListener('input', updateSimSummary);
+    // Live summary update + subcategory toggle when volumes change
+    document.getElementById('simSourcetypesGrid').addEventListener('input', e => {
+        if (e.target.classList.contains('sim-volume-input')) {
+            toggleSubcategories(e.target);
+        }
+        updateSimSummary();
+    });
     document.getElementById('simDurationValue').addEventListener('input', updateSimSummary);
     document.getElementById('simDurationUnit').addEventListener('change', updateSimSummary);
 }
@@ -67,18 +73,58 @@ function populateSimSourcetypesGrid(types) {
         grid.innerHTML = '<p>No sourcetypes available.</p>';
         return;
     }
-    grid.innerHTML = Object.entries(types).map(([key, info]) => `
-        <div class="sim-sourcetype-row">
-            <div class="sim-sourcetype-info">
-                <span class="sim-sourcetype-name">${info.name}</span>
+    grid.innerHTML = Object.entries(types).map(([key, info]) => {
+        const sources = info.sources || [];
+        const subcatsHtml = sources.length ? `
+            <div class="sim-subcategories" data-log-type="${key}" style="display:none;">
+                <div class="sim-subcat-header">
+                    <span>Categories:</span>
+                    <button type="button" class="sim-subcat-toggle-all" data-log-type="${key}">All / None</button>
+                </div>
+                <div class="sim-subcat-list">
+                    ${sources.map(s => `
+                        <label class="sim-subcat-label">
+                            <input type="checkbox" class="sim-subcat-checkbox" value="${s.id}" checked>
+                            <span>${s.name}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>` : '';
+
+        return `
+        <div class="sim-sourcetype-block" data-log-type="${key}">
+            <div class="sim-sourcetype-row">
+                <div class="sim-sourcetype-info">
+                    <span class="sim-sourcetype-name">${info.name}</span>
+                </div>
+                <div class="sim-sourcetype-input">
+                    <input type="number" class="sim-volume-input" data-log-type="${key}"
+                           min="0" step="0.1" value="0" placeholder="0">
+                    <span class="sim-unit">GB</span>
+                </div>
             </div>
-            <div class="sim-sourcetype-input">
-                <input type="number" class="sim-volume-input" data-log-type="${key}"
-                       min="0" step="0.1" value="0" placeholder="0">
-                <span class="sim-unit">GB</span>
-            </div>
-        </div>
-    `).join('');
+            ${subcatsHtml}
+        </div>`;
+    }).join('');
+
+    // All/None toggle buttons
+    grid.querySelectorAll('.sim-subcat-toggle-all').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const block = grid.querySelector(`.sim-subcategories[data-log-type="${btn.dataset.logType}"]`);
+            const boxes = block.querySelectorAll('.sim-subcat-checkbox');
+            const allChecked = [...boxes].every(cb => cb.checked);
+            boxes.forEach(cb => { cb.checked = !allChecked; });
+        });
+    });
+}
+
+function toggleSubcategories(volumeInput) {
+    const logType = volumeInput.dataset.logType;
+    const gb = parseFloat(volumeInput.value) || 0;
+    const subcatDiv = document.querySelector(`.sim-subcategories[data-log-type="${logType}"]`);
+    if (subcatDiv) {
+        subcatDiv.style.display = gb > 0 ? 'block' : 'none';
+    }
 }
 
 function populateSimHecSelect(configs) {
@@ -144,9 +190,23 @@ async function handleCreateSimulation(e) {
     const sourcetypes = [];
     document.querySelectorAll('.sim-volume-input').forEach(input => {
         const gb = parseFloat(input.value) || 0;
-        if (gb > 0) {
-            sourcetypes.push({ log_type: input.dataset.logType, volume_gb: gb });
+        if (gb <= 0) return;
+
+        const logType = input.dataset.logType;
+        const config = SOURCETYPE_CONFIG[logType];
+        let options = {};
+
+        if (config?.optionKey) {
+            const block = document.querySelector(`.sim-subcategories[data-log-type="${logType}"]`);
+            const selected = block
+                ? [...block.querySelectorAll('.sim-subcat-checkbox:checked')].map(cb => cb.value)
+                : [];
+            if (selected.length) {
+                options = { [config.optionKey]: selected };
+            }
         }
+
+        sourcetypes.push({ log_type: logType, volume_gb: gb, options });
     });
 
     if (sourcetypes.length === 0) {
@@ -198,9 +258,14 @@ function renderSimulationsList(simulations) {
         const totalFreq = sim.sourcetypes.reduce((s, st) => s + st.frequency, 0);
         const durationLabel = formatDuration(sim.duration_hours);
 
-        const sourcetypeBadges = sim.sourcetypes.map(st =>
-            `<span class="sim-badge">${logTypes[st.log_type]?.name || st.log_type}: ${st.volume_gb} GB @ ${st.frequency} l/s</span>`
-        ).join('');
+        const sourcetypeBadges = sim.sourcetypes.map(st => {
+            const config = SOURCETYPE_CONFIG[st.log_type];
+            const optionKey = config?.optionKey;
+            const selectedCats = optionKey && st.options?.[optionKey]
+                ? ` (${st.options[optionKey].join(', ')})`
+                : '';
+            return `<span class="sim-badge">${logTypes[st.log_type]?.name || st.log_type}${selectedCats}: ${st.volume_gb} GB @ ${st.frequency} l/s</span>`;
+        }).join('');
 
         return `
         <div class="sender-card ${isRunning ? 'sender-enabled' : ''}">
