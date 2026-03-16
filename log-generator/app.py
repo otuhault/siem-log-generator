@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 from log_senders import SenderManager
 from configuration_manager import ConfigurationManager
+from simulation_manager import SimulationManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
@@ -17,6 +18,7 @@ app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 # Initialize managers
 sender_manager = SenderManager()
 configuration_manager = ConfigurationManager()
+simulation_manager = SimulationManager()
 
 @app.route('/')
 def index():
@@ -192,6 +194,77 @@ def get_attack_types():
     """Get available attack types with their options"""
     from attack_generators import AttackGeneratorFactory
     return jsonify(AttackGeneratorFactory.get_available_attack_types())
+
+@app.route('/api/simulations', methods=['GET'])
+def get_simulations():
+    """Get all simulations"""
+    return jsonify(simulation_manager.get_all_simulations())
+
+
+@app.route('/api/simulations', methods=['POST'])
+def create_simulation():
+    """Create a new simulation"""
+    data = request.json
+    try:
+        sim_id = simulation_manager.create_simulation(
+            name=data['name'],
+            duration_hours=float(data['duration_hours']),
+            sourcetypes=data['sourcetypes'],
+            destination=data.get('destination'),
+            destination_type=data.get('destination_type', 'file'),
+            configuration_id=data.get('configuration_id'),
+        )
+        return jsonify({'success': True, 'simulation_id': sim_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/simulations/<sim_id>', methods=['DELETE'])
+def delete_simulation(sim_id):
+    """Delete a simulation"""
+    try:
+        simulation_manager.delete_simulation(sim_id, sender_manager)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/simulations/<sim_id>/start', methods=['POST'])
+def start_simulation(sim_id):
+    """Start a simulation"""
+    try:
+        simulation_manager.start_simulation(sim_id, sender_manager)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/simulations/<sim_id>/stop', methods=['POST'])
+def stop_simulation(sim_id):
+    """Stop a simulation"""
+    try:
+        simulation_manager.stop_simulation(sim_id, sender_manager)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/simulations/calculate', methods=['POST'])
+def calculate_simulation():
+    """Preview frequencies without creating a simulation"""
+    data = request.json
+    try:
+        duration_seconds = float(data['duration_hours']) * 3600
+        result = []
+        for st in data.get('sourcetypes', []):
+            log_type = st['log_type']
+            volume_gb = float(st.get('volume_gb', 0))
+            freq = simulation_manager.calculate_frequency(volume_gb, duration_seconds, log_type)
+            result.append({'log_type': log_type, 'volume_gb': volume_gb, 'frequency': freq})
+        return jsonify({'success': True, 'sourcetypes': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

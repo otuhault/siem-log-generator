@@ -12,6 +12,7 @@ import { loadConfigurations, handleCreateConfiguration, closeConfigurationForm, 
 import { loadAttackTypesView } from './modules/attacks.js';
 import { loadLogTypes, loadSourcetypes } from './modules/sourcetypes.js';
 import { SOURCETYPE_CONFIG, getAllFormGroupIds } from './modules/sourcetype-config.js';
+import { loadSimulations, initSimulation } from './modules/simulation.js';
 
 /**
  * Initialize the application on page load
@@ -28,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup event listeners and tabs
     setupEventListeners();
     setupTabs();
+    initSimulation();
 
     // Refresh senders every 2 seconds to update counts
     setInterval(loadSenders, 2000);
@@ -231,6 +233,8 @@ function setupTabs() {
                 loadConfigurations();
             } else if (tabName === 'attacks') {
                 loadAttackTypesView();
+            } else if (tabName === 'simulation') {
+                loadSimulations();
             }
         });
     });

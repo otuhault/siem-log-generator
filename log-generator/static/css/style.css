@@ -898,3 +898,101 @@ tr.sender-form-row .card {
     padding: 10px;
     line-height: 1.6;
 }
+
+/* ─── Simulation Tab ─────────────────────────────────────────────────────── */
+
+.sim-sourcetypes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.sim-sourcetype-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.sim-sourcetype-name {
+    font-weight: 500;
+    font-size: 0.9em;
+    color: var(--text-primary);
+}
+
+.sim-sourcetype-input {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sim-volume-input {
+    width: 90px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9em;
+    text-align: right;
+}
+
+.sim-unit {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    min-width: 20px;
+}
+
+.sim-summary {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+}
+
+.sim-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 0.9em;
+    color: var(--text-primary);
+}
+
+.sim-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.sim-badge {
+    font-size: 0.78em;
+    padding: 2px 8px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 12px;
+    border: 1px solid #bae6fd;
+}
+
+.status-badge {
+    font-size: 0.78em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.status-running {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.status-stopped {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}

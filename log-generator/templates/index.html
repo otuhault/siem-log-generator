@@ -18,6 +18,7 @@
             <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
             <button class="tab-btn" data-tab="attacks">Attacks</button>
             <button class="tab-btn" data-tab="configurations">HEC Destinations</button>
+            <button class="tab-btn" data-tab="simulation">Simulation</button>
         </nav>
 
         <div class="main-content">
@@ -578,6 +579,105 @@
                     <h2>Available Attack Types</h2>
                     <div id="attacksContainer">
                         <p class="loading">Loading attack types...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Tab Content -->
+            <div id="simulationTab" class="tab-content">
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Simulations: <strong id="totalSimulations">0</strong></span>
+                        <span class="stat-item">Running: <strong id="runningSimulations">0</strong></span>
+                    </div>
+                    <button id="addSimulationBtn" class="btn btn-primary">+ New Simulation</button>
+                </div>
+
+                <!-- Create Simulation Form -->
+                <div id="simulationFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2>Create New Simulation</h2>
+                        <button id="closeSimulationForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createSimulationForm">
+                        <div class="form-group">
+                            <label for="simName">Simulation Name:</label>
+                            <input type="text" id="simName" required placeholder="e.g., Client ACME — 1TB/day baseline">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="simDuration">Duration:</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="number" id="simDurationValue" min="0.1" step="0.1" value="24" style="width: 100px;">
+                                <select id="simDurationUnit">
+                                    <option value="1">hour(s)</option>
+                                    <option value="24" selected>day(s)</option>
+                                    <option value="168">week(s)</option>
+                                </select>
+                            </div>
+                            <small>Duration over which the total volume will be spread</small>
+                        </div>
+
+                        <!-- Destination -->
+                        <div class="form-group">
+                            <label>Destination:</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="sim_destination_type" value="file" checked>
+                                    <span>File</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="sim_destination_type" value="configuration">
+                                    <span>HEC Destination</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="simFileDestGroup">
+                            <label for="simDestination">Output File Path:</label>
+                            <input type="text" id="simDestination" placeholder="/tmp/simulation.log">
+                        </div>
+
+                        <div class="form-group" id="simHecDestGroup" style="display: none;">
+                            <label for="simConfigurationSelect">HEC Destination:</label>
+                            <select id="simConfigurationSelect">
+                                <option value="">Select a destination...</option>
+                            </select>
+                        </div>
+
+                        <!-- Sourcetype volumes -->
+                        <div class="form-group">
+                            <label>Volume per Sourcetype:</label>
+                            <small>Enter the volume in GB for each sourcetype over the configured duration. Leave at 0 to exclude.</small>
+                            <div id="simSourcetypesGrid" class="sim-sourcetypes-grid">
+                                <p class="loading">Loading sourcetypes...</p>
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div id="simSummary" class="sim-summary" style="display: none;">
+                            <div class="sim-summary-row">
+                                <span>Total volume:</span>
+                                <strong id="simTotalGB">0 GB</strong>
+                            </div>
+                            <div class="sim-summary-row">
+                                <span>Average rate:</span>
+                                <strong id="simTotalRate">0 logs/sec</strong>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Create Simulation</button>
+                            <button type="button" id="cancelSimulationForm" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Simulations List -->
+                <div class="card">
+                    <h2>Simulations</h2>
+                    <div id="simulationsContainer">
+                        <p class="no-senders">No simulations yet. Click "+ New Simulation" to create one!</p>
                     </div>
                 </div>
             </div>

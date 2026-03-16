@@ -94,3 +94,26 @@ export const AttacksApi = {
 export const LogTypesApi = {
     getAll: () => fetchApi('/log-types')
 };
+
+// ============== Simulations API ==============
+
+export const SimulationsApi = {
+    getAll: () => fetchApi('/simulations'),
+
+    create: (data) => fetchApi('/simulations', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    }),
+
+    delete: (id) => fetchApi(`/simulations/${id}`, {
+        method: 'DELETE'
+    }),
+
+    start: (id) => fetchApi(`/simulations/${id}/start`, {
+        method: 'POST'
+    }),
+
+    stop: (id) => fetchApi(`/simulations/${id}/stop`, {
+        method: 'POST'
+    }),
+};
