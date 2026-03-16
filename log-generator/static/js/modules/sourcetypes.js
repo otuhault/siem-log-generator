@@ -430,6 +430,13 @@ async function fetchLogExample(typeKey, sourceId = null) {
             'redundancy': '000100: Feb 19 15:00:01.110: %STANDBY-6-STATECHANGE: Standby: 1: GigabitEthernet0/1 state Standby -> Active',
             'spanning_tree': '000130: Feb 19 18:00:01.110: %SPANTREE-5-TOPOTRAP: Topology change trap for vlan 1',
             'hardware': '000142: Feb 19 19:10:33.332: %SNMP-3-AUTHFAIL: Authentication failure for SNMP req from host 10.1.1.50'
+        },
+        'cisco_ftd': {
+            'connection': '<113>:2026-03-04T10:15:42Z:ftd-primary: %NGIPS-4-430002: EventPriority: Medium, DeviceUUID: e8566508-eaa9-11e5-860f-de3e305d8269, ConnectionID: 12345, AccessControlRuleAction: Allow, SrcIP: 10.1.9.9, DstIP: 93.157.158.93, SrcPort: 13723, DstPort: 443, Protocol: tcp, IngressInterface: inside, EgressInterface: outside, User: john.doe, ApplicationProtocol: HTTPS',
+            'intrusion': '<113>:2026-03-04T10:20:15Z:ftd-primary: %NGIPS-2-430003: EventPriority: High, DeviceUUID: e8566508-eaa9-11e5-860f-de3e305d8269, InstanceID: 3, FirstPacketSecond: 2026-03-04T10:20:15Z, ConnectionID: 12346, AccessControlRuleAction: Block with reset, SrcIP: 93.157.158.93, DstIP: 10.1.9.9, SrcPort: 45678, DstPort: 22, Protocol: tcp, IngressInterface: outside, EgressInterface: inside, SignatureName: SSH Brute Force Login Attempt',
+            'file': '<114>:2026-03-04T10:25:30Z:ftd-datacenter-01: %NGIPS-5-430004: EventPriority: Low, DeviceUUID: a1234567-bbbb-cccc-dddd-123456789abc, ConnectionID: 12347, AccessControlRuleAction: Allow, SrcIP: 185.220.101.50, DstIP: 10.2.5.10, Protocol: tcp, IngressInterface: outside, EgressInterface: dmz, FileName: invoice_2026.pdf, FileType: PDF, FileSize: 524288, FileSHA256: E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855, FileDisposition: Clean, ApplicationProtocol: HTTP',
+            'malware': '<113>:2026-03-04T10:30:45Z:ftd-edge-gw: %NGIPS-1-430005: EventPriority: High, DeviceUUID: f9876543-aaaa-bbbb-cccc-fedcba987654, ConnectionID: 12348, AccessControlRuleAction: Block, SrcIP: 45.33.32.156, DstIP: 10.100.20.50, Protocol: tcp, IngressInterface: outside, EgressInterface: inside, FileName: malware_sample.exe, FileType: MSEXE, FileSHA256: 2C26B46B68FFC68FF99B453C1D30413413422D706483BFA0F98A5E886266E7AE, ThreatName: Win.Trojan.Generic, Disposition: Malware, Action: Block',
+            'traditional': '<135>:2026-03-04T10:35:00Z:ftd-dmz: %FTD-5-111010: User \'admin\', running \'CLI\' from IP 10.1.1.100, executed \'show version\''
         }
     };
 
@@ -461,6 +468,11 @@ async function fetchLogExample(typeKey, sourceId = null) {
     // Handle Cisco IOS with specific event category
     if (typeKey === 'cisco_ios' && sourceId) {
         return examples.cisco_ios[sourceId] || 'No example available for this category.';
+    }
+
+    // Handle Cisco FTD with specific event category
+    if (typeKey === 'cisco_ftd' && sourceId) {
+        return examples.cisco_ftd[sourceId] || 'No example available for this category.';
     }
 
     // Handle regular log types (fallback)

@@ -15,6 +15,7 @@ from log_generators.ssh import SSHAuthLogGenerator
 from log_generators.paloalto import PaloAltoLogGenerator
 from log_generators.active_directory import ActiveDirectoryLogGenerator
 from log_generators.cisco_ios import CiscoIOSLogGenerator
+from log_generators.cisco_ftd import CiscoFTDLogGenerator
 from hec_sender import HECSender
 from attack_generators import ALL_ATTACK_TYPES
 
@@ -62,6 +63,7 @@ class SenderManager:
             'paloalto': PaloAltoLogGenerator,
             'active_directory': ActiveDirectoryLogGenerator,
             'cisco_ios': CiscoIOSLogGenerator,
+            'cisco_ftd': CiscoFTDLogGenerator,
         }
     
     def load_config(self):
@@ -243,6 +245,11 @@ class SenderManager:
             'cisco_ios': {
                 'param_key': 'event_categories',
                 'defaults': ['interface', 'system', 'authentication', 'acl_security', 'routing', 'redundancy', 'spanning_tree', 'hardware'],
+                'multi_instance': False
+            },
+            'cisco_ftd': {
+                'param_key': 'event_categories',
+                'defaults': ['connection', 'intrusion', 'file', 'malware', 'traditional'],
                 'multi_instance': False
             }
         }
@@ -663,6 +670,38 @@ class SenderManager:
                         'id': 'hardware',
                         'name': 'Hardware & Environment',
                         'description': 'SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)'
+                    }
+                ]
+            },
+            'cisco_ftd': {
+                'name': 'Cisco Secure Firewall Threat Defense',
+                'description': 'Cisco FTD (formerly Firepower) EMBLEM syslog format (cisco:ftd sourcetype)',
+                'example': 'Connection events, intrusion detection, file/malware events, traditional messages',
+                'sources': [
+                    {
+                        'id': 'connection',
+                        'name': 'Connection Events',
+                        'description': 'Network connection events with source/dest, ports, protocols, actions (430002)'
+                    },
+                    {
+                        'id': 'intrusion',
+                        'name': 'Intrusion Events',
+                        'description': 'IPS/IDS detections, blocked threats, signature matches (430001, 430003)'
+                    },
+                    {
+                        'id': 'file',
+                        'name': 'File Events',
+                        'description': 'Files detected in network traffic with hashes and dispositions (430004)'
+                    },
+                    {
+                        'id': 'malware',
+                        'name': 'Malware Events',
+                        'description': 'Malware detections with threat names and blocked actions (430005)'
+                    },
+                    {
+                        'id': 'traditional',
+                        'name': 'Traditional Messages',
+                        'description': 'ASA-style system messages (authentication, VPN, interface, system events)'
                     }
                 ]
             }

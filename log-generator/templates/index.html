@@ -303,6 +303,48 @@
                             </div>
                         </div>
 
+                        <!-- Cisco FTD Event Categories -->
+                        <div class="form-group" id="ciscoFTDEventCategoriesGroup" style="display: none;">
+                            <label>Event Categories:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="connection" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Connection Events</strong>
+                                        <small>Network connection events with source/dest, ports, protocols, actions (430002)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="intrusion" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Intrusion Events</strong>
+                                        <small>IPS/IDS detections, blocked threats, signature matches (430001, 430003)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="file" checked>
+                                    <span class="checkbox-text">
+                                        <strong>File Events</strong>
+                                        <small>Files detected in network traffic with hashes and dispositions (430004)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="malware" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Malware Events</strong>
+                                        <small>Malware detections with threat names and blocked actions (430005)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="traditional" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Traditional Messages</strong>
+                                        <small>ASA-style system messages (authentication, VPN, interface, system events)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- Attack-specific options (hidden by default) -->
                         <div class="form-group" id="attackOptionsGroup" style="display: none;">
                             <label>Attack Configuration:</label>
