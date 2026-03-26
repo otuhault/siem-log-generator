@@ -11,6 +11,29 @@ from datetime import datetime
 class CiscoIOSLogGenerator:
     """Generates Cisco IOS syslog messages with various facilities and event types"""
 
+    LOG_TYPE = 'cisco_ios'
+    AVG_LOG_SIZE = 150
+    SOURCETYPE_CONFIG = {
+        'param_key': 'event_categories',
+        'defaults': ['interface', 'system', 'authentication', 'acl_security', 'routing', 'redundancy', 'spanning_tree', 'hardware'],
+        'multi_instance': False,
+    }
+    METADATA = {
+        'name': 'Cisco IOS',
+        'description': 'Cisco IOS syslog messages (cisco:ios sourcetype)',
+        'example': 'Interface status, AAA authentication, ACL logs, routing protocols, HSRP, STP',
+        'sources': [
+            {'id': 'interface',      'name': 'Interface & Link Status', 'description': 'Interface and line protocol state changes (LINK, LINEPROTO)'},
+            {'id': 'system',         'name': 'System Events',           'description': 'Configuration changes, restarts, memory/CPU events (SYS, PARSER)'},
+            {'id': 'authentication', 'name': 'Authentication & AAA',    'description': 'Login success/failed, user sessions, 802.1X (SEC_LOGIN, AAA, AUTHMGR)'},
+            {'id': 'acl_security',   'name': 'ACL & Security',          'description': 'Access list permit/deny, zone-based firewall sessions (SEC, FW)'},
+            {'id': 'routing',        'name': 'Routing Protocols',       'description': 'OSPF, BGP, EIGRP adjacency and neighbor changes'},
+            {'id': 'redundancy',     'name': 'HSRP/VRRP',              'description': 'Hot Standby Router Protocol state transitions (STANDBY)'},
+            {'id': 'spanning_tree',  'name': 'Spanning Tree',           'description': 'Topology changes, root guard, PVID inconsistency (SPANTREE)'},
+            {'id': 'hardware',       'name': 'Hardware & Environment',  'description': 'SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)'},
+        ],
+    }
+
     def __init__(self, event_categories=None):
         if event_categories is None:
             event_categories = [

@@ -9,6 +9,26 @@ from datetime import datetime
 class SSHAuthLogGenerator:
     """Generates SSH auth.log entries with various event types"""
 
+    LOG_TYPE = 'ssh'
+    AVG_LOG_SIZE = 150
+    SOURCETYPE_CONFIG = {
+        'param_key': 'event_categories',
+        'defaults': ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'],
+        'multi_instance': False,
+    }
+    METADATA = {
+        'name': 'SSH Auth Log',
+        'description': 'SSH authentication logs (auth.log) - login attempts, sessions, disconnections',
+        'example': 'Failed password, accepted publickey, connection closed, etc.',
+        'sources': [
+            {'id': 'auth_success', 'name': 'Successful Authentication', 'description': 'Accepted password and publickey authentications'},
+            {'id': 'auth_failed',  'name': 'Failed Authentication',     'description': 'Failed password, invalid users, max auth attempts'},
+            {'id': 'sessions',     'name': 'Session Management',        'description': 'Session opened and closed events (PAM)'},
+            {'id': 'connections',  'name': 'Connection Events',         'description': 'Connection closed, disconnected, reset events'},
+            {'id': 'errors',       'name': 'Errors & Other',            'description': 'Protocol errors, identification issues, server events'},
+        ],
+    }
+
     def __init__(self, event_categories=None):
         """
         Initialize SSH auth log generator

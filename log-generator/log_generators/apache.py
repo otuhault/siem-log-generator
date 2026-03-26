@@ -9,6 +9,25 @@ from datetime import datetime
 class ApacheLogGenerator:
     """Generates Apache logs in different formats (access, error, combined)"""
 
+    LOG_TYPE = 'apache'
+    AVG_LOG_SIZE = 200  # bytes — used by SimulationManager
+    SOURCETYPE_CONFIG = {
+        'param_key': 'log_types',
+        'defaults': ['combined'],
+        'multi_instance': True,
+        'single_param_name': 'log_type',
+    }
+    METADATA = {
+        'name': 'Apache/Nginx Log',
+        'description': 'Apache/Nginx web server logs in various formats',
+        'example': 'Access, Error, and Combined log formats',
+        'sources': [
+            {'id': 'access',    'name': 'Access Log (Common)',   'description': 'Common Log Format without referer and user-agent'},
+            {'id': 'error',     'name': 'Error Log',             'description': 'Apache error logs with various severity levels'},
+            {'id': 'combined',  'name': 'Access Log (Combined)', 'description': 'Combined Log Format with referer and user-agent'},
+        ],
+    }
+
     def __init__(self, log_type='combined'):
         """
         Initialize Apache log generator

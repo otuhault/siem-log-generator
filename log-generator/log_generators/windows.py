@@ -12,6 +12,26 @@ from xml.dom import minidom
 class WindowsEventLogGenerator:
     """Generates Windows Event Logs for different sources (Security, Application, System)"""
 
+    LOG_TYPE = 'windows'
+    AVG_LOG_SIZE = 600
+    SOURCETYPE_CONFIG = {
+        'param_key': 'sources',
+        'defaults': ['Security'],
+        'multi_instance': True,
+        'single_param_name': 'source',
+        'extra_params_keys': {'render_format': 'xml'},
+    }
+    METADATA = {
+        'name': 'Windows Event Log',
+        'description': 'Windows Event Logs - Security, Application, and System sources',
+        'example': 'Event ID 4624 - Successful Logon (Security)',
+        'sources': [
+            {'id': 'Security',    'name': 'Security',    'description': 'Authentication, privileges, processes (4624, 4625, 4688, etc.)'},
+            {'id': 'Application', 'name': 'Application', 'description': 'Application errors, installations, updates (1000, 1001, 11707, etc.)'},
+            {'id': 'System',      'name': 'System',      'description': 'Service management, system events (6005, 7036, 7034, etc.)'},
+        ],
+    }
+
     def __init__(self, source='Security', render_format='xml'):
         self.source = source  # 'Security', 'Application', or 'System'
         self.render_format = render_format  # 'xml' or 'classic'

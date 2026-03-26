@@ -11,6 +11,26 @@ from datetime import datetime, timedelta
 class ActiveDirectoryLogGenerator:
     """Generates Active Directory domain controller event logs in XML format"""
 
+    LOG_TYPE = 'active_directory'
+    AVG_LOG_SIZE = 900
+    SOURCETYPE_CONFIG = {
+        'param_key': 'event_categories',
+        'defaults': ['account_management', 'group_management', 'directory_service', 'authentication', 'computer_management'],
+        'multi_instance': False,
+    }
+    METADATA = {
+        'name': 'Active Directory',
+        'description': 'Active Directory domain controller event logs (XmlWinEventLog)',
+        'example': 'Account management, group changes, Kerberos, directory service',
+        'sources': [
+            {'id': 'account_management',  'name': 'Account Management',  'description': 'User account created, enabled, disabled, deleted, changed, locked out (4720, 4722, 4725, 4726, 4738, 4740, 4767)'},
+            {'id': 'group_management',    'name': 'Group Management',    'description': 'Members added/removed from security groups (4728, 4729, 4732, 4733, 4756, 4757)'},
+            {'id': 'directory_service',   'name': 'Directory Service',   'description': 'LDAP object modifications, creations, and access operations (5136, 5137, 4662)'},
+            {'id': 'authentication',      'name': 'Authentication',      'description': 'Kerberos TGT/TGS requests, pre-auth failures, NTLM validation (4768, 4769, 4771, 4776)'},
+            {'id': 'computer_management', 'name': 'Computer Management', 'description': 'Computer accounts created, changed, deleted (4741, 4742, 4743)'},
+        ],
+    }
+
     def __init__(self, event_categories=None):
         """
         Initialize the AD log generator.

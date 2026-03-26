@@ -3,49 +3,27 @@ Simulation Manager
 Orchestrates multiple senders to simulate a real infrastructure's log volume.
 """
 
-import json
 import uuid
 from datetime import datetime
-from pathlib import Path
+from store import JsonStore
+from log_generators.registry import REGISTRY
 
 
-# Estimated average log size in bytes per sourcetype
-AVG_LOG_SIZES = {
-    'apache':           200,
-    'windows':          600,
-    'ssh':              150,
-    'paloalto':         400,
-    'active_directory': 900,
-    'cisco_ios':        150,
-    'cisco_ftd':        250,
-}
-
-
-class SimulationManager:
+class SimulationManager(JsonStore):
     """Manages infrastructure simulations"""
 
     def __init__(self, config_file='simulations_config.json'):
-        self.config_file = config_file
-        self.simulations = {}
-        self.load_config()
-
-    def load_config(self):
-        if Path(self.config_file).exists():
-            with open(self.config_file, 'r') as f:
-                self.simulations = json.load(f)
-
-    def save_config(self):
-        with open(self.config_file, 'w') as f:
-            json.dump(self.simulations, f, indent=2)
+        super().__init__(config_file)
+        self.simulations = self._data  # alias kept for backward compatibility
 
     def calculate_frequency(self, volume_gb, duration_seconds, log_type):
         """Return logs/sec needed to reach volume_gb over duration_seconds."""
         if volume_gb <= 0 or duration_seconds <= 0:
             return 0
-        avg_size = AVG_LOG_SIZES.get(log_type, 300)
+        cls = REGISTRY.get(log_type)
+        avg_size = cls.AVG_LOG_SIZE if cls else 300
         volume_bytes = volume_gb * 1024 ** 3
         freq = volume_bytes / (duration_seconds * avg_size)
-        # Clamp to [1, 10000]
         return max(1, min(10000, round(freq, 2)))
 
     def create_simulation(self, name, duration_hours, sourcetypes, destination=None,
@@ -77,7 +55,7 @@ class SimulationManager:
         if not entries:
             raise ValueError("At least one sourcetype with volume > 0 is required.")
 
-        self.simulations[sim_id] = {
+        self._data[sim_id] = {
             'id': sim_id,
             'name': name,
             'duration_hours': duration_hours,
@@ -88,26 +66,23 @@ class SimulationManager:
             'status': 'stopped',
             'created_at': datetime.now().isoformat(),
         }
-        self.save_config()
+        self._save()
         return sim_id
 
     def start_simulation(self, sim_id, sender_manager):
         """Start all senders for a simulation."""
-        if sim_id not in self.simulations:
+        if sim_id not in self._data:
             raise ValueError(f"Simulation {sim_id} not found")
 
-        sim = self.simulations[sim_id]
+        sim = self._data[sim_id]
         if sim['status'] == 'running':
             raise ValueError("Simulation is already running")
 
         for entry in sim['sourcetypes']:
-            log_type = entry['log_type']
-            freq = entry['frequency']
-
             sender_id = sender_manager.create_sender(
-                name=f"[SIM] {sim['name']} — {log_type}",
-                log_type=log_type,
-                frequency=freq,
+                name=f"[SIM] {sim['name']} — {entry['log_type']}",
+                log_type=entry['log_type'],
+                frequency=entry['frequency'],
                 enabled=True,
                 options=entry.get('options', {}),
                 destination=sim.get('destination'),
@@ -118,15 +93,14 @@ class SimulationManager:
 
         sim['status'] = 'running'
         sim['started_at'] = datetime.now().isoformat()
-        self.save_config()
+        self._save()
 
     def stop_simulation(self, sim_id, sender_manager):
         """Stop and delete all senders for a simulation."""
-        if sim_id not in self.simulations:
+        if sim_id not in self._data:
             raise ValueError(f"Simulation {sim_id} not found")
 
-        sim = self.simulations[sim_id]
-
+        sim = self._data[sim_id]
         for entry in sim['sourcetypes']:
             sender_id = entry.get('sender_id')
             if sender_id and sender_id in sender_manager.senders:
@@ -135,22 +109,22 @@ class SimulationManager:
 
         sim['status'] = 'stopped'
         sim.pop('started_at', None)
-        self.save_config()
+        self._save()
 
     def delete_simulation(self, sim_id, sender_manager):
         """Stop and remove a simulation."""
-        if sim_id not in self.simulations:
+        if sim_id not in self._data:
             raise ValueError(f"Simulation {sim_id} not found")
 
-        sim = self.simulations[sim_id]
+        sim = self._data[sim_id]
         if sim['status'] == 'running':
             self.stop_simulation(sim_id, sender_manager)
 
-        del self.simulations[sim_id]
-        self.save_config()
+        del self._data[sim_id]
+        self._save()
 
     def get_all_simulations(self):
-        return list(self.simulations.values())
+        return list(self._data.values())
 
     def get_simulation(self, sim_id):
-        return self.simulations.get(sim_id)
+        return self._data.get(sim_id)

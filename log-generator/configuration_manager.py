@@ -2,35 +2,21 @@
 Configuration Management for HEC Destinations
 """
 
-import json
 import uuid
 from datetime import datetime
-from pathlib import Path
+from store import JsonStore
 
 
-class ConfigurationManager:
+class ConfigurationManager(JsonStore):
     """Manages HEC destination configurations"""
 
     def __init__(self, config_file='configurations.json'):
-        self.config_file = config_file
-        self.configurations = {}
-        self.load_config()
-
-    def load_config(self):
-        """Load configuration from file"""
-        if Path(self.config_file).exists():
-            with open(self.config_file, 'r') as f:
-                self.configurations = json.load(f)
-
-    def save_config(self):
-        """Save configuration to file"""
-        with open(self.config_file, 'w') as f:
-            json.dump(self.configurations, f, indent=2)
+        super().__init__(config_file)
+        self.configurations = self._data  # alias kept for backward compatibility
 
     def create_configuration(self, name, url, port, token, index=None, sourcetype=None, host=None, source=None):
-        """Create a new configuration"""
         config_id = str(uuid.uuid4())
-        self.configurations[config_id] = {
+        self._data[config_id] = {
             'id': config_id,
             'name': name,
             'url': url,
@@ -40,46 +26,37 @@ class ConfigurationManager:
             'sourcetype': sourcetype,
             'host': host,
             'source': source,
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat(),
         }
-        self.save_config()
+        self._save()
         return config_id
 
     def get_configuration(self, config_id):
-        """Get a specific configuration"""
-        return self.configurations.get(config_id)
+        return self._data.get(config_id)
 
     def get_all_configurations(self):
-        """Get all configurations"""
-        return list(self.configurations.values())
+        return list(self._data.values())
 
     def update_configuration(self, config_id, data):
-        """Update configuration"""
-        if config_id not in self.configurations:
+        if config_id not in self._data:
             raise ValueError(f"Configuration {config_id} not found")
-
-        self.configurations[config_id].update(data)
-        self.save_config()
+        self._data[config_id].update(data)
+        self._save()
 
     def delete_configuration(self, config_id):
-        """Delete a configuration"""
-        if config_id not in self.configurations:
+        if config_id not in self._data:
             raise ValueError(f"Configuration {config_id} not found")
-
-        del self.configurations[config_id]
-        self.save_config()
+        del self._data[config_id]
+        self._save()
 
     def clone_configuration(self, config_id):
-        """Clone a configuration"""
-        if config_id not in self.configurations:
+        if config_id not in self._data:
             raise ValueError(f"Configuration {config_id} not found")
-
-        original = self.configurations[config_id].copy()
+        original = self._data[config_id].copy()
         new_id = str(uuid.uuid4())
         original['id'] = new_id
         original['name'] = f"{original['name']} (copy)"
         original['created_at'] = datetime.now().isoformat()
-
-        self.configurations[new_id] = original
-        self.save_config()
+        self._data[new_id] = original
+        self._save()
         return new_id

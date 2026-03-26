@@ -16,6 +16,26 @@ import uuid
 class CiscoFTDLogGenerator:
     """Generate Cisco Secure Firewall Threat Defense logs"""
 
+    LOG_TYPE = 'cisco_ftd'
+    AVG_LOG_SIZE = 250
+    SOURCETYPE_CONFIG = {
+        'param_key': 'event_categories',
+        'defaults': ['connection', 'intrusion', 'file', 'malware', 'traditional'],
+        'multi_instance': False,
+    }
+    METADATA = {
+        'name': 'Cisco Secure Firewall Threat Defense',
+        'description': 'Cisco FTD (formerly Firepower) EMBLEM syslog format (cisco:ftd sourcetype)',
+        'example': 'Connection events, intrusion detection, file/malware events, traditional messages',
+        'sources': [
+            {'id': 'connection', 'name': 'Connection Events',    'description': 'Network connection events with source/dest, ports, protocols, actions (430002)'},
+            {'id': 'intrusion',  'name': 'Intrusion Events',     'description': 'IPS/IDS detections, blocked threats, signature matches (430001, 430003)'},
+            {'id': 'file',       'name': 'File Events',          'description': 'Files detected in network traffic with hashes and dispositions (430004)'},
+            {'id': 'malware',    'name': 'Malware Events',       'description': 'Malware detections with threat names and blocked actions (430005)'},
+            {'id': 'traditional','name': 'Traditional Messages', 'description': 'ASA-style system messages (authentication, VPN, interface, system events)'},
+        ],
+    }
+
     def __init__(self, event_categories=None):
         """
         Initialize generator with configurable event categories.

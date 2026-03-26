@@ -9,700 +9,332 @@ import uuid
 import random
 from datetime import datetime
 from pathlib import Path
-from log_generators.apache import ApacheLogGenerator
-from log_generators.windows import WindowsEventLogGenerator
-from log_generators.ssh import SSHAuthLogGenerator
-from log_generators.paloalto import PaloAltoLogGenerator
-from log_generators.active_directory import ActiveDirectoryLogGenerator
-from log_generators.cisco_ios import CiscoIOSLogGenerator
-from log_generators.cisco_ftd import CiscoFTDLogGenerator
+
+from store import JsonStore
+from log_generators.registry import REGISTRY
 from hec_sender import HECSender
-from attack_generators import ALL_ATTACK_TYPES
+from configuration_manager import ConfigurationManager
+from attack_generators import ATTACK_REGISTRY, AttackGeneratorFactory
 
 
 class MultiSourceLogGenerator:
-    """
-    Universal wrapper for multi-source/category log generators
-    Handles both direct delegation and random selection patterns
-    """
+    """Wraps one or more generator instances behind a single generate() call."""
 
     def __init__(self, generator_or_list):
-        """
-        Args:
-            generator_or_list: Either a single generator instance, or a list of generator instances
-        """
         if isinstance(generator_or_list, list):
-            self.generators = generator_or_list
-            self.is_multi = True
+            self._generators = generator_or_list
+            self._multi = True
         else:
-            self.generator = generator_or_list
-            self.is_multi = False
+            self._generator = generator_or_list
+            self._multi = False
 
     def generate(self):
-        """Generate a log from the configured generator(s)"""
-        if self.is_multi:
-            return random.choice(self.generators).generate()
-        else:
-            return self.generator.generate()
+        if self._multi:
+            return random.choice(self._generators).generate()
+        return self._generator.generate()
 
 
-class SenderManager:
-    """Manages log senders and their lifecycle"""
-    
-    def __init__(self, config_file='senders_config.json'):
-        self.config_file = config_file
-        self.senders = {}
-        self.threads = {}
-        self.load_config()
-        
-        # Register available log generators
-        self.log_generators = {
-            'apache': ApacheLogGenerator,
-            'windows': WindowsEventLogGenerator,
-            'ssh': SSHAuthLogGenerator,
-            'paloalto': PaloAltoLogGenerator,
-            'active_directory': ActiveDirectoryLogGenerator,
-            'cisco_ios': CiscoIOSLogGenerator,
-            'cisco_ftd': CiscoFTDLogGenerator,
-        }
-    
-    def load_config(self):
-        """Load sender configuration from file"""
-        if Path(self.config_file).exists():
-            with open(self.config_file, 'r') as f:
-                self.senders = json.load(f)
-    
-    def save_config(self):
-        """Save sender configuration to file"""
-        with open(self.config_file, 'w') as f:
-            json.dump(self.senders, f, indent=2)
-    
+class SenderManager(JsonStore):
+    """Manages log senders and their lifecycle."""
+
+    def __init__(self, config_file='senders_config.json', config_mgr=None):
+        super().__init__(config_file)
+        self.senders = self._data           # alias for backward compatibility
+        self.threads: dict = {}
+        self._config_mgr = config_mgr or ConfigurationManager()
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+
+    def _build_hec_sender(self, config_id: str) -> HECSender:
+        """Load a HEC config and return a ready HECSender, or raise ValueError."""
+        hec_config = self._config_mgr.get_configuration(config_id)
+        if not hec_config:
+            raise ValueError(f"Configuration {config_id} not found")
+        return HECSender(
+            url=hec_config['url'],
+            port=hec_config['port'],
+            token=hec_config['token'],
+            index=hec_config.get('index'),
+            sourcetype=hec_config.get('sourcetype'),
+            host=hec_config.get('host'),
+            source=hec_config.get('source'),
+        )
+
+    # ------------------------------------------------------------------
+    # CRUD
+    # ------------------------------------------------------------------
+
     def create_sender(self, name, log_type, frequency, enabled=False, options=None,
                       destination=None, destination_type='file', configuration_id=None,
                       attack_status=None):
-        """Create a new sender"""
-        # Check if it's an attack type
-        is_attack = log_type in ALL_ATTACK_TYPES
+        is_attack = log_type in ATTACK_REGISTRY
 
-        if not is_attack and log_type not in self.log_generators:
+        if not is_attack and log_type not in REGISTRY:
             raise ValueError(f"Unknown log type: {log_type}")
 
         sender_id = str(uuid.uuid4())
-        self.senders[sender_id] = {
-            'id': sender_id,
-            'name': name,
-            'log_type': log_type,
-            'destination': destination,
+        self._data[sender_id] = {
+            'id':               sender_id,
+            'name':             name,
+            'log_type':         log_type,
+            'destination':      destination,
             'destination_type': destination_type,
             'configuration_id': configuration_id,
-            'frequency': frequency,  # logs per second
-            'enabled': enabled,
-            'created_at': datetime.now().isoformat(),
-            'logs_generated': 0,
-            'options': options or {},  # Store log type specific options
-            'attack_status': attack_status if is_attack else None  # Attack status (Disabled/Running/Done)
+            'frequency':        frequency,
+            'enabled':          enabled,
+            'created_at':       datetime.now().isoformat(),
+            'logs_generated':   0,
+            'options':          options or {},
+            'attack_status':    attack_status if is_attack else None,
         }
-        self.save_config()
+        self._save()
 
         if enabled:
             self.start_sender(sender_id)
 
         return sender_id
-    
+
     def update_sender(self, sender_id, data):
-        """Update sender configuration"""
-        if sender_id not in self.senders:
+        if sender_id not in self._data:
             raise ValueError(f"Sender {sender_id} not found")
-        
-        was_enabled = self.senders[sender_id]['enabled']
-        self.senders[sender_id].update(data)
-        self.save_config()
-        
-        # Restart if configuration changed while enabled
+
+        was_enabled = self._data[sender_id]['enabled']
+        self._data[sender_id].update(data)
+        self._save()
+
         if was_enabled:
             self.stop_sender(sender_id)
-            if self.senders[sender_id]['enabled']:
+            if self._data[sender_id]['enabled']:
                 self.start_sender(sender_id)
-    
+
     def delete_sender(self, sender_id):
-        """Delete a sender"""
-        if sender_id not in self.senders:
+        if sender_id not in self._data:
             raise ValueError(f"Sender {sender_id} not found")
-        
         self.stop_sender(sender_id)
-        del self.senders[sender_id]
-        self.save_config()
-    
+        del self._data[sender_id]
+        self._save()
+
     def toggle_sender(self, sender_id):
-        """Enable or disable a sender"""
-        if sender_id not in self.senders:
+        if sender_id not in self._data:
             raise ValueError(f"Sender {sender_id} not found")
 
-        sender = self.senders[sender_id]
-        is_attack = sender['log_type'] in ALL_ATTACK_TYPES or (sender['log_type'] and sender['log_type'].startswith('attack:'))
+        sender = self._data[sender_id]
+        is_attack = sender['log_type'] in ATTACK_REGISTRY
 
-        # For attacks, toggle means restart the attack
         if is_attack:
-            current_status = sender.get('attack_status', 'Disabled')
-            if current_status == 'Running':
-                # Stop the running attack
-                self.senders[sender_id]['enabled'] = False
-                self.senders[sender_id]['attack_status'] = 'Disabled'
-                self.save_config()
+            if sender.get('attack_status') == 'Running':
+                sender['enabled'] = False
+                sender['attack_status'] = 'Disabled'
+                self._save()
                 self.stop_sender(sender_id)
             else:
-                # Start/restart the attack
-                self.senders[sender_id]['enabled'] = True
-                self.save_config()
+                sender['enabled'] = True
+                self._save()
                 self.start_sender(sender_id)
         else:
-            # Normal sender toggle
-            enabled = not self.senders[sender_id]['enabled']
-            self.senders[sender_id]['enabled'] = enabled
-            self.save_config()
-
+            enabled = not sender['enabled']
+            sender['enabled'] = enabled
+            self._save()
             if enabled:
                 self.start_sender(sender_id)
             else:
                 self.stop_sender(sender_id)
-    
+
     def clone_sender(self, sender_id):
-        """Clone a sender"""
-        if sender_id not in self.senders:
+        if sender_id not in self._data:
             raise ValueError(f"Sender {sender_id} not found")
-        
-        original = self.senders[sender_id].copy()
+
+        original = self._data[sender_id].copy()
         new_id = str(uuid.uuid4())
-        original['id'] = new_id
-        original['name'] = f"{original['name']} (copy)"
-        original['enabled'] = False
-        original['created_at'] = datetime.now().isoformat()
-        original['logs_generated'] = 0
-        
-        self.senders[new_id] = original
-        self.save_config()
+        original.update({
+            'id':             new_id,
+            'name':           f"{original['name']} (copy)",
+            'enabled':        False,
+            'created_at':     datetime.now().isoformat(),
+            'logs_generated': 0,
+        })
+        self._data[new_id] = original
+        self._save()
         return new_id
-    
+
+    # ------------------------------------------------------------------
+    # Thread management
+    # ------------------------------------------------------------------
+
     def start_sender(self, sender_id):
-        """Start a sender thread"""
         if sender_id in self.threads:
-            return  # Already running
+            return  # already running
 
-        sender = self.senders[sender_id]
+        sender   = self._data[sender_id]
         log_type = sender['log_type']
+        options  = sender.get('options', {})
 
-        # Pass options to generator if available
-        options = sender.get('options', {})
-
-        # Handle attack types
-        if log_type in ALL_ATTACK_TYPES:
-            # Update attack status to Running
-            self.senders[sender_id]['attack_status'] = 'Running'
-            self.save_config()
-
+        if log_type in ATTACK_REGISTRY:
+            self._data[sender_id]['attack_status'] = 'Running'
+            self._save()
             stop_event = threading.Event()
             thread = threading.Thread(
                 target=self._execute_attack,
                 args=(sender_id, sender, stop_event),
-                daemon=True
+                daemon=True,
             )
             self.threads[sender_id] = {'thread': thread, 'stop_event': stop_event}
             thread.start()
             return
 
-        generator_class = self.log_generators[log_type]
+        # Build the generator from the registry config
+        generator_class = REGISTRY[log_type]
+        config          = generator_class.SOURCETYPE_CONFIG
+        param_value     = options.get(config['param_key'], config['defaults'])
 
-        # Configuration for each sourcetype: how to create the generator(s)
-        sourcetype_configs = {
-            'windows': {
-                'param_key': 'sources',
-                'defaults': ['Security'],
-                'multi_instance': True,  # Create multiple generators, one per source
-                'single_param_name': 'source',  # Parameter name for single instance
-                'extra_params': {'render_format': options.get('render_format', 'xml')}
-            },
-            'apache': {
-                'param_key': 'log_types',
-                'defaults': ['combined'],
-                'multi_instance': True,  # Create multiple generators, one per log_type
-                'single_param_name': 'log_type'
-            },
-            'ssh': {
-                'param_key': 'event_categories',
-                'defaults': ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'],
-                'multi_instance': False  # Single generator handles multiple categories
-            },
-            'paloalto': {
-                'param_key': 'log_types',
-                'defaults': ['traffic', 'threat', 'system'],
-                'multi_instance': False
-            },
-            'active_directory': {
-                'param_key': 'event_categories',
-                'defaults': ['account_management', 'group_management', 'directory_service', 'authentication', 'computer_management'],
-                'multi_instance': False
-            },
-            'cisco_ios': {
-                'param_key': 'event_categories',
-                'defaults': ['interface', 'system', 'authentication', 'acl_security', 'routing', 'redundancy', 'spanning_tree', 'hardware'],
-                'multi_instance': False
-            },
-            'cisco_ftd': {
-                'param_key': 'event_categories',
-                'defaults': ['connection', 'intrusion', 'file', 'malware', 'traditional'],
-                'multi_instance': False
+        if config.get('multi_instance'):
+            extra_params = {
+                k: options.get(k, default)
+                for k, default in config.get('extra_params_keys', {}).items()
             }
-        }
-
-        # Create generator based on configuration
-        if log_type in sourcetype_configs:
-            config = sourcetype_configs[log_type]
-            param_value = options.get(config['param_key'], config['defaults'])
-
-            if config.get('multi_instance'):
-                # Create multiple generator instances (Apache, Windows)
-                extra_params = config.get('extra_params', {})
-                single_param = config['single_param_name']
-                generators = []
-                for value in param_value:
-                    gen_params = {single_param: value}
-                    gen_params.update(extra_params)
-                    generators.append(generator_class(**gen_params))
-                generator = MultiSourceLogGenerator(generators)
-            else:
-                # Single generator instance with list parameter (SSH, PaloAlto, AD, Cisco)
-                generator = MultiSourceLogGenerator(
-                    generator_class(**{config['param_key']: param_value})
-                )
+            generators = [
+                generator_class(**{config['single_param_name']: val, **extra_params})
+                for val in param_value
+            ]
+            generator = MultiSourceLogGenerator(generators)
         else:
-            # Default: single generator with no special parameters
-            generator = MultiSourceLogGenerator(generator_class())
+            generator = MultiSourceLogGenerator(
+                generator_class(**{config['param_key']: param_value})
+            )
 
         stop_event = threading.Event()
         thread = threading.Thread(
             target=self._generate_logs,
             args=(sender_id, generator, sender, stop_event),
-            daemon=True
+            daemon=True,
         )
-
         self.threads[sender_id] = {'thread': thread, 'stop_event': stop_event}
         thread.start()
-    
+
     def stop_sender(self, sender_id):
-        """Stop a sender thread"""
         if sender_id in self.threads:
             self.threads[sender_id]['stop_event'].set()
             self.threads[sender_id]['thread'].join(timeout=2)
             del self.threads[sender_id]
-    
+
+    # ------------------------------------------------------------------
+    # Worker threads
+    # ------------------------------------------------------------------
+
     def _execute_attack(self, sender_id, sender_config, stop_event):
-        """Execute an attack with finite events over a duration"""
-        from attack_generators import AttackGeneratorFactory
-
+        """Execute a finite attack: N events spread over a duration."""
         log_type = sender_config['log_type']
-        options = sender_config.get('options', {})
+        options  = sender_config.get('options', {})
 
-        # Get attack configuration with safety limits
         events_count = min(max(int(options.get('attack_events_count', 100)), 1), 10000)
-        duration = min(max(int(options.get('attack_duration', 60)), 1), 3600)
+        duration     = min(max(int(options.get('attack_duration', 60)), 1), 3600)
+        interval     = duration / events_count if events_count > 0 else 1.0
 
-        # Calculate interval between events
-        interval = duration / events_count if events_count > 0 else 1.0
+        print(f"[Attack] {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
 
-        print(f"[Attack] Starting attack {sender_id}: {events_count} events over {duration}s (interval: {interval:.3f}s)")
-
-        # Validate attack type
-        if log_type not in ALL_ATTACK_TYPES:
-            print(f"[Attack] Error: Unknown attack type {log_type}")
-            self.senders[sender_id]['attack_status'] = 'Error: Unknown type'
-            self.senders[sender_id]['enabled'] = False
-            self.save_config()
-            if sender_id in self.threads:
-                del self.threads[sender_id]
-            return
-
-        attack_type = log_type
-
-        # Create generator with sender options (includes target_src_ip, target_dest_ip, etc.)
-        generator = AttackGeneratorFactory.get_generator(attack_type, options)
+        generator = AttackGeneratorFactory.get_generator(log_type, options)
         if not generator:
-            print(f"[Attack] Error: No generator for attack_type {attack_type}")
-            self.senders[sender_id]['attack_status'] = 'Error: No generator'
-            self.senders[sender_id]['enabled'] = False
-            self.save_config()
-            if sender_id in self.threads:
-                del self.threads[sender_id]
+            self._fail_attack(sender_id, 'Error: No generator')
             return
-
-        print(f"[Attack] Using generator: {attack_type}")
 
         destination_type = sender_config.get('destination_type', 'file')
+        events_sent = 0
 
         try:
-            events_sent = 0
-
             if destination_type == 'file':
-                destination = sender_config['destination']
-                dest_path = Path(destination)
+                dest_path = Path(sender_config['destination'])
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-                with open(destination, 'a') as f:
+                with dest_path.open('a') as f:
                     while not stop_event.is_set() and events_sent < events_count:
-                        log_line = generator.generate()
-                        f.write(log_line + '\n')
+                        f.write(generator.generate() + '\n')
                         f.flush()
                         events_sent += 1
-                        self.senders[sender_id]['logs_generated'] += 1
+                        self._data[sender_id]['logs_generated'] += 1
                         time.sleep(interval)
 
             elif destination_type == 'configuration':
-                from configuration_manager import ConfigurationManager
-                config_mgr = ConfigurationManager()
-
                 config_id = sender_config.get('configuration_id')
                 if not config_id:
-                    print(f"[Attack] Error: No configuration_id specified for sender {sender_id}")
-                    self.senders[sender_id]['attack_status'] = 'Error: No configuration'
-                    self.senders[sender_id]['enabled'] = False
-                    self.save_config()
-                    if sender_id in self.threads:
-                        del self.threads[sender_id]
+                    self._fail_attack(sender_id, 'Error: No configuration')
                     return
-
-                hec_config = config_mgr.get_configuration(config_id)
-                if not hec_config:
-                    print(f"[Attack] Error: Configuration {config_id} not found")
-                    self.senders[sender_id]['attack_status'] = 'Error: Config not found'
-                    self.senders[sender_id]['enabled'] = False
-                    self.save_config()
-                    if sender_id in self.threads:
-                        del self.threads[sender_id]
-                    return
-
-                hec_sender = HECSender(
-                    url=hec_config['url'],
-                    port=hec_config['port'],
-                    token=hec_config['token'],
-                    index=hec_config.get('index'),
-                    sourcetype=hec_config.get('sourcetype'),
-                    host=hec_config.get('host'),
-                    source=hec_config.get('source')
-                )
-
+                hec = self._build_hec_sender(config_id)
                 try:
                     while not stop_event.is_set() and events_sent < events_count:
-                        log_line = generator.generate()
-                        success = hec_sender.send_event(log_line)
-                        if success:
+                        if hec.send_event(generator.generate()):
                             events_sent += 1
-                            self.senders[sender_id]['logs_generated'] += 1
+                            self._data[sender_id]['logs_generated'] += 1
                         time.sleep(interval)
                 finally:
-                    hec_sender.close()
+                    hec.close()
 
-            # Attack completed - update status
-            print(f"[Attack] Completed: {events_sent}/{events_count} events sent")
             completion_time = datetime.now().strftime('%m/%d %H:%M:%S')
-            self.senders[sender_id]['attack_status'] = f'Done ({completion_time})'
-            self.senders[sender_id]['enabled'] = False
-            self.save_config()
-            print(f"[Attack] Status updated to Done ({completion_time})")
+            print(f"[Attack] Done: {events_sent}/{events_count} events")
+            self._data[sender_id]['attack_status'] = f'Done ({completion_time})'
+            self._data[sender_id]['enabled'] = False
+            self._save()
 
         except Exception as e:
-            print(f"[Attack] Exception: {str(e)}")
-            self.senders[sender_id]['attack_status'] = f'Error: {str(e)}'
-            self.senders[sender_id]['enabled'] = False
-            self.save_config()
+            print(f"[Attack] Exception: {e}")
+            self._data[sender_id]['attack_status'] = f'Error: {e}'
+            self._data[sender_id]['enabled'] = False
+            self._save()
         finally:
-            # Clean up thread reference
-            if sender_id in self.threads:
-                del self.threads[sender_id]
-            print(f"[Attack] Thread cleaned up for {sender_id}")
+            self.threads.pop(sender_id, None)
 
     def _generate_logs(self, sender_id, generator, sender_config, stop_event):
-        """Generate logs at specified frequency"""
+        """Generate logs continuously at the configured frequency."""
         frequency = sender_config['frequency']
-        interval = 1.0 / frequency if frequency > 0 else 1.0
-
+        interval  = 1.0 / frequency if frequency > 0 else 1.0
         destination_type = sender_config.get('destination_type', 'file')
 
-        # Handle file destination
-        if destination_type == 'file':
-            destination = sender_config['destination']
+        try:
+            if destination_type == 'file':
+                dest_path = Path(sender_config['destination'])
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                with dest_path.open('a') as f:
+                    while not stop_event.is_set():
+                        f.write(generator.generate() + '\n')
+                        f.flush()
+                        self._data[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
 
-            # Ensure destination directory exists
-            dest_path = Path(destination)
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            elif destination_type == 'configuration':
+                config_id = sender_config.get('configuration_id')
+                if not config_id:
+                    print(f"[Sender] {sender_id}: No configuration_id")
+                    return
+                hec = self._build_hec_sender(config_id)
+                try:
+                    while not stop_event.is_set():
+                        if hec.send_event(generator.generate()):
+                            self._data[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
+                finally:
+                    hec.close()
 
-            with open(destination, 'a') as f:
-                while not stop_event.is_set():
-                    log_line = generator.generate()
-                    f.write(log_line + '\n')
-                    f.flush()
+        except Exception as e:
+            print(f"[Sender] {sender_id}: Exception: {e}")
 
-                    self.senders[sender_id]['logs_generated'] += 1
+    def _fail_attack(self, sender_id, reason: str):
+        """Mark an attack as failed and clean up."""
+        print(f"[Attack] {sender_id}: {reason}")
+        self._data[sender_id]['attack_status'] = reason
+        self._data[sender_id]['enabled'] = False
+        self._save()
+        self.threads.pop(sender_id, None)
 
-                    time.sleep(interval)
+    # ------------------------------------------------------------------
+    # Read helpers
+    # ------------------------------------------------------------------
 
-        # Handle HEC destination
-        elif destination_type == 'configuration':
-            # Load configuration manager to get HEC config
-            from configuration_manager import ConfigurationManager
-            config_mgr = ConfigurationManager()
-
-            config_id = sender_config.get('configuration_id')
-            if not config_id:
-                print(f"Error: No configuration_id specified for sender {sender_id}")
-                return
-
-            hec_config = config_mgr.get_configuration(config_id)
-            if not hec_config:
-                print(f"Error: Configuration {config_id} not found")
-                return
-
-            # Create HEC sender
-            hec_sender = HECSender(
-                url=hec_config['url'],
-                port=hec_config['port'],
-                token=hec_config['token'],
-                index=hec_config.get('index'),
-                sourcetype=hec_config.get('sourcetype'),
-                host=hec_config.get('host'),
-                source=hec_config.get('source')
-            )
-
-            try:
-                while not stop_event.is_set():
-                    log_line = generator.generate()
-
-                    # Send to HEC
-                    success = hec_sender.send_event(log_line)
-
-                    if success:
-                        self.senders[sender_id]['logs_generated'] += 1
-
-                    time.sleep(interval)
-            finally:
-                hec_sender.close()
-    
     def get_all_senders(self):
-        """Get all senders"""
-        return list(self.senders.values())
+        return list(self._data.values())
 
     def get_sender(self, sender_id):
-        """Get a specific sender"""
-        return self.senders.get(sender_id)
+        return self._data.get(sender_id)
 
     def get_available_log_types(self):
-        """Get available log types with descriptions"""
-        return {
-            'apache': {
-                'name': 'Apache/Nginx Log',
-                'description': 'Apache/Nginx web server logs in various formats',
-                'example': 'Access, Error, and Combined log formats',
-                'sources': [
-                    {
-                        'id': 'access',
-                        'name': 'Access Log (Common)',
-                        'description': 'Common Log Format without referer and user-agent'
-                    },
-                    {
-                        'id': 'error',
-                        'name': 'Error Log',
-                        'description': 'Apache error logs with various severity levels'
-                    },
-                    {
-                        'id': 'combined',
-                        'name': 'Access Log (Combined)',
-                        'description': 'Combined Log Format with referer and user-agent'
-                    }
-                ]
-            },
-            'ssh': {
-                'name': 'SSH Auth Log',
-                'description': 'SSH authentication logs (auth.log) - login attempts, sessions, disconnections',
-                'example': 'Failed password, accepted publickey, connection closed, etc.',
-                'sources': [
-                    {
-                        'id': 'auth_success',
-                        'name': 'Successful Authentication',
-                        'description': 'Accepted password and publickey authentications'
-                    },
-                    {
-                        'id': 'auth_failed',
-                        'name': 'Failed Authentication',
-                        'description': 'Failed password, invalid users, max auth attempts'
-                    },
-                    {
-                        'id': 'sessions',
-                        'name': 'Session Management',
-                        'description': 'Session opened and closed events (PAM)'
-                    },
-                    {
-                        'id': 'connections',
-                        'name': 'Connection Events',
-                        'description': 'Connection closed, disconnected, reset events'
-                    },
-                    {
-                        'id': 'errors',
-                        'name': 'Errors & Other',
-                        'description': 'Protocol errors, identification issues, server events'
-                    }
-                ]
-            },
-            'windows': {
-                'name': 'Windows Event Log',
-                'description': 'Windows Event Logs - Security, Application, and System sources',
-                'example': 'Event ID 4624 - Successful Logon (Security)',
-                'sources': [
-                    {
-                        'id': 'Security',
-                        'name': 'Security',
-                        'description': 'Authentication, privileges, processes (4624, 4625, 4688, etc.)'
-                    },
-                    {
-                        'id': 'Application',
-                        'name': 'Application',
-                        'description': 'Application errors, installations, updates (1000, 1001, 11707, etc.)'
-                    },
-                    {
-                        'id': 'System',
-                        'name': 'System',
-                        'description': 'Service management, system events (6005, 7036, 7034, etc.)'
-                    }
-                ]
-            },
-            'paloalto': {
-                'name': 'Palo Alto Firewall',
-                'description': 'Palo Alto Networks PAN-OS firewall logs in syslog CSV format',
-                'example': 'Traffic, Threat, and System logs',
-                'sources': [
-                    {
-                        'id': 'traffic',
-                        'name': 'Traffic',
-                        'description': 'Network traffic logs (sessions, bytes, packets, actions)'
-                    },
-                    {
-                        'id': 'threat',
-                        'name': 'Threat',
-                        'description': 'Security threat logs (vulnerabilities, malware, spyware, URLs)'
-                    },
-                    {
-                        'id': 'system',
-                        'name': 'System',
-                        'description': 'System events (authentication, configuration, HA, upgrades)'
-                    }
-                ]
-            },
-            'active_directory': {
-                'name': 'Active Directory',
-                'description': 'Active Directory domain controller event logs (XmlWinEventLog)',
-                'example': 'Account management, group changes, Kerberos, directory service',
-                'sources': [
-                    {
-                        'id': 'account_management',
-                        'name': 'Account Management',
-                        'description': 'User account created, enabled, disabled, deleted, changed, locked out (4720, 4722, 4725, 4726, 4738, 4740, 4767)'
-                    },
-                    {
-                        'id': 'group_management',
-                        'name': 'Group Management',
-                        'description': 'Members added/removed from security groups (4728, 4729, 4732, 4733, 4756, 4757)'
-                    },
-                    {
-                        'id': 'directory_service',
-                        'name': 'Directory Service',
-                        'description': 'LDAP object modifications, creations, and access operations (5136, 5137, 4662)'
-                    },
-                    {
-                        'id': 'authentication',
-                        'name': 'Authentication',
-                        'description': 'Kerberos TGT/TGS requests, pre-auth failures, NTLM validation (4768, 4769, 4771, 4776)'
-                    },
-                    {
-                        'id': 'computer_management',
-                        'name': 'Computer Management',
-                        'description': 'Computer accounts created, changed, deleted (4741, 4742, 4743)'
-                    }
-                ]
-            },
-            'cisco_ios': {
-                'name': 'Cisco IOS',
-                'description': 'Cisco IOS syslog messages (cisco:ios sourcetype)',
-                'example': 'Interface status, AAA authentication, ACL logs, routing protocols, HSRP, STP',
-                'sources': [
-                    {
-                        'id': 'interface',
-                        'name': 'Interface & Link Status',
-                        'description': 'Interface and line protocol state changes (LINK, LINEPROTO)'
-                    },
-                    {
-                        'id': 'system',
-                        'name': 'System Events',
-                        'description': 'Configuration changes, restarts, memory/CPU events (SYS, PARSER)'
-                    },
-                    {
-                        'id': 'authentication',
-                        'name': 'Authentication & AAA',
-                        'description': 'Login success/failed, user sessions, 802.1X (SEC_LOGIN, AAA, AUTHMGR)'
-                    },
-                    {
-                        'id': 'acl_security',
-                        'name': 'ACL & Security',
-                        'description': 'Access list permit/deny, zone-based firewall sessions (SEC, FW)'
-                    },
-                    {
-                        'id': 'routing',
-                        'name': 'Routing Protocols',
-                        'description': 'OSPF, BGP, EIGRP adjacency and neighbor changes'
-                    },
-                    {
-                        'id': 'redundancy',
-                        'name': 'HSRP/VRRP',
-                        'description': 'Hot Standby Router Protocol state transitions (STANDBY)'
-                    },
-                    {
-                        'id': 'spanning_tree',
-                        'name': 'Spanning Tree',
-                        'description': 'Topology changes, root guard, PVID inconsistency (SPANTREE)'
-                    },
-                    {
-                        'id': 'hardware',
-                        'name': 'Hardware & Environment',
-                        'description': 'SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)'
-                    }
-                ]
-            },
-            'cisco_ftd': {
-                'name': 'Cisco Secure Firewall Threat Defense',
-                'description': 'Cisco FTD (formerly Firepower) EMBLEM syslog format (cisco:ftd sourcetype)',
-                'example': 'Connection events, intrusion detection, file/malware events, traditional messages',
-                'sources': [
-                    {
-                        'id': 'connection',
-                        'name': 'Connection Events',
-                        'description': 'Network connection events with source/dest, ports, protocols, actions (430002)'
-                    },
-                    {
-                        'id': 'intrusion',
-                        'name': 'Intrusion Events',
-                        'description': 'IPS/IDS detections, blocked threats, signature matches (430001, 430003)'
-                    },
-                    {
-                        'id': 'file',
-                        'name': 'File Events',
-                        'description': 'Files detected in network traffic with hashes and dispositions (430004)'
-                    },
-                    {
-                        'id': 'malware',
-                        'name': 'Malware Events',
-                        'description': 'Malware detections with threat names and blocked actions (430005)'
-                    },
-                    {
-                        'id': 'traditional',
-                        'name': 'Traditional Messages',
-                        'description': 'ASA-style system messages (authentication, VPN, interface, system events)'
-                    }
-                ]
-            }
-        }
+        """Return metadata for all registered log types (driven by the registry)."""
+        return {log_type: cls.METADATA for log_type, cls in REGISTRY.items()}

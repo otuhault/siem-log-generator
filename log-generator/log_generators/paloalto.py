@@ -10,6 +10,24 @@ from datetime import datetime, timedelta
 class PaloAltoLogGenerator:
     """Generates Palo Alto Networks firewall logs in syslog CSV format"""
 
+    LOG_TYPE = 'paloalto'
+    AVG_LOG_SIZE = 400
+    SOURCETYPE_CONFIG = {
+        'param_key': 'log_types',
+        'defaults': ['traffic', 'threat', 'system'],
+        'multi_instance': False,
+    }
+    METADATA = {
+        'name': 'Palo Alto Firewall',
+        'description': 'Palo Alto Networks PAN-OS firewall logs in syslog CSV format',
+        'example': 'Traffic, Threat, and System logs',
+        'sources': [
+            {'id': 'traffic', 'name': 'Traffic', 'description': 'Network traffic logs (sessions, bytes, packets, actions)'},
+            {'id': 'threat',  'name': 'Threat',  'description': 'Security threat logs (vulnerabilities, malware, spyware, URLs)'},
+            {'id': 'system',  'name': 'System',  'description': 'System events (authentication, configuration, HA, upgrades)'},
+        ],
+    }
+
     def __init__(self, log_types=None):
         """
         Initialize Palo Alto log generator

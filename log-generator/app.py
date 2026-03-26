@@ -15,9 +15,9 @@ from simulation_manager import SimulationManager
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 
-# Initialize managers
-sender_manager = SenderManager()
+# Initialize managers — order matters: config_mgr must exist before SenderManager
 configuration_manager = ConfigurationManager()
+sender_manager = SenderManager(config_mgr=configuration_manager)
 simulation_manager = SimulationManager()
 
 @app.route('/')
