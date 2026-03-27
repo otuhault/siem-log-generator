@@ -45,7 +45,7 @@ function setupEventListeners() {
 
     // Add Sender button
     document.getElementById('addSenderBtn').addEventListener('click', function() {
-        restoreFormToOriginalPosition();
+        closeSenderForm();
         document.getElementById('senderFormCard').style.display = 'block';
         loadConfigurations();
     });

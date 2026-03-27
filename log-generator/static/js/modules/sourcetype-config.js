@@ -38,6 +38,11 @@ export const SOURCETYPE_CONFIG = {
         checkboxGroup: 'cisco_ftd_event_categories',
         optionKey: 'event_categories',
         formGroups: ['ciscoFTDEventCategoriesGroup']
+    },
+    'zscaler': {
+        checkboxGroup: 'zscaler_log_types',
+        optionKey: 'log_types',
+        formGroups: ['zscalerLogTypesGroup']
     }
 };
 

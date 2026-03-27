@@ -65,7 +65,7 @@
 
                         <!-- Apache Log Types Selection (hidden by default) -->
                         <div class="form-group" id="apacheLogTypesGroup" style="display: none;">
-                            <label>Apache Log Types:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="apache_log_types" value="access" checked>
@@ -93,7 +93,7 @@
 
                         <!-- SSH Event Categories Selection (hidden by default) -->
                         <div class="form-group" id="sshEventCategoriesGroup" style="display: none;">
-                            <label>SSH Event Categories:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="ssh_event_categories" value="auth_success" checked>
@@ -135,7 +135,7 @@
 
                         <!-- Windows Sources Selection (hidden by default) -->
                         <div class="form-group" id="windowsSourcesGroup" style="display: none;">
-                            <label>Sources Windows:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="windows_sources" value="Security" checked>
@@ -173,7 +173,7 @@
 
                         <!-- Palo Alto Log Types Selection (hidden by default) -->
                         <div class="form-group" id="paloaltoLogTypesGroup" style="display: none;">
-                            <label>Log Types Palo Alto:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="paloalto_log_types" value="traffic" checked>
@@ -201,7 +201,7 @@
 
                         <!-- Active Directory event categories (hidden by default) -->
                         <div class="form-group" id="adEventCategoriesGroup" style="display: none;">
-                            <label>Event Categories:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="ad_event_categories" value="account_management" checked>
@@ -243,7 +243,7 @@
 
                         <!-- Cisco IOS Event Categories Selection (hidden by default) -->
                         <div class="form-group" id="ciscoIOSEventCategoriesGroup" style="display: none;">
-                            <label>Event Categories:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="cisco_ios_event_categories" value="interface" checked>
@@ -306,7 +306,7 @@
 
                         <!-- Cisco FTD Event Categories -->
                         <div class="form-group" id="ciscoFTDEventCategoriesGroup" style="display: none;">
-                            <label>Event Categories:</label>
+                            <label>Log type:</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="cisco_ftd_event_categories" value="connection" checked>
@@ -341,6 +341,27 @@
                                     <span class="checkbox-text">
                                         <strong>Traditional Messages</strong>
                                         <small>ASA-style system messages (authentication, VPN, interface, system events)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Zscaler Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="zscalerLogTypesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="zscaler_log_types" value="web" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Web Proxy</strong>
+                                        <small>NSS web proxy transactions (URL categories, threats, DLP, users)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="zscaler_log_types" value="tunnel" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Tunnel</strong>
+                                        <small>IPSec/GRE tunnel session records (zscalernss-tunnel)</small>
                                     </span>
                                 </label>
                             </div>

@@ -623,6 +623,8 @@ export function closeSenderForm() {
     document.getElementById('paloaltoLogTypesGroup').style.display = 'none';
     document.getElementById('adEventCategoriesGroup').style.display = 'none';
     document.getElementById('ciscoIOSEventCategoriesGroup').style.display = 'none';
+    document.getElementById('ciscoFTDEventCategoriesGroup').style.display = 'none';
+    document.getElementById('zscalerLogTypesGroup').style.display = 'none';
 
     // Reset attack options and frequency
     document.getElementById('attackOptionsGroup').style.display = 'none';
