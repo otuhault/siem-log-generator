@@ -87,20 +87,27 @@ function setupEventListeners() {
 function setupDestinationTypeListeners() {
     document.querySelectorAll('input[name="destination_type"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const fileGroup = document.getElementById('fileDestinationGroup');
+            const fileGroup   = document.getElementById('fileDestinationGroup');
             const configGroup = document.getElementById('configurationDestinationGroup');
-            const destinationInput = document.getElementById('destination');
+            const syslogGroup = document.getElementById('syslogDestinationGroup');
+            const destInput   = document.getElementById('destination');
+            const configSel   = document.getElementById('configurationSelect');
+
+            // Hide all, clear required
+            fileGroup.style.display   = 'none';
+            configGroup.style.display = 'none';
+            syslogGroup.style.display = 'none';
+            destInput.required = false;
+            configSel.required = false;
 
             if (this.value === 'file') {
                 fileGroup.style.display = 'block';
-                configGroup.style.display = 'none';
-                destinationInput.required = true;
-                document.getElementById('configurationSelect').required = false;
-            } else {
-                fileGroup.style.display = 'none';
+                destInput.required = true;
+            } else if (this.value === 'configuration') {
                 configGroup.style.display = 'block';
-                destinationInput.required = false;
-                document.getElementById('configurationSelect').required = true;
+                configSel.required = true;
+            } else if (this.value === 'syslog') {
+                syslogGroup.style.display = 'block';
             }
         });
     });

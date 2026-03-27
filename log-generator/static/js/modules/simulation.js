@@ -37,9 +37,10 @@ export function initSimulation() {
     // Destination type toggle
     document.querySelectorAll('input[name="sim_destination_type"]').forEach(radio => {
         radio.addEventListener('change', () => {
-            const isFile = document.querySelector('input[name="sim_destination_type"]:checked').value === 'file';
-            document.getElementById('simFileDestGroup').style.display = isFile ? 'block' : 'none';
-            document.getElementById('simHecDestGroup').style.display = isFile ? 'none' : 'block';
+            const val = document.querySelector('input[name="sim_destination_type"]:checked').value;
+            document.getElementById('simFileDestGroup').style.display   = val === 'file'          ? 'block' : 'none';
+            document.getElementById('simHecDestGroup').style.display    = val === 'configuration' ? 'block' : 'none';
+            document.getElementById('simSyslogDestGroup').style.display = val === 'syslog'        ? 'block' : 'none';
         });
     });
 
@@ -183,9 +184,12 @@ async function handleCreateSimulation(e) {
     const durationVal = parseFloat(document.getElementById('simDurationValue').value) || 1;
     const durationUnit = parseFloat(document.getElementById('simDurationUnit').value) || 1;
     const durationHours = durationVal * durationUnit;
-    const destType = document.querySelector('input[name="sim_destination_type"]:checked').value;
-    const destination = destType === 'file' ? document.getElementById('simDestination').value.trim() : null;
-    const configId = destType === 'configuration' ? document.getElementById('simConfigurationSelect').value : null;
+    const destType       = document.querySelector('input[name="sim_destination_type"]:checked').value;
+    const destination    = destType === 'file'          ? document.getElementById('simDestination').value.trim() : null;
+    const configId       = destType === 'configuration' ? document.getElementById('simConfigurationSelect').value : null;
+    const syslogHost     = destType === 'syslog'        ? document.getElementById('simSyslogHost').value.trim() : null;
+    const syslogPort     = destType === 'syslog'        ? parseInt(document.getElementById('simSyslogPort').value) || 514 : null;
+    const syslogProtocol = destType === 'syslog'        ? document.getElementById('simSyslogProtocol').value : null;
 
     const sourcetypes = [];
     document.querySelectorAll('.sim-volume-input').forEach(input => {
@@ -221,6 +225,10 @@ async function handleCreateSimulation(e) {
         showNotification('Please select a HEC destination.', 'error');
         return;
     }
+    if (destType === 'syslog' && !syslogHost) {
+        showNotification('Please specify a syslog host.', 'error');
+        return;
+    }
 
     try {
         const result = await SimulationsApi.create({
@@ -228,6 +236,9 @@ async function handleCreateSimulation(e) {
             sourcetypes, destination,
             destination_type: destType,
             configuration_id: configId,
+            syslog_host: syslogHost,
+            syslog_port: syslogPort,
+            syslog_protocol: syslogProtocol,
         });
 
         if (result.success) {

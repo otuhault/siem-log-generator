@@ -27,7 +27,8 @@ class SimulationManager(JsonStore):
         return max(1, min(10000, round(freq, 2)))
 
     def create_simulation(self, name, duration_hours, sourcetypes, destination=None,
-                          destination_type='file', configuration_id=None):
+                          destination_type='file', configuration_id=None,
+                          syslog_host=None, syslog_port=514, syslog_protocol='udp'):
         """
         Create a simulation.
 
@@ -62,6 +63,9 @@ class SimulationManager(JsonStore):
             'destination': destination,
             'destination_type': destination_type,
             'configuration_id': configuration_id,
+            'syslog_host': syslog_host,
+            'syslog_port': syslog_port,
+            'syslog_protocol': syslog_protocol,
             'sourcetypes': entries,
             'status': 'stopped',
             'created_at': datetime.now().isoformat(),
@@ -88,6 +92,9 @@ class SimulationManager(JsonStore):
                 destination=sim.get('destination'),
                 destination_type=sim['destination_type'],
                 configuration_id=sim.get('configuration_id'),
+                syslog_host=sim.get('syslog_host'),
+                syslog_port=sim.get('syslog_port', 514),
+                syslog_protocol=sim.get('syslog_protocol', 'udp'),
             )
             entry['sender_id'] = sender_id
 

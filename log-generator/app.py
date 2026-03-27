@@ -213,6 +213,9 @@ def create_simulation():
             destination=data.get('destination'),
             destination_type=data.get('destination_type', 'file'),
             configuration_id=data.get('configuration_id'),
+            syslog_host=data.get('syslog_host'),
+            syslog_port=data.get('syslog_port', 514),
+            syslog_protocol=data.get('syslog_protocol', 'udp'),
         )
         return jsonify({'success': True, 'simulation_id': sim_id})
     except Exception as e:

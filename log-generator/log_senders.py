@@ -13,6 +13,7 @@ from pathlib import Path
 from store import JsonStore
 from log_generators.registry import REGISTRY
 from hec_sender import HECSender
+from syslog_sender import SyslogSender
 from configuration_manager import ConfigurationManager
 from attack_generators import ATTACK_REGISTRY, AttackGeneratorFactory
 
@@ -47,6 +48,14 @@ class SenderManager(JsonStore):
     # Persistence helpers
     # ------------------------------------------------------------------
 
+    def _build_syslog_sender(self, sender_config: dict) -> SyslogSender:
+        """Return a ready SyslogSender from sender config fields."""
+        return SyslogSender(
+            host=sender_config['syslog_host'],
+            port=sender_config.get('syslog_port', 514),
+            protocol=sender_config.get('syslog_protocol', 'udp'),
+        )
+
     def _build_hec_sender(self, config_id: str) -> HECSender:
         """Load a HEC config and return a ready HECSender, or raise ValueError."""
         hec_config = self._config_mgr.get_configuration(config_id)
@@ -68,6 +77,7 @@ class SenderManager(JsonStore):
 
     def create_sender(self, name, log_type, frequency, enabled=False, options=None,
                       destination=None, destination_type='file', configuration_id=None,
+                      syslog_host=None, syslog_port=514, syslog_protocol='udp',
                       attack_status=None):
         is_attack = log_type in ATTACK_REGISTRY
 
@@ -82,6 +92,9 @@ class SenderManager(JsonStore):
             'destination':      destination,
             'destination_type': destination_type,
             'configuration_id': configuration_id,
+            'syslog_host':      syslog_host,
+            'syslog_port':      syslog_port,
+            'syslog_protocol':  syslog_protocol,
             'frequency':        frequency,
             'enabled':          enabled,
             'created_at':       datetime.now().isoformat(),
@@ -269,6 +282,17 @@ class SenderManager(JsonStore):
                 finally:
                     hec.close()
 
+            elif destination_type == 'syslog':
+                syslog = self._build_syslog_sender(sender_config)
+                try:
+                    while not stop_event.is_set() and events_sent < events_count:
+                        if syslog.send_event(generator.generate()):
+                            events_sent += 1
+                            self._data[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
+                finally:
+                    syslog.close()
+
             completion_time = datetime.now().strftime('%m/%d %H:%M:%S')
             print(f"[Attack] Done: {events_sent}/{events_count} events")
             self._data[sender_id]['attack_status'] = f'Done ({completion_time})'
@@ -313,6 +337,16 @@ class SenderManager(JsonStore):
                         time.sleep(interval)
                 finally:
                     hec.close()
+
+            elif destination_type == 'syslog':
+                syslog = self._build_syslog_sender(sender_config)
+                try:
+                    while not stop_event.is_set():
+                        if syslog.send_event(generator.generate()):
+                            self._data[sender_id]['logs_generated'] += 1
+                        time.sleep(interval)
+                finally:
+                    syslog.close()
 
         except Exception as e:
             print(f"[Sender] {sender_id}: Exception: {e}")

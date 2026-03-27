@@ -251,7 +251,10 @@ function createSenderRow(sender) {
     const destCell = document.createElement('td');
     if (sender.destination_type === 'configuration' && sender.configuration_id) {
         const config = state.configurations.find(c => c.id === sender.configuration_id);
-        destCell.textContent = config ? `HEC: ${config.name}` : 'HEC (Configuration not found)';
+        destCell.textContent = config ? `HEC: ${config.name}` : 'HEC (config not found)';
+    } else if (sender.destination_type === 'syslog') {
+        const proto = (sender.syslog_protocol || 'udp').toUpperCase();
+        destCell.textContent = `Syslog: ${sender.syslog_host}:${sender.syslog_port} (${proto})`;
     } else {
         destCell.textContent = sender.destination;
     }
@@ -365,19 +368,28 @@ export async function editSender(senderId) {
             logTypeSelect.dispatchEvent(changeEvent);
 
             // Set destination type
-            if (sender.destination_type === 'configuration') {
+            // Hide all groups first, then show the right one
+            document.getElementById('fileDestinationGroup').style.display = 'none';
+            document.getElementById('configurationDestinationGroup').style.display = 'none';
+            document.getElementById('syslogDestinationGroup').style.display = 'none';
+            document.getElementById('destination').required = false;
+            document.getElementById('configurationSelect').required = false;
+
+            if (sender.destination_type === 'syslog') {
+                document.querySelector('input[name="destination_type"][value="syslog"]').checked = true;
+                document.getElementById('syslogDestinationGroup').style.display = 'block';
+                document.getElementById('syslogHost').value = sender.syslog_host || '';
+                document.getElementById('syslogPort').value = sender.syslog_port || 514;
+                document.getElementById('syslogProtocol').value = sender.syslog_protocol || 'udp';
+            } else if (sender.destination_type === 'configuration') {
                 document.querySelector('input[name="destination_type"][value="configuration"]').checked = true;
-                document.getElementById('fileDestinationGroup').style.display = 'none';
                 document.getElementById('configurationDestinationGroup').style.display = 'block';
-                document.getElementById('destination').required = false;
                 document.getElementById('configurationSelect').required = true;
             } else {
                 document.querySelector('input[name="destination_type"][value="file"]').checked = true;
                 document.getElementById('fileDestinationGroup').style.display = 'block';
-                document.getElementById('configurationDestinationGroup').style.display = 'none';
                 document.getElementById('destination').required = true;
-                document.getElementById('configurationSelect').required = false;
-                document.getElementById('destination').value = sender.destination;
+                document.getElementById('destination').value = sender.destination || '';
             }
 
             // Set options based on log type using configuration mapping
@@ -506,6 +518,11 @@ export async function handleCreateSender(e) {
     if (destinationType === 'file') {
         data.destination = formData.get('destination').trim();
         data.destination_type = 'file';
+    } else if (destinationType === 'syslog') {
+        data.syslog_host     = formData.get('syslog_host').trim();
+        data.syslog_port     = parseInt(formData.get('syslog_port')) || 514;
+        data.syslog_protocol = formData.get('syslog_protocol');
+        data.destination_type = 'syslog';
     } else {
         data.configuration_id = formData.get('configuration_id');
         data.destination_type = 'configuration';
@@ -630,8 +647,12 @@ export function closeSenderForm() {
     document.querySelector('input[name="destination_type"][value="file"]').checked = true;
     document.getElementById('fileDestinationGroup').style.display = 'block';
     document.getElementById('configurationDestinationGroup').style.display = 'none';
+    document.getElementById('syslogDestinationGroup').style.display = 'none';
     document.getElementById('destination').required = true;
     document.getElementById('configurationSelect').required = false;
+    document.getElementById('syslogHost').value = '';
+    document.getElementById('syslogPort').value = '514';
+    document.getElementById('syslogProtocol').value = 'udp';
 
     // Reset all checkboxes to checked by default
     Object.values(SOURCETYPE_CONFIG).forEach(config => {

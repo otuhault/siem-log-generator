@@ -333,6 +333,14 @@ export function validateSenderForm(form) {
             isValid = false;
             errors.push('Please select a HEC destination');
         }
+    } else if (destinationType === 'syslog') {
+        const hostField = form.querySelector('#syslogHost');
+        if (!validateField(hostField, [
+            { type: 'required' }
+        ])) {
+            isValid = false;
+            errors.push('Please enter a syslog host');
+        }
     }
 
     // Windows sources validation
