@@ -206,7 +206,7 @@ class ActiveDirectoryLogGenerator:
 
     def _system_block(self, event_id, task, computer=None):
         """Generate the System block common to all events"""
-        timestamp = datetime.now().isoformat() + 'Z'
+        timestamp = datetime.now().astimezone().isoformat()
         computer = computer or random.choice(self.domain_controllers)
         return f'''  <System>
     <Provider Name="{self.provider_name}" Guid="{self.provider_guid}" />

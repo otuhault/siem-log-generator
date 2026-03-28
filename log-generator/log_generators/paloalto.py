@@ -73,13 +73,13 @@ class PaloAltoLogGenerator:
             '8.8.8.{}',
             '1.1.1.{}',
             '208.67.222.{}',
-            '104.16.{}',
-            '151.101.{}',
-            '185.199.{}',
-            '140.82.{}',
-            '52.84.{}',
-            '13.107.{}',
-            '23.45.{}'
+            '104.16.{}.{}',
+            '151.101.{}.{}',
+            '185.199.{}.{}',
+            '140.82.{}.{}',
+            '52.84.{}.{}',
+            '13.107.{}.{}',
+            '23.45.{}.{}'
         ]
 
         # Malicious IPs for threat logs
@@ -268,7 +268,7 @@ class PaloAltoLogGenerator:
         now = datetime.now()
         hostname = random.choice(self.hostnames)
         # Syslog priority 14 = facility 1 (user) * 8 + severity 6 (informational)
-        return f"<14>{now.strftime('%b %d %Y %H:%M:%S')} {hostname}"
+        return f"<14>{now.strftime('%b %d %H:%M:%S')} {hostname}"
 
     def _get_timestamp(self):
         """Generate PAN-OS timestamp format"""
@@ -276,14 +276,17 @@ class PaloAltoLogGenerator:
         return now.strftime('%Y/%m/%d %H:%M:%S')
 
     def _get_iso_timestamp(self):
-        """Generate ISO 8601 timestamp"""
-        now = datetime.now()
-        return now.strftime('%Y-%m-%dT%H:%M:%S.') + f'{random.randint(100, 999)}Z'
+        """Generate ISO 8601 timestamp with local timezone offset"""
+        now = datetime.now().astimezone()
+        offset = now.strftime('%z')  # e.g. +0100
+        offset_fmt = offset[:3] + ':' + offset[3:]  # e.g. +01:00
+        return now.strftime('%Y-%m-%dT%H:%M:%S.') + f'{random.randint(100, 999)}{offset_fmt}'
 
     def _get_random_ip(self, ip_list):
         """Generate random IP from template list"""
         template = random.choice(ip_list)
-        return template.format(random.randint(1, 254))
+        count = template.count('{}')
+        return template.format(*[random.randint(1, 254) for _ in range(count)])
 
     def _generate_traffic_log(self):
         """Generate a traffic log entry"""

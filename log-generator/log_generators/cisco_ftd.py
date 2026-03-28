@@ -141,7 +141,7 @@ class CiscoFTDLogGenerator:
 
     def _timestamp(self):
         """Generate ISO 8601 timestamp for EMBLEM format"""
-        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        return datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S%z')
 
     def _get_connection_id(self):
         """Get incrementing connection ID"""

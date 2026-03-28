@@ -139,7 +139,7 @@ class ApacheLogGenerator:
         ip = ip_template.format(random.randint(1, 254))
 
         # Current timestamp in Apache format
-        timestamp = datetime.now().strftime('%d/%b/%Y:%H:%M:%S +0000')
+        timestamp = datetime.now().astimezone().strftime('%d/%b/%Y:%H:%M:%S %z')
 
         # Select request with weighted probability
         weights = [r[4] for r in self.requests]
@@ -208,7 +208,7 @@ class ApacheLogGenerator:
         ip = ip_template.format(random.randint(1, 254))
 
         # Current timestamp in Apache format
-        timestamp = datetime.now().strftime('%d/%b/%Y:%H:%M:%S +0000')
+        timestamp = datetime.now().astimezone().strftime('%d/%b/%Y:%H:%M:%S %z')
 
         # Select request with weighted probability
         weights = [r[4] for r in self.requests]
