@@ -1149,6 +1149,12 @@ tr.sender-form-row .card {
     color: #8c959f;
 }
 
+.hint-meta {
+    font-size: 0.75em;
+    color: #8c959f;
+    font-style: italic;
+}
+
 /* ── A&I Ratio Slider (Sender form) ── */
 
 .ai-ratio-labels {

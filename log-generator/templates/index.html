@@ -650,54 +650,46 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="form-group">
                                 <label for="assetIp">IP Address <span style="color: red;">*</span></label>
-                                <input type="text" id="assetIp" name="ip" placeholder="192.168.1.10" required data-field-name="IP Address">
+                                <input type="text" id="assetIp" name="ip" placeholder="192.168.1.10" required>
                                 <div class="field-hint">
                                     <div class="field-hint-row"><span class="hint-cim">src_ip</span><span class="hint-logs">Apache · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · SSH · Zscaler</span></div>
-                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA <em>(external)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA <em>(catégorie external)</em></span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetHostname">Hostname (nt_host)</label>
+                                <label for="assetHostname">Hostname</label>
                                 <input type="text" id="assetHostname" name="nt_host" placeholder="DESKTOP-JSMITH">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR · Active Directory</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR</span></div>
                                     <div class="field-hint-row"><span class="hint-cim">src_nt_host</span><span class="hint-logs">Windows · Active Directory · Zscaler</span></div>
                                     <div class="field-hint-row"><span class="hint-cim">dest_host</span><span class="hint-logs">SSH</span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetDns">FQDN (dns)</label>
-                                <input type="text" id="assetDns" name="dns" placeholder="jsmith.corp.local">
-                            </div>
-                            <div class="form-group">
                                 <label for="assetMac">MAC Address</label>
                                 <input type="text" id="assetMac" name="mac" placeholder="00:11:22:33:44:55">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">src_mac</span><span class="hint-logs">Cisco IOS <em>(événements 802.1X AUTHMGR)</em></span></div>
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetOs">Operating System</label>
-                                <input type="text" id="assetOs" name="os" placeholder="Windows 10">
+                                <label for="assetDns">FQDN</label>
+                                <input type="text" id="assetDns" name="dns" placeholder="dc01.contoso.local">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">Computer</span><span class="hint-logs">Active Directory <em>(FQDN du Domain Controller)</em></span></div>
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetBunit">Business Unit / Dept</label>
-                                <input type="text" id="assetBunit" name="bunit" placeholder="Engineering">
-                            </div>
-                            <div class="form-group">
-                                <label for="assetOwner">Owner (username)</label>
-                                <input type="text" id="assetOwner" name="owner" placeholder="jsmith">
-                            </div>
-                            <div class="form-group">
-                                <label for="assetPriority">Priority</label>
-                                <select id="assetPriority" name="priority">
-                                    <option value="unknown">Unknown</option>
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="critical">Critical</option>
-                                </select>
+                                <label for="assetOs">OS / Platform</label>
+                                <input type="text" id="assetOs" name="os" placeholder="Windows OS">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">deviceostype</span><span class="hint-logs">Zscaler <em>(Windows OS, Mac OS, iOS, Android…)</em></span></div>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Category</label>
+                            <label>Sourcetypes <span style="color: red;">*</span></label>
+                            <p class="hint-meta" style="margin: 2px 0 6px;">Cocher les logs dans lesquels cet asset doit apparaître</p>
                             <div class="checkbox-group checkbox-group-compact" id="assetCategoryGroup"></div>
                         </div>
                         <div class="form-actions">
@@ -718,7 +710,7 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="form-group">
                                 <label for="identityUsername">Username <span style="color: red;">*</span></label>
-                                <input type="text" id="identityUsername" name="identity" placeholder="jsmith" required data-field-name="Username">
+                                <input type="text" id="identityUsername" name="identity" placeholder="jsmith" required>
                                 <div class="field-hint">
                                     <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Windows · SSH · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR · Active Directory</span></div>
                                 </div>
@@ -727,34 +719,13 @@
                                 <label for="identityEmail">Email</label>
                                 <input type="text" id="identityEmail" name="email" placeholder="j.smith@corp.com">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(champ email utilisé comme identifiant)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(email utilisé comme identifiant)</em></span></div>
                                 </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="identityFirst">First Name</label>
-                                <input type="text" id="identityFirst" name="first" placeholder="John">
-                            </div>
-                            <div class="form-group">
-                                <label for="identityLast">Last Name</label>
-                                <input type="text" id="identityLast" name="last" placeholder="Smith">
-                            </div>
-                            <div class="form-group">
-                                <label for="identityBunit">Business Unit / Dept</label>
-                                <input type="text" id="identityBunit" name="bunit" placeholder="Engineering">
-                            </div>
-                            <div class="form-group">
-                                <label for="identityPriority">Priority</label>
-                                <select id="identityPriority" name="priority">
-                                    <option value="unknown">Unknown</option>
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="critical">Critical</option>
-                                </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Category</label>
+                            <label>Rôle</label>
+                            <p class="hint-meta" style="margin: 2px 0 6px;">Filtre de rôle — ex. seuls les comptes <em>privileged</em> apparaissent dans les logs d'admin réseau (Cisco IOS/XR)</p>
                             <div class="checkbox-group checkbox-group-compact" id="identityCategoryGroup"></div>
                         </div>
                         <div class="form-group">
@@ -784,11 +755,10 @@
                                 <tr>
                                     <th>IP</th>
                                     <th>Hostname</th>
+                                    <th>MAC</th>
                                     <th>FQDN</th>
-                                    <th>Category</th>
                                     <th>OS</th>
-                                    <th>Dept</th>
-                                    <th>Priority</th>
+                                    <th>Sourcetypes</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -808,11 +778,7 @@
                                 <tr>
                                     <th>Username</th>
                                     <th>Email</th>
-                                    <th>Name</th>
-                                    <th>Category</th>
-                                    <th>Dept</th>
-                                    <th>Priority</th>
-                                    <th>Watchlist</th>
+                                    <th>Rôle</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>

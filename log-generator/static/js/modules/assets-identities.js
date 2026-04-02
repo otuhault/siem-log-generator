@@ -153,11 +153,10 @@ function renderAssets() {
         tr.innerHTML = `
             <td><strong>${escHtml(asset.ip)}</strong></td>
             <td>${escHtml(asset.nt_host)}</td>
+            <td>${escHtml(asset.mac)}</td>
             <td>${escHtml(asset.dns)}</td>
-            <td>${renderCategories(asset.category, aiState.assetCategoryLabels)}</td>
             <td>${escHtml(asset.os)}</td>
-            <td>${escHtml(asset.bunit)}</td>
-            <td>${renderPriority(asset.priority)}</td>
+            <td>${renderCategories(asset.category, aiState.assetCategoryLabels)}</td>
             <td>
                 <button class="btn btn-small btn-secondary" onclick="editAsset('${asset.id}')">Edit</button>
                 <button class="btn btn-small btn-delete" onclick="deleteAsset('${asset.id}')">Delete</button>
@@ -183,19 +182,11 @@ function renderIdentities() {
     table.style.display = 'block';
 
     aiState.identities.forEach(ident => {
-        const fullName = [ident.first, ident.last].filter(Boolean).join(' ');
-        const watchlistBadge = ident.watchlist
-            ? '<span class="watchlist-badge">Watchlist</span>'
-            : '';
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${escHtml(ident.identity)}</strong></td>
             <td>${escHtml(ident.email)}</td>
-            <td>${escHtml(fullName)}</td>
             <td>${renderCategories(ident.category, aiState.identityCategoryLabels)}</td>
-            <td>${escHtml(ident.bunit)}</td>
-            <td>${renderPriority(ident.priority)}</td>
-            <td>${watchlistBadge}</td>
             <td>
                 <button class="btn btn-small btn-secondary" onclick="editIdentity('${ident.id}')">Edit</button>
                 <button class="btn btn-small btn-delete" onclick="deleteIdentity('${ident.id}')">Delete</button>
@@ -273,14 +264,11 @@ function setupAssetForm() {
         const formData = new FormData(e.target);
 
         const payload = {
-            ip:       formData.get('ip').trim(),
-            nt_host:  formData.get('nt_host').trim(),
-            dns:      formData.get('dns').trim(),
-            mac:      formData.get('mac').trim(),
-            os:       formData.get('os').trim(),
-            bunit:    formData.get('bunit').trim(),
-            owner:    formData.get('owner').trim(),
-            priority: formData.get('priority'),
+            ip:      formData.get('ip').trim(),
+            nt_host: formData.get('nt_host').trim(),
+            mac:     formData.get('mac').trim(),
+            dns:     formData.get('dns').trim(),
+            os:      formData.get('os').trim(),
             category: getCheckedCategories('assetCategoryGroup'),
         };
 
@@ -317,14 +305,9 @@ function setupIdentityForm() {
         const formData = new FormData(e.target);
 
         const payload = {
-            identity:  formData.get('identity').trim(),
-            email:     formData.get('email').trim(),
-            first:     formData.get('first').trim(),
-            last:      formData.get('last').trim(),
-            bunit:     formData.get('bunit').trim(),
-            priority:  formData.get('priority'),
-            watchlist: document.getElementById('identityWatchlist').checked,
-            category:  getCheckedCategories('identityCategoryGroup'),
+            identity: formData.get('identity').trim(),
+            email:    formData.get('email').trim(),
+            category: getCheckedCategories('identityCategoryGroup'),
         };
 
         if (!payload.identity) {
@@ -361,15 +344,12 @@ window.editAsset = function(id) {
     aiState.editingAssetId = id;
     document.getElementById('assetFormTitle').textContent = 'Edit Asset';
     document.getElementById('submitAssetBtn').textContent = 'Update Asset';
-    document.getElementById('assetId').value    = id;
-    document.getElementById('assetIp').value     = asset.ip || '';
+    document.getElementById('assetId').value       = id;
+    document.getElementById('assetIp').value       = asset.ip || '';
     document.getElementById('assetHostname').value = asset.nt_host || '';
-    document.getElementById('assetDns').value    = asset.dns || '';
-    document.getElementById('assetMac').value    = asset.mac || '';
-    document.getElementById('assetOs').value     = asset.os || '';
-    document.getElementById('assetBunit').value  = asset.bunit || '';
-    document.getElementById('assetOwner').value  = asset.owner || '';
-    document.getElementById('assetPriority').value = asset.priority || 'unknown';
+    document.getElementById('assetMac').value      = asset.mac || '';
+    document.getElementById('assetDns').value      = asset.dns || '';
+    document.getElementById('assetOs').value       = asset.os || '';
     setCheckedCategories('assetCategoryGroup', asset.category || []);
     document.getElementById('assetFormCard').style.display = 'block';
     document.getElementById('assetFormCard').scrollIntoView({ behavior: 'smooth' });
@@ -397,11 +377,6 @@ window.editIdentity = function(id) {
     document.getElementById('identityId').value       = id;
     document.getElementById('identityUsername').value = ident.identity || '';
     document.getElementById('identityEmail').value    = ident.email || '';
-    document.getElementById('identityFirst').value    = ident.first || '';
-    document.getElementById('identityLast').value     = ident.last || '';
-    document.getElementById('identityBunit').value    = ident.bunit || '';
-    document.getElementById('identityPriority').value = ident.priority || 'unknown';
-    document.getElementById('identityWatchlist').checked = !!ident.watchlist;
     setCheckedCategories('identityCategoryGroup', ident.category || []);
     document.getElementById('identityFormCard').style.display = 'block';
     document.getElementById('identityFormCard').scrollIntoView({ behavior: 'smooth' });

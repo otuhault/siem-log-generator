@@ -13,8 +13,7 @@ from configuration_manager import ConfigurationManager
 from simulation_manager import SimulationManager
 from asset_identity_manager import (AssetIdentityManager,
     ASSET_CATEGORIES, ASSET_CATEGORY_LABELS,
-    IDENTITY_CATEGORIES, IDENTITY_CATEGORY_LABELS,
-    PRIORITIES)
+    IDENTITY_CATEGORIES, IDENTITY_CATEGORY_LABELS)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
@@ -315,7 +314,6 @@ def get_ai_meta():
         'asset_category_labels':    ASSET_CATEGORY_LABELS,
         'identity_categories':      IDENTITY_CATEGORIES,
         'identity_category_labels': IDENTITY_CATEGORY_LABELS,
-        'priorities':               PRIORITIES,
         'stats':                    ai_manager.get_stats(),
         'has_data':                 ai_manager.has_data(),
     })
@@ -340,13 +338,10 @@ def create_asset():
         asset_id = ai_manager.create_asset(
             ip=data['ip'],
             nt_host=data.get('nt_host'),
-            dns=data.get('dns'),
             mac=data.get('mac'),
-            category=data.get('category', []),
+            dns=data.get('dns'),
             os=data.get('os'),
-            bunit=data.get('bunit'),
-            owner=data.get('owner'),
-            priority=data.get('priority', 'unknown'),
+            category=data.get('category', []),
         )
         return jsonify({'success': True, 'asset_id': asset_id})
     except Exception as e:
@@ -389,12 +384,7 @@ def create_identity():
         identity_id = ai_manager.create_identity(
             identity=data['identity'],
             email=data.get('email'),
-            first=data.get('first'),
-            last=data.get('last'),
-            bunit=data.get('bunit'),
             category=data.get('category', []),
-            priority=data.get('priority', 'unknown'),
-            watchlist=data.get('watchlist', False),
         )
         return jsonify({'success': True, 'identity_id': identity_id})
     except Exception as e:

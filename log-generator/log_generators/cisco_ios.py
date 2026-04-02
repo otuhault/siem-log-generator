@@ -19,9 +19,10 @@ class CiscoIOSLogGenerator:
         'multi_instance': False,
     }
     ASSET_IDENTITY_MAPPING = {
-        'hostnames':    {'type': 'asset',    'field': 'nt_host',  'categories': ['cisco_ios'],             'cim_field': 'dvc'},
-        'internal_ips': {'type': 'asset',    'field': 'ip',       'categories': ['cisco_ios'],             'cim_field': 'src_ip'},
-        'admin_users':  {'type': 'identity', 'field': 'identity', 'categories': ['privileged'],            'cim_field': 'user'},
+        'hostnames':     {'type': 'asset',    'field': 'nt_host',  'categories': ['cisco_ios'],  'cim_field': 'dvc'},
+        'internal_ips':  {'type': 'asset',    'field': 'ip',       'categories': ['cisco_ios'],  'cim_field': 'src_ip'},
+        'mac_addresses': {'type': 'asset',    'field': 'mac',      'categories': ['cisco_ios'],  'cim_field': 'src_mac'},
+        'admin_users':   {'type': 'identity', 'field': 'identity', 'categories': ['privileged'], 'cim_field': 'user'},
     }
     METADATA = {
         'name': 'Cisco IOS',
@@ -106,6 +107,10 @@ class CiscoIOSLogGenerator:
 
         # SNMP hosts
         self.snmp_hosts = ['10.1.1.50', '10.10.10.100', '192.168.1.200']
+
+        # MAC addresses — used in 802.1X AUTHMGR events (Cisco dot notation)
+        # Injected from A&I store if available; falls back to random generation
+        self.mac_addresses = []
 
         # IOS versions
         self.ios_versions = [
@@ -231,6 +236,14 @@ class CiscoIOSLogGenerator:
     def _random_admin_user(self):
         return random.choice(self.admin_users)
 
+    def _pick_mac(self):
+        """Return a MAC in Cisco dot notation. Uses A&I pool if available, else random."""
+        if self.mac_addresses:
+            raw = random.choice(self.mac_addresses).replace(':', '').replace('-', '').replace('.', '')
+            return f'{raw[0:4]}.{raw[4:8]}.{raw[8:12]}'
+        raw = ''.join([f'{random.randint(0,255):02x}' for _ in range(6)])
+        return f'{raw[0:4]}.{raw[4:8]}.{raw[8:12]}'
+
     def _format_log(self, facility, severity, mnemonic, message):
         """Format a Cisco IOS syslog message"""
         seq = self._next_seq()
@@ -355,17 +368,14 @@ class CiscoIOSLogGenerator:
             return self._format_log('AAA', 6, 'USER_PRIVILEGE_UPDATE', f'username: {user} privilege updated with priv-{priv}')
 
         elif event_type == 'authmgr_start':
-            mac = ':'.join([f'{random.randint(0,255):02x}' for _ in range(6)])
-            mac_cisco = mac.replace(':', '')
-            mac_formatted = f'{mac_cisco[0:4]}.{mac_cisco[4:8]}.{mac_cisco[8:12]}'
+            mac_formatted = self._pick_mac()
             iface = random.choice(['GigabitEthernet1/0/5', 'GigabitEthernet1/0/12', 'GigabitEthernet1/0/24'])
             session_id = f'{random.randint(0x0A000000, 0x0AFFFFFF):08X}{random.randint(0x00000001, 0x0000FFFF):08X}{random.randint(0x10000000, 0xFFFFFFFF):08X}'
             return self._format_log('AUTHMGR', 5, 'START',
                 f"Starting 'dot1x' for client ({mac_formatted}) on Interface {iface} AuditSessionID {session_id}")
 
         elif event_type == 'authmgr_success':
-            mac_cisco = ''.join([f'{random.randint(0,255):02x}' for _ in range(6)])
-            mac_formatted = f'{mac_cisco[0:4]}.{mac_cisco[4:8]}.{mac_cisco[8:12]}'
+            mac_formatted = self._pick_mac()
             iface = random.choice(['GigabitEthernet1/0/5', 'GigabitEthernet1/0/12', 'GigabitEthernet1/0/24'])
             session_id = f'{random.randint(0x0A000000, 0x0AFFFFFF):08X}{random.randint(0x00000001, 0x0000FFFF):08X}{random.randint(0x10000000, 0xFFFFFFFF):08X}'
             return self._format_log('AUTHMGR', 5, 'SUCCESS',

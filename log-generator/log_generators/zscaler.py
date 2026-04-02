@@ -31,9 +31,10 @@ class ZscalerLogGenerator:
     }
 
     ASSET_IDENTITY_MAPPING = {
-        '_USERS':        {'type': 'identity', 'field': 'email',                               'cim_field': 'user'},
-        '_INTERNAL_IPS': {'type': 'asset',    'field': 'ip',      'categories': ['zscaler'], 'cim_field': 'src_ip'},
-        '_device_names': {'type': 'asset',    'field': 'nt_host', 'categories': ['zscaler'], 'cim_field': 'src_nt_host'},
+        '_USERS':            {'type': 'identity', 'field': 'email',                               'cim_field': 'user'},
+        '_INTERNAL_IPS':     {'type': 'asset',    'field': 'ip',      'categories': ['zscaler'], 'cim_field': 'src_ip'},
+        '_device_names':     {'type': 'asset',    'field': 'nt_host', 'categories': ['zscaler'], 'cim_field': 'src_nt_host'},
+        '_device_os_types':  {'type': 'asset',    'field': 'os',      'categories': ['zscaler'], 'cim_field': 'deviceostype'},
     }
 
     # --- shared data ---
