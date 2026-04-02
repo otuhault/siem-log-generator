@@ -39,6 +39,16 @@ export const SOURCETYPE_CONFIG = {
         optionKey: 'event_categories',
         formGroups: ['ciscoFTDEventCategoriesGroup']
     },
+    'cisco_asa': {
+        checkboxGroup: 'cisco_asa_event_categories',
+        optionKey: 'event_categories',
+        formGroups: ['ciscoASAEventCategoriesGroup']
+    },
+    'cisco_xr': {
+        checkboxGroup: 'cisco_xr_event_categories',
+        optionKey: 'event_categories',
+        formGroups: ['ciscoXREventCategoriesGroup']
+    },
     'zscaler': {
         checkboxGroup: 'zscaler_log_types',
         optionKey: 'log_types',

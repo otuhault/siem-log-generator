@@ -79,6 +79,30 @@ function setupEventListeners() {
 
     // Log type selection handler
     setupLogTypeListener();
+
+    // A&I toggle → show/hide slider + impact panel
+    document.getElementById('useAssetsIdentities').addEventListener('change', function() {
+        const ratioGroup  = document.getElementById('aiRatioGroup');
+        const impactPanel = document.getElementById('aiImpactPanel');
+        if (this.checked) {
+            ratioGroup.style.display = 'block';
+            document.getElementById('aiRatio').value = 100;
+            document.getElementById('aiRatioValue').textContent = '100%';
+            const logType = document.getElementById('logType').value;
+            if (logType) loadAIImpact(logType);
+        } else {
+            ratioGroup.style.display = 'none';
+            impactPanel.style.display = 'none';
+        }
+    });
+
+    // A&I slider → live label update
+    document.getElementById('aiRatio').addEventListener('input', function() {
+        document.getElementById('aiRatioValue').textContent = this.value + '%';
+        // Update gradient fill to reflect position
+        const pct = this.value;
+        this.style.background = `linear-gradient(to right, #d0d7de 0%, #d0d7de ${100-pct}%, #0969da ${100-pct}%, #0969da 100%)`;
+    });
 }
 
 /**
@@ -184,6 +208,7 @@ function setupLogTypeListener() {
             attackOptionsGroup.style.display = 'block';
             frequencyGroup.style.display = 'none';
             frequencyInput.disabled = true;
+            document.getElementById('useAssetsIdentitiesGroup').style.display = 'none';
         }
         // Check if it's a sourcetype
         else if (selectedType && state.logTypes[selectedType]) {
@@ -194,6 +219,14 @@ function setupLogTypeListener() {
             attackOptionsGroup.style.display = 'none';
             frequencyGroup.style.display = 'block';
             frequencyInput.disabled = false;
+
+            // Show Assets & Identities toggle for sourcetypes
+            document.getElementById('useAssetsIdentitiesGroup').style.display = 'block';
+
+            // Refresh impact panel if toggle is already on
+            if (document.getElementById('useAssetsIdentities').checked) {
+                loadAIImpact(selectedType);
+            }
 
             // Show type-specific options using configuration
             hideAllOptions();
@@ -211,6 +244,7 @@ function setupLogTypeListener() {
             // Reset to default state
             attackOptionsGroup.style.display = 'none';
             frequencyGroup.style.display = 'none';
+            document.getElementById('useAssetsIdentitiesGroup').style.display = 'none';
         }
     });
 }
@@ -242,7 +276,45 @@ function setupTabs() {
                 loadAttackTypesView();
             } else if (tabName === 'simulation') {
                 loadSimulations();
+            } else if (tabName === 'assets-identities') {
+                // handled by assets-identities.js
             }
         });
     });
+}
+
+/**
+ * Load and render the A&I Impact panel for a given log type.
+ * Called when the A&I toggle is checked or the sourcetype changes.
+ * Exposed on window so senders.js (another ES module) can call it.
+ */
+window.loadAIImpact = loadAIImpact;
+async function loadAIImpact(logType) {
+    const panel = document.getElementById('aiImpactPanel');
+    const rows  = document.getElementById('aiImpactRows');
+    rows.innerHTML = '<div style="font-size:0.82em;color:#57606a;padding:4px 0;">Loading…</div>';
+    panel.style.display = 'block';
+
+    try {
+        const res  = await fetch(`/api/assets-identities/impact/${logType}`);
+        const data = await res.json();
+
+        if (!data.length) {
+            rows.innerHTML = '<div style="font-size:0.82em;color:#57606a;padding:4px 0;">No A&amp;I mapping for this sourcetype.</div>';
+            return;
+        }
+
+        rows.innerHTML = data.map(row => {
+            const cls   = row.available ? 'available' : 'fallback';
+            const badge = row.available
+                ? `<span class="ai-count available">${row.count}</span>`
+                : `<span class="ai-count fallback">0</span>`;
+            return `<div class="ai-impact-row ${cls}">
+                <span class="ai-cim-field">${row.cim_field}</span>
+                ${badge}
+            </div>`;
+        }).join('');
+    } catch (err) {
+        rows.innerHTML = '<div style="font-size:0.82em;color:#cf222e;">Failed to load impact data.</div>';
+    }
 }

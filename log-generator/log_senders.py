@@ -16,6 +16,9 @@ from hec_sender import HECSender
 from syslog_sender import SyslogSender
 from configuration_manager import ConfigurationManager
 from attack_generators import ATTACK_REGISTRY, AttackGeneratorFactory
+from asset_identity_manager import AssetIdentityManager
+
+_ai_manager = AssetIdentityManager()
 
 
 class MultiSourceLogGenerator:
@@ -202,20 +205,27 @@ class SenderManager(JsonStore):
         config          = generator_class.SOURCETYPE_CONFIG
         param_value     = options.get(config['param_key'], config['defaults'])
 
+        use_ai = options.get('use_assets_identities', False)
+        ai_ratio = int(options.get('assets_identities_ratio', 100))
+
         if config.get('multi_instance'):
             extra_params = {
                 k: options.get(k, default)
                 for k, default in config.get('extra_params_keys', {}).items()
             }
-            generators = [
+            gen_instances = [
                 generator_class(**{config['single_param_name']: val, **extra_params})
                 for val in param_value
             ]
-            generator = MultiSourceLogGenerator(generators)
+            if use_ai:
+                for gi in gen_instances:
+                    _ai_manager.inject_into(gi, generator_class, ratio=ai_ratio)
+            generator = MultiSourceLogGenerator(gen_instances)
         else:
-            generator = MultiSourceLogGenerator(
-                generator_class(**{config['param_key']: param_value})
-            )
+            gen_instance = generator_class(**{config['param_key']: param_value})
+            if use_ai:
+                _ai_manager.inject_into(gen_instance, generator_class, ratio=ai_ratio)
+            generator = MultiSourceLogGenerator(gen_instance)
 
         stop_event = threading.Event()
         thread = threading.Thread(

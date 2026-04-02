@@ -1,0 +1,84 @@
+{
+  "assets": {
+    "58293c64-3461-4539-a5c8-50da4ade22cd": {
+      "id": "58293c64-3461-4539-a5c8-50da4ade22cd",
+      "ip": "192.168.1.27",
+      "nt_host": "splunk",
+      "dns": "",
+      "mac": "",
+      "category": [
+        "workstation",
+        "endpoint",
+        "server",
+        "domain_controller",
+        "firewall",
+        "router",
+        "switch",
+        "web_server",
+        "db_server",
+        "vpn_gateway",
+        "external"
+      ],
+      "os": "",
+      "bunit": "Lab",
+      "owner": "splunk",
+      "priority": "low",
+      "created_at": "2026-03-30T22:55:38.445257"
+    },
+    "98a99030-f09b-474b-b1e9-5ea746066c34": {
+      "id": "98a99030-f09b-474b-b1e9-5ea746066c34",
+      "ip": "192.168.1.14",
+      "nt_host": "firewall",
+      "dns": "",
+      "mac": "",
+      "category": [
+        "workstation",
+        "endpoint",
+        "server",
+        "domain_controller",
+        "firewall",
+        "router",
+        "switch",
+        "web_server",
+        "db_server",
+        "vpn_gateway",
+        "external"
+      ],
+      "os": "",
+      "bunit": "",
+      "owner": "fwuser",
+      "priority": "medium",
+      "created_at": "2026-03-31T21:16:23.749758"
+    }
+  },
+  "identities": {
+    "f401b2dc-b884-4483-950d-55de561a0a56": {
+      "id": "f401b2dc-b884-4483-950d-55de561a0a56",
+      "identity": "splunk",
+      "email": "",
+      "first": "",
+      "last": "",
+      "bunit": "",
+      "category": [
+        "standard"
+      ],
+      "priority": "unknown",
+      "watchlist": false,
+      "created_at": "2026-03-31T21:16:57.714631"
+    },
+    "9c03a787-f9c0-41e5-a6d9-b1ad42a65474": {
+      "id": "9c03a787-f9c0-41e5-a6d9-b1ad42a65474",
+      "identity": "root",
+      "email": "",
+      "first": "",
+      "last": "",
+      "bunit": "",
+      "category": [
+        "privileged"
+      ],
+      "priority": "unknown",
+      "watchlist": true,
+      "created_at": "2026-03-31T21:17:07.637885"
+    }
+  }
+}

@@ -1,22 +1,22 @@
 """
-Cisco Secure Firewall Threat Defense (FTD) Log Generator
+Cisco Adaptive Security Appliance (ASA) Log Generator
 
-Generates FTD syslog messages in EMBLEM format.
-Format: <PRI>:ISO_timestamp:hostname: %FTD-severity-msgid: message
-Sourcetype: cisco:ftd  →  index: netfw
+Generates ASA syslog messages in BSD format.
+Format: <PRI>Mmm DD HH:MM:SS hostname : %ASA-severity-msgid: message
+Sourcetype: cisco:asa  →  index: netfw
 
-Note: Firepower Unified Events (430xxx / %NGIPS-) belong to cisco:firepower:syslog.
-      ASA-style messages (%ASA-) belong to cisco:asa.
-      This generator covers proper %FTD- system messages only.
+Note: FTD EMBLEM format (%FTD-) belongs to cisco:ftd.
+      Firepower Unified Events (430xxx) belong to cisco:firepower:syslog.
+      This generator covers %ASA- system messages only.
 """
 
 import random
 from datetime import datetime
 
 
-class CiscoFTDLogGenerator:
+class CiscoASALogGenerator:
 
-    LOG_TYPE = 'cisco_ftd'
+    LOG_TYPE = 'cisco_asa'
     AVG_LOG_SIZE = 200
     SOURCETYPE_CONFIG = {
         'param_key': 'event_categories',
@@ -24,14 +24,14 @@ class CiscoFTDLogGenerator:
         'multi_instance': False,
     }
     ASSET_IDENTITY_MAPPING = {
-        'devices':      {'type': 'asset',    'field': 'nt_host', 'categories': ['cisco_ftd'], 'cim_field': 'dvc'},
-        'internal_ips': {'type': 'asset',    'field': 'ip',      'categories': ['cisco_ftd'], 'cim_field': 'src_ip'},
+        'devices':      {'type': 'asset',    'field': 'nt_host', 'categories': ['cisco_asa'], 'cim_field': 'dvc'},
+        'internal_ips': {'type': 'asset',    'field': 'ip',      'categories': ['cisco_asa'], 'cim_field': 'src_ip'},
         'external_ips': {'type': 'asset',    'field': 'ip',      'categories': ['external'],  'cim_field': 'dest_ip'},
         'users':        {'type': 'identity', 'field': 'identity',                             'cim_field': 'user'},
     }
     METADATA = {
-        'name': 'Cisco Secure Firewall (FTD)',
-        'description': 'Cisco FTD EMBLEM syslog — %FTD- system messages (cisco:ftd, index: netfw)',
+        'name': 'Cisco ASA',
+        'description': 'Cisco ASA BSD syslog — %ASA- system messages (cisco:asa, index: netfw)',
         'example': 'TCP/UDP connections, VPN sessions, AAA auth, ACL decisions, system events',
         'sources': [
             {'id': 'connection', 'name': 'Connection Events', 'description': 'TCP/UDP session built/teardown (302013–302016)'},
@@ -47,7 +47,7 @@ class CiscoFTDLogGenerator:
         self._conn_id = random.randint(100000, 999999)
 
         self.devices = [
-            'ftd-primary', 'ftd-secondary', 'ftd-dc-01', 'ftd-edge-gw', 'ftd-dmz',
+            'asa-primary', 'asa-secondary', 'asa-dc-01', 'asa-edge-gw', 'asa-dmz',
         ]
         self.internal_ips = [
             '10.0.0.{}', '10.1.9.{}', '10.100.20.{}', '192.168.1.{}', '172.16.10.{}',
@@ -63,11 +63,6 @@ class CiscoFTDLogGenerator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
-    def _ts(self):
-        now = datetime.now().astimezone()
-        offset = now.strftime('%z')
-        return now.strftime('%Y-%m-%dT%H:%M:%S') + offset[:3] + ':' + offset[3:]
 
     def _bsd_ts(self):
         return datetime.now().strftime('%b %d %H:%M:%S')
@@ -86,7 +81,7 @@ class CiscoFTDLogGenerator:
 
     def _line(self, severity, msgid, message):
         device = random.choice(self.devices)
-        return f'<{self._pri(severity)}>:{self._ts()}:{device}: %FTD-{severity}-{msgid}: {message}'
+        return f'<{self._pri(severity)}>{self._bsd_ts()} {device} : %ASA-{severity}-{msgid}: {message}'
 
     # ------------------------------------------------------------------
     # Categories
@@ -96,7 +91,7 @@ class CiscoFTDLogGenerator:
         weights = {'connection': 40, 'vpn': 20, 'auth': 15, 'acl': 15, 'system': 10}
         active  = {k: v for k, v in weights.items() if k in self.event_categories} or weights
         cat     = random.choices(list(active), weights=list(active.values()), k=1)[0]
-        return getattr(self, f'_gen_{cat}')()
+        return getattr(self, f'_gen_{cat}')()\
 
     def _gen_connection(self):
         proto    = random.choice(self.protocols)
@@ -109,7 +104,6 @@ class CiscoFTDLogGenerator:
         conn_id  = self._conn()
 
         if random.random() > 0.4:
-            # Teardown
             duration = random.randint(1, 3600)
             sent     = random.randint(0, 500000)
             rcvd     = random.randint(0, 500000)
@@ -120,8 +114,8 @@ class CiscoFTDLogGenerator:
                    f'bytes {sent+rcvd} {reason}')
             return self._line(6, msgid, msg)
         else:
-            msgid    = '302013' if proto == 'TCP' else '302015'
-            direction= random.choice(['inbound', 'outbound'])
+            msgid     = '302013' if proto == 'TCP' else '302015'
+            direction = random.choice(['inbound', 'outbound'])
             msg = (f'Built {direction} {proto} connection {conn_id} for {iface_in}:{src_ip}/{src_port} '
                    f'({src_ip}/{src_port}) to {iface_out}:{dst_ip}/{dst_port} ({dst_ip}/{dst_port})')
             return self._line(6, msgid, msg)
@@ -191,7 +185,8 @@ class CiscoFTDLogGenerator:
             (6, '725001', f'Starting SSL handshake with client {iface}:{ip}/{random.randint(1024,65535)} for {random.choice(["TLSv1.2","TLSv1.3"])} session.'),
             (6, '725002', f'Device completed SSL handshake with client {iface}:{ip}/{random.randint(1024,65535)}.'),
             (6, '725007', f'SSL session with client {iface}:{ip}/{random.randint(1024,65535)} terminated.'),
-            (5, '409023', f'Queued log messages are being dropped. Queue limit of {random.choice([512,1024,2048])} messages has been reached.'),
+            (3, '210005', f'LAN Failover interface is up'),
+            (2, '105003', f'(Primary) Monitoring on interface {iface} waiting'),
         ]
         sev, msgid, msg = random.choice(events)
         return self._line(sev, msgid, msg)

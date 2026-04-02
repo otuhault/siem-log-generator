@@ -11,6 +11,10 @@ from datetime import datetime
 from log_senders import SenderManager
 from configuration_manager import ConfigurationManager
 from simulation_manager import SimulationManager
+from asset_identity_manager import (AssetIdentityManager,
+    ASSET_CATEGORIES, ASSET_CATEGORY_LABELS,
+    IDENTITY_CATEGORIES, IDENTITY_CATEGORY_LABELS,
+    PRIORITIES)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
@@ -19,6 +23,7 @@ app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 configuration_manager = ConfigurationManager()
 sender_manager = SenderManager(config_mgr=configuration_manager)
 simulation_manager = SimulationManager()
+ai_manager = AssetIdentityManager()
 
 @app.route('/')
 def index():
@@ -265,6 +270,150 @@ def calculate_simulation():
             freq = simulation_manager.calculate_frequency(volume_gb, duration_seconds, log_type)
             result.append({'log_type': log_type, 'volume_gb': volume_gb, 'frequency': freq})
         return jsonify({'success': True, 'sourcetypes': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Assets & Identities
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route('/api/assets-identities/impact/<log_type>', methods=['GET'])
+def get_ai_impact(log_type):
+    """
+    For a given log_type, return each mapped pool with its A&I availability.
+    Used by the sender form to show the 'A&I Impact' panel.
+    """
+    from log_generators.registry import REGISTRY
+    generator_class = REGISTRY.get(log_type)
+    if not generator_class:
+        return jsonify({'error': f'Unknown log type: {log_type}'}), 404
+
+    mapping = getattr(generator_class, 'ASSET_IDENTITY_MAPPING', {})
+    rows = []
+    for pool_name, spec in mapping.items():
+        count = len(ai_manager.get_pool(
+            pool_type=spec['type'],
+            field=spec['field'],
+            categories=spec.get('categories'),
+        ))
+        cats = spec.get('categories') or []
+        rows.append({
+            'pool':       pool_name,
+            'cim_field':  spec.get('cim_field', pool_name),
+            'count':      count,
+            'available':  count > 0,
+        })
+    return jsonify(rows)
+
+
+@app.route('/api/assets-identities/meta', methods=['GET'])
+def get_ai_meta():
+    """Return category/priority enumerations and current stats."""
+    return jsonify({
+        'asset_categories':         ASSET_CATEGORIES,
+        'asset_category_labels':    ASSET_CATEGORY_LABELS,
+        'identity_categories':      IDENTITY_CATEGORIES,
+        'identity_category_labels': IDENTITY_CATEGORY_LABELS,
+        'priorities':               PRIORITIES,
+        'stats':                    ai_manager.get_stats(),
+        'has_data':                 ai_manager.has_data(),
+    })
+
+# --- Assets ---
+
+@app.route('/api/assets', methods=['GET'])
+def get_assets():
+    return jsonify(ai_manager.get_all_assets())
+
+@app.route('/api/assets/<asset_id>', methods=['GET'])
+def get_asset(asset_id):
+    asset = ai_manager.get_asset(asset_id)
+    if asset:
+        return jsonify(asset)
+    return jsonify({'error': 'Asset not found'}), 404
+
+@app.route('/api/assets', methods=['POST'])
+def create_asset():
+    data = request.json
+    try:
+        asset_id = ai_manager.create_asset(
+            ip=data['ip'],
+            nt_host=data.get('nt_host'),
+            dns=data.get('dns'),
+            mac=data.get('mac'),
+            category=data.get('category', []),
+            os=data.get('os'),
+            bunit=data.get('bunit'),
+            owner=data.get('owner'),
+            priority=data.get('priority', 'unknown'),
+        )
+        return jsonify({'success': True, 'asset_id': asset_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/assets/<asset_id>', methods=['PUT'])
+def update_asset(asset_id):
+    data = request.json
+    try:
+        ai_manager.update_asset(asset_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/assets/<asset_id>', methods=['DELETE'])
+def delete_asset(asset_id):
+    try:
+        ai_manager.delete_asset(asset_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+# --- Identities ---
+
+@app.route('/api/identities', methods=['GET'])
+def get_identities():
+    return jsonify(ai_manager.get_all_identities())
+
+@app.route('/api/identities/<identity_id>', methods=['GET'])
+def get_identity(identity_id):
+    ident = ai_manager.get_identity(identity_id)
+    if ident:
+        return jsonify(ident)
+    return jsonify({'error': 'Identity not found'}), 404
+
+@app.route('/api/identities', methods=['POST'])
+def create_identity():
+    data = request.json
+    try:
+        identity_id = ai_manager.create_identity(
+            identity=data['identity'],
+            email=data.get('email'),
+            first=data.get('first'),
+            last=data.get('last'),
+            bunit=data.get('bunit'),
+            category=data.get('category', []),
+            priority=data.get('priority', 'unknown'),
+            watchlist=data.get('watchlist', False),
+        )
+        return jsonify({'success': True, 'identity_id': identity_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/identities/<identity_id>', methods=['PUT'])
+def update_identity(identity_id):
+    data = request.json
+    try:
+        ai_manager.update_identity(identity_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/identities/<identity_id>', methods=['DELETE'])
+def delete_identity(identity_id):
+    try:
+        ai_manager.delete_identity(identity_id)
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 

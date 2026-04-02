@@ -401,6 +401,20 @@ export async function editSender(senderId) {
                     restoreCheckboxes(config.checkboxGroup, optionValue);
                 }
 
+                // Restore Assets & Identities toggle + slider + impact panel
+                const useAI = !!sender.options.use_assets_identities;
+                document.getElementById('useAssetsIdentities').checked = useAI;
+                const ratio = sender.options.assets_identities_ratio ?? 100;
+                document.getElementById('aiRatio').value = ratio;
+                document.getElementById('aiRatioValue').textContent = ratio + '%';
+                document.getElementById('aiRatioGroup').style.display = useAI ? 'block' : 'none';
+                if (useAI) {
+                    // loadAIImpact is defined in app.js — call via window or dispatch
+                    if (typeof window.loadAIImpact === 'function') {
+                        window.loadAIImpact(sender.log_type);
+                    }
+                }
+
                 // Restore additional fields if any
                 if (config.additionalFields) {
                     Object.entries(config.additionalFields).forEach(([optKey, elemId]) => {
@@ -539,8 +553,11 @@ export async function handleCreateSender(e) {
             return;
         }
 
+        const useAI = document.getElementById('useAssetsIdentities').checked;
         data.options = {
-            [config.optionKey]: selectedValues
+            [config.optionKey]: selectedValues,
+            use_assets_identities:    useAI,
+            assets_identities_ratio:  useAI ? parseInt(document.getElementById('aiRatio').value) : 100,
         };
 
         // Add additional fields if configured
@@ -624,7 +641,16 @@ export function closeSenderForm() {
     document.getElementById('adEventCategoriesGroup').style.display = 'none';
     document.getElementById('ciscoIOSEventCategoriesGroup').style.display = 'none';
     document.getElementById('ciscoFTDEventCategoriesGroup').style.display = 'none';
+    document.getElementById('ciscoASAEventCategoriesGroup').style.display = 'none';
+    document.getElementById('ciscoXREventCategoriesGroup').style.display = 'none';
     document.getElementById('zscalerLogTypesGroup').style.display = 'none';
+    document.getElementById('useAssetsIdentitiesGroup').style.display = 'none';
+    document.getElementById('useAssetsIdentities').checked = false;
+    document.getElementById('aiRatioGroup').style.display = 'none';
+    document.getElementById('aiRatio').value = 100;
+    document.getElementById('aiRatioValue').textContent = '100%';
+    document.getElementById('aiImpactPanel').style.display = 'none';
+    document.getElementById('aiImpactRows').innerHTML = '';
 
     // Reset attack options and frequency
     document.getElementById('attackOptionsGroup').style.display = 'none';

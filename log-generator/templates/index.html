@@ -17,6 +17,7 @@
             <button class="tab-btn active" data-tab="senders">Senders</button>
             <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
             <button class="tab-btn" data-tab="attacks">Attacks</button>
+            <button class="tab-btn" data-tab="assets-identities">Assets &amp; Identities</button>
             <button class="tab-btn" data-tab="configurations">HEC Destinations</button>
             <button class="tab-btn" data-tab="simulation">Simulation</button>
         </nav>
@@ -53,6 +54,31 @@
                                 <option value="">Select a sourcetype or attack...</option>
                             </select>
                             <div id="logTypeDescription" class="description"></div>
+                        </div>
+
+                        <!-- Assets & Identities toggle + ratio slider (hidden by default) -->
+                        <div class="form-group" id="useAssetsIdentitiesGroup" style="display: none;">
+                            <label class="checkbox-label" style="font-weight: 600;">
+                                <input type="checkbox" id="useAssetsIdentities" name="use_assets_identities">
+                                <span class="checkbox-text">
+                                    <strong>Use Assets &amp; Identities</strong>
+                                    <small>Replace default data pools (IPs, usernames, hostnames) with your configured assets and identities</small>
+                                </span>
+                            </label>
+                            <div id="aiRatioGroup" style="display: none; margin-top: 12px;">
+                                <div class="ai-ratio-labels">
+                                    <span>Random defaults</span>
+                                    <span id="aiRatioValue">100%</span>
+                                    <span>Assets &amp; Identities</span>
+                                </div>
+                                <input type="range" id="aiRatio" name="assets_identities_ratio"
+                                       min="0" max="100" value="100" step="5"
+                                       class="ai-ratio-slider">
+                            </div>
+                            <div id="aiImpactPanel" style="display: none; margin-top: 14px;">
+                                <div class="ai-impact-header">A&amp;I Impact</div>
+                                <div id="aiImpactRows"></div>
+                            </div>
                         </div>
 
                         <!-- Frequency for sourcetypes (hidden by default) -->
@@ -312,35 +338,119 @@
                                     <input type="checkbox" name="cisco_ftd_event_categories" value="connection" checked>
                                     <span class="checkbox-text">
                                         <strong>Connection Events</strong>
-                                        <small>Network connection events with source/dest, ports, protocols, actions (430002)</small>
+                                        <small>TCP/UDP session built/teardown (302013–302016)</small>
                                     </span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="cisco_ftd_event_categories" value="intrusion" checked>
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="vpn" checked>
                                     <span class="checkbox-text">
-                                        <strong>Intrusion Events</strong>
-                                        <small>IPS/IDS detections, blocked threats, signature matches (430001, 430003)</small>
+                                        <strong>VPN Events</strong>
+                                        <small>IPsec/SSL VPN connect, disconnect, NAT-T (713xxx, 716xxx)</small>
                                     </span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="cisco_ftd_event_categories" value="file" checked>
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="auth" checked>
                                     <span class="checkbox-text">
-                                        <strong>File Events</strong>
-                                        <small>Files detected in network traffic with hashes and dispositions (430004)</small>
+                                        <strong>Authentication</strong>
+                                        <small>AAA success/failure, SSH/HTTPS login (113xxx, 605xxx)</small>
                                     </span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="cisco_ftd_event_categories" value="malware" checked>
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="acl" checked>
                                     <span class="checkbox-text">
-                                        <strong>Malware Events</strong>
-                                        <small>Malware detections with threat names and blocked actions (430005)</small>
+                                        <strong>ACL &amp; Policy</strong>
+                                        <small>Access-list permit/deny decisions (106xxx)</small>
                                     </span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="cisco_ftd_event_categories" value="traditional" checked>
+                                    <input type="checkbox" name="cisco_ftd_event_categories" value="system" checked>
                                     <span class="checkbox-text">
-                                        <strong>Traditional Messages</strong>
-                                        <small>ASA-style system messages (authentication, VPN, interface, system events)</small>
+                                        <strong>System Events</strong>
+                                        <small>CLI commands, SSL handshake, HA, config (111xxx, 725xxx)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cisco ASA Event Categories -->
+                        <div class="form-group" id="ciscoASAEventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="connection" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Connection Events</strong>
+                                        <small>TCP/UDP session built/teardown (302013–302016)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="vpn" checked>
+                                    <span class="checkbox-text">
+                                        <strong>VPN Events</strong>
+                                        <small>IPsec/SSL VPN connect, disconnect, NAT-T (713xxx, 716xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="auth" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication</strong>
+                                        <small>AAA success/failure, SSH/HTTPS login (113xxx, 605xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="acl" checked>
+                                    <span class="checkbox-text">
+                                        <strong>ACL &amp; Policy</strong>
+                                        <small>Access-list permit/deny decisions (106xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System Events</strong>
+                                        <small>CLI commands, SSL handshake, HA, failover (111xxx, 725xxx, 105xxx)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cisco IOS XR Event Categories -->
+                        <div class="form-group" id="ciscoXREventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_xr_event_categories" value="routing" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Routing Events</strong>
+                                        <small>BGP, OSPF, IS-IS adjacency and route changes</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_xr_event_categories" value="mpls" checked>
+                                    <span class="checkbox-text">
+                                        <strong>MPLS Events</strong>
+                                        <small>LDP session, label binding, TE tunnel events</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_xr_event_categories" value="interface" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Interface Events</strong>
+                                        <small>Link up/down, carrier transitions, error counters</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_xr_event_categories" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System Events</strong>
+                                        <small>Process restarts, config commits, platform health</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_xr_event_categories" value="security" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Security Events</strong>
+                                        <small>SSH login, AAA, ACL hits, uRPF drops</small>
                                     </span>
                                 </label>
                             </div>
@@ -508,6 +618,206 @@
                     <h2>Inactive Senders</h2>
                     <div id="inactiveSendersContainer">
                         <p class="no-senders">No inactive senders.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assets & Identities Tab Content -->
+            <div id="assets-identitiesTab" class="tab-content">
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Assets: <strong id="totalAssets">0</strong></span>
+                        <span class="stat-item">Identities: <strong id="totalIdentities">0</strong></span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div class="ai-sub-tabs">
+                            <button class="ai-sub-tab-btn active" data-subtab="assets">Assets</button>
+                            <button class="ai-sub-tab-btn" data-subtab="identities">Identities</button>
+                        </div>
+                        <button id="addAssetBtn" class="btn btn-primary">+ Add Asset</button>
+                        <button id="addIdentityBtn" class="btn btn-primary" style="display: none;">+ Add Identity</button>
+                    </div>
+                </div>
+
+                <!-- Asset Form -->
+                <div id="assetFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="assetFormTitle">Add Asset</h2>
+                        <button id="closeAssetForm" class="btn-close">×</button>
+                    </div>
+                    <form id="assetForm">
+                        <input type="hidden" id="assetId" name="id">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label for="assetIp">IP Address <span style="color: red;">*</span></label>
+                                <input type="text" id="assetIp" name="ip" placeholder="192.168.1.10" required data-field-name="IP Address">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">src_ip</span><span class="hint-logs">Apache · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · SSH · Zscaler</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA <em>(external)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetHostname">Hostname (nt_host)</label>
+                                <input type="text" id="assetHostname" name="nt_host" placeholder="DESKTOP-JSMITH">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR · Active Directory</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">src_nt_host</span><span class="hint-logs">Windows · Active Directory · Zscaler</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_host</span><span class="hint-logs">SSH</span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetDns">FQDN (dns)</label>
+                                <input type="text" id="assetDns" name="dns" placeholder="jsmith.corp.local">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetMac">MAC Address</label>
+                                <input type="text" id="assetMac" name="mac" placeholder="00:11:22:33:44:55">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetOs">Operating System</label>
+                                <input type="text" id="assetOs" name="os" placeholder="Windows 10">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetBunit">Business Unit / Dept</label>
+                                <input type="text" id="assetBunit" name="bunit" placeholder="Engineering">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetOwner">Owner (username)</label>
+                                <input type="text" id="assetOwner" name="owner" placeholder="jsmith">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetPriority">Priority</label>
+                                <select id="assetPriority" name="priority">
+                                    <option value="unknown">Unknown</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <div class="checkbox-group checkbox-group-compact" id="assetCategoryGroup"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="submitAssetBtn" class="btn btn-primary">Add Asset</button>
+                            <button type="button" id="cancelAssetBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Identity Form -->
+                <div id="identityFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="identityFormTitle">Add Identity</h2>
+                        <button id="closeIdentityForm" class="btn-close">×</button>
+                    </div>
+                    <form id="identityForm">
+                        <input type="hidden" id="identityId" name="id">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label for="identityUsername">Username <span style="color: red;">*</span></label>
+                                <input type="text" id="identityUsername" name="identity" placeholder="jsmith" required data-field-name="Username">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Windows · SSH · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR · Active Directory</span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="identityEmail">Email</label>
+                                <input type="text" id="identityEmail" name="email" placeholder="j.smith@corp.com">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(champ email utilisé comme identifiant)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="identityFirst">First Name</label>
+                                <input type="text" id="identityFirst" name="first" placeholder="John">
+                            </div>
+                            <div class="form-group">
+                                <label for="identityLast">Last Name</label>
+                                <input type="text" id="identityLast" name="last" placeholder="Smith">
+                            </div>
+                            <div class="form-group">
+                                <label for="identityBunit">Business Unit / Dept</label>
+                                <input type="text" id="identityBunit" name="bunit" placeholder="Engineering">
+                            </div>
+                            <div class="form-group">
+                                <label for="identityPriority">Priority</label>
+                                <select id="identityPriority" name="priority">
+                                    <option value="unknown">Unknown</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <div class="checkbox-group checkbox-group-compact" id="identityCategoryGroup"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="identityWatchlist" name="watchlist">
+                                <span class="checkbox-text">
+                                    <strong>Watchlist</strong>
+                                    <small>Flag this identity as monitored / suspicious</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="submitIdentityBtn" class="btn btn-primary">Add Identity</button>
+                            <button type="button" id="cancelIdentityBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Assets sub-tab -->
+                <div id="assetsSubTab" class="ai-subtab-content active">
+                    <div id="assetsEmptyState" class="empty-state" style="display: none;">
+                        <p>No assets configured. Add assets to represent hosts, servers, workstations, and network devices in your simulated environment.</p>
+                    </div>
+                    <div id="assetsTableContainer" style="display: none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>IP</th>
+                                    <th>Hostname</th>
+                                    <th>FQDN</th>
+                                    <th>Category</th>
+                                    <th>OS</th>
+                                    <th>Dept</th>
+                                    <th>Priority</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Identities sub-tab -->
+                <div id="identitiesSubTab" class="ai-subtab-content">
+                    <div id="identitiesEmptyState" class="empty-state" style="display: none;">
+                        <p>No identities configured. Add identities to represent users, service accounts, and contractors in your simulated environment.</p>
+                    </div>
+                    <div id="identitiesTableContainer" style="display: none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Dept</th>
+                                    <th>Priority</th>
+                                    <th>Watchlist</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="identitiesTableBody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -756,5 +1066,6 @@
     </div>
 
     <script type="module" src="/static/js/app.js?v=20260210a"></script>
+    <script type="module" src="/static/js/modules/assets-identities.js?v=20260210a"></script>
 </body>
 </html>

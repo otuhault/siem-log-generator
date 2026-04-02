@@ -17,6 +17,12 @@ class PaloAltoLogGenerator:
         'defaults': ['traffic', 'threat', 'system'],
         'multi_instance': False,
     }
+    ASSET_IDENTITY_MAPPING = {
+        'internal_ips': {'type': 'asset',    'field': 'ip',      'categories': ['paloalto'], 'cim_field': 'src_ip'},
+        'external_ips': {'type': 'asset',    'field': 'ip',      'categories': ['external'], 'cim_field': 'dest_ip'},
+        'hostnames':    {'type': 'asset',    'field': 'nt_host', 'categories': ['paloalto'], 'cim_field': 'dvc'},
+        'usernames':    {'type': 'identity', 'field': 'identity',                            'cim_field': 'user'},
+    }
     METADATA = {
         'name': 'Palo Alto Firewall',
         'description': 'Palo Alto Networks PAN-OS firewall logs in syslog CSV format',

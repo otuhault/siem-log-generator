@@ -18,6 +18,11 @@ class ActiveDirectoryLogGenerator:
         'defaults': ['account_management', 'group_management', 'directory_service', 'authentication', 'computer_management'],
         'multi_instance': False,
     }
+    ASSET_IDENTITY_MAPPING = {
+        'domain_controllers': {'type': 'asset',    'field': 'nt_host', 'categories': ['active_directory'],          'cim_field': 'dvc'},
+        'target_users':       {'type': 'identity', 'field': 'identity',                                              'cim_field': 'user'},
+        'computer_accounts':  {'type': 'asset',    'field': 'nt_host', 'categories': ['windows', 'active_directory'],'cim_field': 'src_nt_host'},
+    }
     METADATA = {
         'name': 'Active Directory',
         'description': 'Active Directory domain controller event logs (XmlWinEventLog)',

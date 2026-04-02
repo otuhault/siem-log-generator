@@ -1072,3 +1072,287 @@ tr.sender-form-row .card {
     margin: 0;
     cursor: pointer;
 }
+
+/* ── A&I Impact Panel (Sender form) ── */
+
+.ai-impact-header {
+    font-size: 0.78em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #57606a;
+    margin-bottom: 6px;
+}
+
+.ai-impact-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 0.83em;
+    margin-bottom: 3px;
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+}
+
+.ai-impact-row.available { border-color: #2da44e44; background: #f0fdf4; }
+.ai-impact-row.fallback  { border-color: #d0d7de;   background: #f6f8fa; opacity: 0.8; }
+
+.ai-cim-field {
+    font-family: monospace;
+    font-weight: 600;
+    font-size: 0.97em;
+    color: #24292f;
+}
+.ai-impact-row.fallback .ai-cim-field { color: #57606a; }
+
+.ai-count {
+    font-weight: 700;
+    font-size: 0.88em;
+    padding: 1px 7px;
+    border-radius: 10px;
+}
+.ai-count.available { background: #2da44e; color: #fff; }
+.ai-count.fallback  { background: #d0d7de; color: #57606a; }
+
+/* ── Field hints (Asset / Identity forms) ── */
+
+.field-hint {
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.field-hint-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 0.75em;
+    line-height: 1.5;
+}
+
+.hint-cim {
+    font-family: monospace;
+    font-weight: 700;
+    color: #0969da;
+}
+
+.hint-logs {
+    color: #57606a;
+}
+
+.hint-logs em {
+    font-style: italic;
+    color: #8c959f;
+}
+
+/* ── A&I Ratio Slider (Sender form) ── */
+
+.ai-ratio-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82em;
+    color: #57606a;
+    margin-bottom: 6px;
+}
+
+.ai-ratio-labels span:nth-child(2) {
+    font-size: 1em;
+    font-weight: 700;
+    color: #0969da;
+    min-width: 38px;
+    text-align: center;
+}
+
+.ai-ratio-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 3px;
+    background: linear-gradient(to right, #d0d7de 0%, #0969da 100%);
+    outline: none;
+    cursor: pointer;
+}
+
+.ai-ratio-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0969da;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    cursor: pointer;
+}
+
+.ai-ratio-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0969da;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    cursor: pointer;
+}
+
+/* ── Assets & Identities Tab ── */
+
+.ai-sub-tabs {
+    display: flex;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.ai-sub-tab-btn {
+    padding: 6px 18px;
+    background: #f6f8fa;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #57606a;
+    transition: background 0.15s;
+}
+
+.ai-sub-tab-btn:not(:last-child) {
+    border-right: 1px solid #d0d7de;
+}
+
+.ai-sub-tab-btn.active {
+    background: #0969da;
+    color: #fff;
+}
+
+.ai-subtab-content {
+    display: none;
+    margin-top: 20px;
+}
+
+.ai-subtab-content.active {
+    display: block;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #57606a;
+    background: #f6f8fa;
+    border: 1px dashed #d0d7de;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+.data-table th {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #24292f;
+    white-space: nowrap;
+}
+
+.data-table td {
+    border: 1px solid #d0d7de;
+    padding: 7px 12px;
+    vertical-align: middle;
+    color: #24292f;
+}
+
+.data-table tr:nth-child(even) td {
+    background: #f6f8fa;
+}
+
+.data-table tr:hover td {
+    background: #eaf2ff;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 600;
+    background: #ddf4ff;
+    color: #0550ae;
+    margin: 1px 2px;
+    white-space: nowrap;
+}
+
+.priority-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 600;
+}
+
+.priority-badge.unknown  { background: #f6f8fa; color: #57606a; }
+.priority-badge.low      { background: #dafbe1; color: #116329; }
+.priority-badge.medium   { background: #fff8c5; color: #7d4e00; }
+.priority-badge.high     { background: #ffd8b5; color: #953800; }
+.priority-badge.critical { background: #ffebe9; color: #82071e; }
+
+.watchlist-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 600;
+    background: #ffebe9;
+    color: #82071e;
+}
+
+.checkbox-group-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.checkbox-group-compact label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border: 1px solid #d0d7de;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    background: #f6f8fa;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.checkbox-group-compact label:has(input:checked) {
+    background: #ddf4ff;
+    border-color: #0969da;
+    color: #0550ae;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #d0d7de;
+}

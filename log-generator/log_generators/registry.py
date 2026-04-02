@@ -14,6 +14,8 @@ from .paloalto import PaloAltoLogGenerator
 from .active_directory import ActiveDirectoryLogGenerator
 from .cisco_ios import CiscoIOSLogGenerator
 from .cisco_ftd import CiscoFTDLogGenerator
+from .cisco_asa import CiscoASALogGenerator
+from .cisco_xr import CiscoXRLogGenerator
 from .zscaler import ZscalerLogGenerator
 
 # Ordered list of all generator classes.
@@ -25,6 +27,8 @@ GENERATORS = [
     ActiveDirectoryLogGenerator,
     CiscoIOSLogGenerator,
     CiscoFTDLogGenerator,
+    CiscoASALogGenerator,
+    CiscoXRLogGenerator,
     ZscalerLogGenerator,
 ]
 
