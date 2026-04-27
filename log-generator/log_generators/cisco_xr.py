@@ -22,10 +22,6 @@ class CiscoXRLogGenerator:
         'defaults': ['routing', 'mpls', 'interface', 'system', 'security'],
         'multi_instance': False,
     }
-    ASSET_IDENTITY_MAPPING = {
-        'devices': {'type': 'asset',    'field': 'nt_host',  'categories': ['cisco_xr'],                 'cim_field': 'dvc'},
-        'users':   {'type': 'identity', 'field': 'identity', 'categories': ['privileged', 'standard'],   'cim_field': 'user'},
-    }
     METADATA = {
         'name': 'Cisco IOS XR',
         'description': 'Cisco IOS XR syslog — %FACILITY- messages with ms timestamps (cisco:xr, index: netops)',

@@ -358,14 +358,16 @@ export async function editSender(senderId) {
             // Populate form with sender data
             document.getElementById('senderId').value = sender.id;
             document.getElementById('senderName').value = sender.name;
-            document.getElementById('logType').value = sender.log_type;
             document.getElementById('frequency').value = sender.frequency;
             document.getElementById('enabledOnCreate').checked = sender.enabled;
 
-            // Trigger log type change event to show appropriate options
-            const logTypeSelect = document.getElementById('logType');
-            const changeEvent = new Event('change', { bubbles: true });
-            logTypeSelect.dispatchEvent(changeEvent);
+            // Update custom dropdown + fire change event
+            if (typeof window.setLogTypeValue === 'function') {
+                window.setLogTypeValue(sender.log_type);
+            } else {
+                document.getElementById('logType').value = sender.log_type;
+                document.getElementById('logType').dispatchEvent(new Event('change', { bubbles: true }));
+            }
 
             // Set destination type
             // Hide all groups first, then show the right one
@@ -384,6 +386,7 @@ export async function editSender(senderId) {
             } else if (sender.destination_type === 'configuration') {
                 document.querySelector('input[name="destination_type"][value="configuration"]').checked = true;
                 document.getElementById('configurationDestinationGroup').style.display = 'block';
+                document.getElementById('hecOverridesGroup').style.display = 'block';
                 document.getElementById('configurationSelect').required = true;
             } else {
                 document.querySelector('input[name="destination_type"][value="file"]').checked = true;
@@ -453,6 +456,12 @@ export async function editSender(senderId) {
             // Set configuration select value AFTER loadConfigurations rebuilds the dropdown
             if (sender.destination_type === 'configuration' && sender.configuration_id) {
                 document.getElementById('configurationSelect').value = sender.configuration_id;
+                // Restore HEC metadata overrides
+                const opts = sender.options || {};
+                document.getElementById('hecIndex').value      = opts.hec_index      || '';
+                document.getElementById('hecSourcetype').value = opts.hec_sourcetype || '';
+                document.getElementById('hecHost').value       = opts.hec_host       || '';
+                document.getElementById('hecSource').value     = opts.hec_source     || '';
             }
         }
     } catch (error) {
@@ -540,6 +549,13 @@ export async function handleCreateSender(e) {
     } else {
         data.configuration_id = formData.get('configuration_id');
         data.destination_type = 'configuration';
+        // Collect per-sender HEC metadata overrides (merged into options below)
+        data._hecOverrides = {
+            hec_index:      document.getElementById('hecIndex').value.trim()      || undefined,
+            hec_sourcetype: document.getElementById('hecSourcetype').value.trim() || undefined,
+            hec_host:       document.getElementById('hecHost').value.trim()       || undefined,
+            hec_source:     document.getElementById('hecSource').value.trim()     || undefined,
+        };
     }
 
     // Add options for log sourcetypes using configuration mapping
@@ -594,6 +610,15 @@ export async function handleCreateSender(e) {
 
         data.frequency = 0;
         data.attack_status = 'Disabled';
+    }
+
+    // Merge HEC metadata overrides into options (applies to all log types when dest=configuration)
+    if (data._hecOverrides) {
+        if (!data.options) data.options = {};
+        Object.entries(data._hecOverrides).forEach(([k, v]) => {
+            if (v !== undefined) data.options[k] = v;
+        });
+        delete data._hecOverrides;
     }
 
     try {
@@ -676,6 +701,11 @@ export function closeSenderForm() {
     document.getElementById('fileDestinationGroup').style.display = 'block';
     document.getElementById('configurationDestinationGroup').style.display = 'none';
     document.getElementById('syslogDestinationGroup').style.display = 'none';
+    document.getElementById('hecOverridesGroup').style.display = 'none';
+    document.getElementById('hecIndex').value = '';
+    document.getElementById('hecSourcetype').value = '';
+    document.getElementById('hecHost').value = '';
+    document.getElementById('hecSource').value = '';
     document.getElementById('destination').required = true;
     document.getElementById('configurationSelect').required = false;
     document.getElementById('syslogHost').value = '';

@@ -18,12 +18,6 @@ class CiscoIOSLogGenerator:
         'defaults': ['interface', 'system', 'authentication', 'acl_security', 'routing', 'redundancy', 'spanning_tree', 'hardware'],
         'multi_instance': False,
     }
-    ASSET_IDENTITY_MAPPING = {
-        'hostnames':     {'type': 'asset',    'field': 'nt_host',  'categories': ['cisco_ios'],  'cim_field': 'dvc'},
-        'internal_ips':  {'type': 'asset',    'field': 'ip',       'categories': ['cisco_ios'],  'cim_field': 'src_ip'},
-        'mac_addresses': {'type': 'asset',    'field': 'mac',      'categories': ['cisco_ios'],  'cim_field': 'src_mac'},
-        'admin_users':   {'type': 'identity', 'field': 'identity', 'categories': ['privileged'], 'cim_field': 'user'},
-    }
     METADATA = {
         'name': 'Cisco IOS',
         'description': 'Cisco IOS syslog messages (cisco:ios sourcetype)',

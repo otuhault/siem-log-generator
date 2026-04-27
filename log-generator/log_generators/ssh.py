@@ -16,11 +16,6 @@ class SSHAuthLogGenerator:
         'defaults': ['auth_success', 'auth_failed', 'sessions', 'connections', 'errors'],
         'multi_instance': False,
     }
-    ASSET_IDENTITY_MAPPING = {
-        'ip_addresses': {'type': 'asset',    'field': 'ip',       'categories': ['ssh'],                          'cim_field': 'src_ip'},
-        'hostnames':    {'type': 'asset',    'field': 'nt_host',  'categories': ['ssh'],                          'cim_field': 'dest_host'},
-        'valid_users':  {'type': 'identity', 'field': 'identity', 'categories': ['standard', 'service_account'], 'cim_field': 'user'},
-    }
     METADATA = {
         'name': 'SSH Auth Log',
         'description': 'SSH authentication logs (auth.log) - login attempts, sessions, disconnections',

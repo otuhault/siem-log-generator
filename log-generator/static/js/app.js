@@ -111,16 +111,18 @@ function setupEventListeners() {
 function setupDestinationTypeListeners() {
     document.querySelectorAll('input[name="destination_type"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const fileGroup   = document.getElementById('fileDestinationGroup');
-            const configGroup = document.getElementById('configurationDestinationGroup');
-            const syslogGroup = document.getElementById('syslogDestinationGroup');
-            const destInput   = document.getElementById('destination');
-            const configSel   = document.getElementById('configurationSelect');
+            const fileGroup        = document.getElementById('fileDestinationGroup');
+            const configGroup      = document.getElementById('configurationDestinationGroup');
+            const syslogGroup      = document.getElementById('syslogDestinationGroup');
+            const hecOverridesGroup = document.getElementById('hecOverridesGroup');
+            const destInput        = document.getElementById('destination');
+            const configSel        = document.getElementById('configurationSelect');
 
             // Hide all, clear required
-            fileGroup.style.display   = 'none';
-            configGroup.style.display = 'none';
-            syslogGroup.style.display = 'none';
+            fileGroup.style.display        = 'none';
+            configGroup.style.display      = 'none';
+            syslogGroup.style.display      = 'none';
+            hecOverridesGroup.style.display = 'none';
             destInput.required = false;
             configSel.required = false;
 
@@ -128,7 +130,8 @@ function setupDestinationTypeListeners() {
                 fileGroup.style.display = 'block';
                 destInput.required = true;
             } else if (this.value === 'configuration') {
-                configGroup.style.display = 'block';
+                configGroup.style.display      = 'block';
+                hecOverridesGroup.style.display = 'block';
                 configSel.required = true;
             } else if (this.value === 'syslog') {
                 syslogGroup.style.display = 'block';
@@ -276,16 +279,16 @@ function setupTabs() {
                 loadAttackTypesView();
             } else if (tabName === 'simulation') {
                 loadSimulations();
-            } else if (tabName === 'assets-identities') {
-                // handled by assets-identities.js
+            } else if (tabName === 'environment') {
+                // handled by environment.js
             }
         });
     });
 }
 
 /**
- * Load and render the A&I Impact panel for a given log type.
- * Called when the A&I toggle is checked or the sourcetype changes.
+ * Load and render the Environment Impact panel for a given log type.
+ * Called when the Environment toggle is checked or the sourcetype changes.
  * Exposed on window so senders.js (another ES module) can call it.
  */
 window.loadAIImpact = loadAIImpact;
@@ -296,11 +299,11 @@ async function loadAIImpact(logType) {
     panel.style.display = 'block';
 
     try {
-        const res  = await fetch(`/api/assets-identities/impact/${logType}`);
+        const res  = await fetch(`/api/environment/impact/${logType}`);
         const data = await res.json();
 
         if (!data.length) {
-            rows.innerHTML = '<div style="font-size:0.82em;color:#57606a;padding:4px 0;">No A&amp;I mapping for this sourcetype.</div>';
+            rows.innerHTML = '<div style="font-size:0.82em;color:#57606a;padding:4px 0;">No environment mapping for this sourcetype.</div>';
             return;
         }
 

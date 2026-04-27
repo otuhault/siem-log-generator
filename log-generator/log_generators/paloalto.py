@@ -17,12 +17,6 @@ class PaloAltoLogGenerator:
         'defaults': ['traffic', 'threat', 'system'],
         'multi_instance': False,
     }
-    ASSET_IDENTITY_MAPPING = {
-        'internal_ips': {'type': 'asset',    'field': 'ip',      'categories': ['paloalto'], 'cim_field': 'src_ip'},
-        'external_ips': {'type': 'asset',    'field': 'ip',      'categories': ['external'], 'cim_field': 'dest_ip'},
-        'hostnames':    {'type': 'asset',    'field': 'nt_host', 'categories': ['paloalto'], 'cim_field': 'dvc'},
-        'usernames':    {'type': 'identity', 'field': 'identity',                            'cim_field': 'user'},
-    }
     METADATA = {
         'name': 'Palo Alto Firewall',
         'description': 'Palo Alto Networks PAN-OS firewall logs in syslog CSV format',
@@ -338,6 +332,11 @@ class PaloAltoLogGenerator:
         dst_country = random.choice(self.countries) if is_outbound else 'Internal'
         session_end_reason = random.choice(self.session_end_reasons) if subtype == 'end' else ''
 
+        # User-ID: show src_user for ~70% of outbound sessions (internal user → internet)
+        src_user = ''
+        if is_outbound and self.usernames and random.random() < 0.7:
+            src_user = random.choice(self.usernames)
+
         # Build CSV fields (simplified but realistic traffic log)
         fields = [
             '1',                          # future_use
@@ -352,7 +351,7 @@ class PaloAltoLogGenerator:
             '0.0.0.0',                    # nat_src_ip
             '0.0.0.0',                    # nat_dst_ip
             rule,                         # rule_name
-            '',                           # src_user
+            src_user,                     # src_user
             '',                           # dst_user
             app,                          # application
             vsys,                         # vsys
@@ -495,6 +494,11 @@ class PaloAltoLogGenerator:
         # For URL threats, use a malicious URL
         misc_field = f'"{random.choice(self.malicious_urls)}"' if subtype in ['url', 'wildfire', 'virus'] else f'"{threat_name}"'
 
+        # User-ID: show src_user for outbound threats (internal user connecting to malicious IP)
+        src_user = ''
+        if not is_inbound and self.usernames and random.random() < 0.8:
+            src_user = random.choice(self.usernames)
+
         # Build CSV fields for threat log
         fields = [
             '1',                          # future_use
@@ -509,7 +513,7 @@ class PaloAltoLogGenerator:
             '0.0.0.0',                    # nat_src_ip
             '0.0.0.0',                    # nat_dst_ip
             rule,                         # rule_name
-            '',                           # src_user
+            src_user,                     # src_user
             '',                           # dst_user
             app,                          # application
             vsys,                         # vsys

@@ -11,9 +11,9 @@ from datetime import datetime
 from log_senders import SenderManager
 from configuration_manager import ConfigurationManager
 from simulation_manager import SimulationManager
-from asset_identity_manager import (AssetIdentityManager,
-    ASSET_CATEGORIES, ASSET_CATEGORY_LABELS,
-    IDENTITY_CATEGORIES, IDENTITY_CATEGORY_LABELS)
+from environment_manager import (EnvironmentManager,
+    ENTITY_TYPES, ENTITY_TYPE_LABELS,
+    ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-change-in-production'
@@ -22,7 +22,7 @@ app.config['SECRET_KEY'] = 'dev-key-change-in-production'
 configuration_manager = ConfigurationManager()
 sender_manager = SenderManager(config_mgr=configuration_manager)
 simulation_manager = SimulationManager()
-ai_manager = AssetIdentityManager()
+env_manager = EnvironmentManager()
 
 @app.route('/')
 def index():
@@ -274,135 +274,124 @@ def calculate_simulation():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Assets & Identities
+# Environment (Entities & Accounts)
 # ──────────────────────────────────────────────────────────────────────────────
 
-@app.route('/api/assets-identities/impact/<log_type>', methods=['GET'])
-def get_ai_impact(log_type):
-    """
-    For a given log_type, return each mapped pool with its A&I availability.
-    Used by the sender form to show the 'A&I Impact' panel.
-    """
+@app.route('/api/environment/counts', methods=['GET'])
+def get_env_counts():
+    """Return per-log-type entity/account counts for the sourcetype dropdown."""
     from log_generators.registry import REGISTRY
-    generator_class = REGISTRY.get(log_type)
-    if not generator_class:
-        return jsonify({'error': f'Unknown log type: {log_type}'}), 404
+    from attack_generators import ATTACK_REGISTRY
+    all_types = list(REGISTRY.keys()) + list(ATTACK_REGISTRY.keys())
+    return jsonify(env_manager.get_counts_by_log_type(all_types))
 
-    mapping = getattr(generator_class, 'ASSET_IDENTITY_MAPPING', {})
-    rows = []
-    for pool_name, spec in mapping.items():
-        count = len(ai_manager.get_pool(
-            pool_type=spec['type'],
-            field=spec['field'],
-            categories=spec.get('categories'),
-        ))
-        cats = spec.get('categories') or []
-        rows.append({
-            'pool':       pool_name,
-            'cim_field':  spec.get('cim_field', pool_name),
-            'count':      count,
-            'available':  count > 0,
-        })
+
+@app.route('/api/environment/impact/<log_type>', methods=['GET'])
+def get_env_impact(log_type):
+    """Return pool availability rows for a given log_type (used by the sender form)."""
+    rows = env_manager.get_impact(log_type)
     return jsonify(rows)
 
 
-@app.route('/api/assets-identities/meta', methods=['GET'])
-def get_ai_meta():
-    """Return category/priority enumerations and current stats."""
+@app.route('/api/environment/meta', methods=['GET'])
+def get_env_meta():
+    """Return entity/account type enumerations and current stats."""
     return jsonify({
-        'asset_categories':         ASSET_CATEGORIES,
-        'asset_category_labels':    ASSET_CATEGORY_LABELS,
-        'identity_categories':      IDENTITY_CATEGORIES,
-        'identity_category_labels': IDENTITY_CATEGORY_LABELS,
-        'stats':                    ai_manager.get_stats(),
-        'has_data':                 ai_manager.has_data(),
+        'entity_types':        ENTITY_TYPES,
+        'entity_type_labels':  ENTITY_TYPE_LABELS,
+        'account_types':       ACCOUNT_TYPES,
+        'account_type_labels': ACCOUNT_TYPE_LABELS,
+        'stats':               env_manager.get_stats(),
+        'has_data':            env_manager.has_data(),
     })
 
-# --- Assets ---
+# --- Entities ---
 
-@app.route('/api/assets', methods=['GET'])
-def get_assets():
-    return jsonify(ai_manager.get_all_assets())
+@app.route('/api/entities', methods=['GET'])
+def get_entities():
+    return jsonify(env_manager.get_all_entities())
 
-@app.route('/api/assets/<asset_id>', methods=['GET'])
-def get_asset(asset_id):
-    asset = ai_manager.get_asset(asset_id)
-    if asset:
-        return jsonify(asset)
-    return jsonify({'error': 'Asset not found'}), 404
+@app.route('/api/entities/<entity_id>', methods=['GET'])
+def get_entity(entity_id):
+    entity = env_manager.get_entity(entity_id)
+    if entity:
+        return jsonify(entity)
+    return jsonify({'error': 'Entity not found'}), 404
 
-@app.route('/api/assets', methods=['POST'])
-def create_asset():
+@app.route('/api/entities', methods=['POST'])
+def create_entity():
     data = request.json
     try:
-        asset_id = ai_manager.create_asset(
-            ip=data['ip'],
-            nt_host=data.get('nt_host'),
-            mac=data.get('mac'),
-            dns=data.get('dns'),
-            os=data.get('os'),
-            category=data.get('category', []),
+        entity_id = env_manager.create_entity(
+            name=data['name'],
+            entity_type=data['type'],
+            ip=data.get('ip', ''),
+            nt_host=data.get('nt_host', ''),
+            mac=data.get('mac', ''),
+            fqdn=data.get('fqdn', ''),
+            os=data.get('os', ''),
         )
-        return jsonify({'success': True, 'asset_id': asset_id})
+        return jsonify({'success': True, 'entity_id': entity_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/api/assets/<asset_id>', methods=['PUT'])
-def update_asset(asset_id):
+@app.route('/api/entities/<entity_id>', methods=['PUT'])
+def update_entity(entity_id):
     data = request.json
     try:
-        ai_manager.update_asset(asset_id, data)
+        env_manager.update_entity(entity_id, data)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/api/assets/<asset_id>', methods=['DELETE'])
-def delete_asset(asset_id):
+@app.route('/api/entities/<entity_id>', methods=['DELETE'])
+def delete_entity(entity_id):
     try:
-        ai_manager.delete_asset(asset_id)
+        env_manager.delete_entity(entity_id)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-# --- Identities ---
+# --- Accounts ---
 
-@app.route('/api/identities', methods=['GET'])
-def get_identities():
-    return jsonify(ai_manager.get_all_identities())
+@app.route('/api/accounts', methods=['GET'])
+def get_accounts():
+    return jsonify(env_manager.get_all_accounts())
 
-@app.route('/api/identities/<identity_id>', methods=['GET'])
-def get_identity(identity_id):
-    ident = ai_manager.get_identity(identity_id)
-    if ident:
-        return jsonify(ident)
-    return jsonify({'error': 'Identity not found'}), 404
+@app.route('/api/accounts/<account_id>', methods=['GET'])
+def get_account(account_id):
+    acc = env_manager.get_account(account_id)
+    if acc:
+        return jsonify(acc)
+    return jsonify({'error': 'Account not found'}), 404
 
-@app.route('/api/identities', methods=['POST'])
-def create_identity():
+@app.route('/api/accounts', methods=['POST'])
+def create_account():
     data = request.json
     try:
-        identity_id = ai_manager.create_identity(
-            identity=data['identity'],
-            email=data.get('email'),
-            category=data.get('category', []),
+        account_id = env_manager.create_account(
+            username=data['username'],
+            email=data.get('email', ''),
+            account_type=data.get('type', 'standard'),
+            linked_entity=data.get('linked_entity'),
         )
-        return jsonify({'success': True, 'identity_id': identity_id})
+        return jsonify({'success': True, 'account_id': account_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/api/identities/<identity_id>', methods=['PUT'])
-def update_identity(identity_id):
+@app.route('/api/accounts/<account_id>', methods=['PUT'])
+def update_account(account_id):
     data = request.json
     try:
-        ai_manager.update_identity(identity_id, data)
+        env_manager.update_account(account_id, data)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
-@app.route('/api/identities/<identity_id>', methods=['DELETE'])
-def delete_identity(identity_id):
+@app.route('/api/accounts/<account_id>', methods=['DELETE'])
+def delete_account(account_id):
     try:
-        ai_manager.delete_identity(identity_id)
+        env_manager.delete_account(account_id)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400

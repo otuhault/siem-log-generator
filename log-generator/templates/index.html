@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Generator - SIEM Testing Tool</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260210a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260408a">
 </head>
 <body>
     <div class="container">
@@ -17,7 +17,7 @@
             <button class="tab-btn active" data-tab="senders">Senders</button>
             <button class="tab-btn" data-tab="sourcetypes">Sourcetypes</button>
             <button class="tab-btn" data-tab="attacks">Attacks</button>
-            <button class="tab-btn" data-tab="assets-identities">Assets &amp; Identities</button>
+            <button class="tab-btn" data-tab="environment">Environment</button>
             <button class="tab-btn" data-tab="configurations">HEC Destinations</button>
             <button class="tab-btn" data-tab="simulation">Simulation</button>
         </nav>
@@ -49,27 +49,36 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="logType">Sourcetype or Attack:</label>
-                            <select id="logType" name="log_type" required data-field-name="Log type">
-                                <option value="">Select a sourcetype or attack...</option>
-                            </select>
+                            <label for="logTypeTrigger">Sourcetype or Attack:</label>
+                            <!-- Custom dropdown — native select replaced by hidden input -->
+                            <div class="csd-wrapper" id="logTypeWrapper">
+                                <button type="button" class="csd-trigger" id="logTypeTrigger" data-field-name="Log type">
+                                    <span class="csd-trigger-text" id="logTypeDisplay">Select a sourcetype or attack…</span>
+                                    <span class="csd-caret">▾</span>
+                                </button>
+                                <div class="csd-panel" id="logTypePanel">
+                                    <div class="csd-options" id="logTypeOptions"></div>
+                                </div>
+                            </div>
+                            <!-- Hidden input keeps value + triggers change events for existing listeners -->
+                            <input type="hidden" id="logType" name="log_type" data-field-name="Log type">
                             <div id="logTypeDescription" class="description"></div>
                         </div>
 
-                        <!-- Assets & Identities toggle + ratio slider (hidden by default) -->
+                        <!-- Environment toggle + ratio slider (hidden by default) -->
                         <div class="form-group" id="useAssetsIdentitiesGroup" style="display: none;">
                             <label class="checkbox-label" style="font-weight: 600;">
                                 <input type="checkbox" id="useAssetsIdentities" name="use_assets_identities">
                                 <span class="checkbox-text">
-                                    <strong>Use Assets &amp; Identities</strong>
-                                    <small>Replace default data pools (IPs, usernames, hostnames) with your configured assets and identities</small>
+                                    <strong>Use Environment</strong>
+                                    <small>Replace default data pools (IPs, usernames, hostnames) with your configured entities and accounts</small>
                                 </span>
                             </label>
                             <div id="aiRatioGroup" style="display: none; margin-top: 12px;">
                                 <div class="ai-ratio-labels">
                                     <span>Random defaults</span>
                                     <span id="aiRatioValue">100%</span>
-                                    <span>Assets &amp; Identities</span>
+                                    <span>Environment</span>
                                 </div>
                                 <input type="range" id="aiRatio" name="assets_identities_ratio"
                                        min="0" max="100" value="100" step="5"
@@ -570,6 +579,29 @@
                             <small>Choose a pre-configured HEC destination</small>
                         </div>
 
+                        <!-- HEC Metadata Overrides (shown when HEC destination is selected) -->
+                        <div id="hecOverridesGroup" style="display: none;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="hecIndex">Index (optional):</label>
+                                    <input type="text" id="hecIndex" name="hec_index" placeholder="e.g. main">
+                                </div>
+                                <div class="form-group">
+                                    <label for="hecSourcetype">Sourcetype (optional):</label>
+                                    <input type="text" id="hecSourcetype" name="hec_sourcetype" placeholder="e.g. pan:traffic">
+                                </div>
+                                <div class="form-group">
+                                    <label for="hecHost">Host (optional):</label>
+                                    <input type="text" id="hecHost" name="hec_host" placeholder="e.g. pa-fw-01">
+                                    <small>Leave empty — Splunk/SC4S extracts host from the log</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="hecSource">Source (optional):</label>
+                                    <input type="text" id="hecSource" name="hec_source" placeholder="e.g. http:log-generator">
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Syslog Destination -->
                         <div class="form-group" id="syslogDestinationGroup" style="display: none;">
                             <label for="syslogHost">Syslog Host:</label>
@@ -622,167 +654,179 @@
                 </div>
             </div>
 
-            <!-- Assets & Identities Tab Content -->
-            <div id="assets-identitiesTab" class="tab-content">
+            <!-- Environment Tab Content -->
+            <div id="environmentTab" class="tab-content">
                 <div class="tab-header">
                     <div class="sender-stats">
-                        <span class="stat-item">Assets: <strong id="totalAssets">0</strong></span>
-                        <span class="stat-item">Identities: <strong id="totalIdentities">0</strong></span>
+                        <span class="stat-item">Entities: <strong id="totalEntities">0</strong></span>
+                        <span class="stat-item">Accounts: <strong id="totalAccounts">0</strong></span>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <div class="ai-sub-tabs">
-                            <button class="ai-sub-tab-btn active" data-subtab="assets">Assets</button>
-                            <button class="ai-sub-tab-btn" data-subtab="identities">Identities</button>
+                            <button class="env-sub-tab-btn active" data-subtab="entities">Entities</button>
+                            <button class="env-sub-tab-btn" data-subtab="accounts">Accounts</button>
                         </div>
-                        <button id="addAssetBtn" class="btn btn-primary">+ Add Asset</button>
-                        <button id="addIdentityBtn" class="btn btn-primary" style="display: none;">+ Add Identity</button>
+                        <button id="addEntityBtn" class="btn btn-primary">+ Add Entity</button>
+                        <button id="addAccountBtn" class="btn btn-primary" style="display: none;">+ Add Account</button>
                     </div>
                 </div>
 
-                <!-- Asset Form -->
-                <div id="assetFormCard" class="card" style="display: none;">
+                <!-- Entity Form -->
+                <div id="entityFormCard" class="card" style="display: none;">
                     <div class="card-header">
-                        <h2 id="assetFormTitle">Add Asset</h2>
-                        <button id="closeAssetForm" class="btn-close">×</button>
+                        <h2 id="entityFormTitle">Add Entity</h2>
+                        <button id="closeEntityForm" class="btn-close">×</button>
                     </div>
-                    <form id="assetForm">
-                        <input type="hidden" id="assetId" name="id">
+                    <form id="entityForm">
+                        <input type="hidden" id="entityId" name="id">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="form-group">
-                                <label for="assetIp">IP Address <span style="color: red;">*</span></label>
-                                <input type="text" id="assetIp" name="ip" placeholder="192.168.1.10" required>
+                                <label for="entityName">Name <span style="color: red;">*</span></label>
+                                <input type="text" id="entityName" name="name" placeholder="DESKTOP-JSMITH" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityType">Type <span style="color: red;">*</span></label>
+                                <select id="entityType" name="type" required>
+                                    <option value="">— Select type —</option>
+                                    <option value="endpoint">Endpoint / Workstation</option>
+                                    <option value="server">Server</option>
+                                    <option value="domain_controller">Domain Controller</option>
+                                    <option value="firewall">Firewall / NGFW</option>
+                                    <option value="router">Router / Switch</option>
+                                    <option value="external">External / Internet</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityIp">IP Address</label>
+                                <input type="text" id="entityIp" name="ip" placeholder="192.168.1.10">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">src_ip</span><span class="hint-logs">Apache · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · SSH · Zscaler</span></div>
-                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA <em>(catégorie external)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">src_ip</span><span class="hint-logs">Apache · Palo Alto · FTD · ASA · IOS · SSH · Zscaler</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · FTD · ASA <em>(external)</em></span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetHostname">Hostname</label>
-                                <input type="text" id="assetHostname" name="nt_host" placeholder="DESKTOP-JSMITH">
+                                <label for="entityHostname">Hostname</label>
+                                <input type="text" id="entityHostname" name="nt_host" placeholder="DESKTOP-JSMITH">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · FTD · ASA · IOS · XR</span></div>
                                     <div class="field-hint-row"><span class="hint-cim">src_nt_host</span><span class="hint-logs">Windows · Active Directory · Zscaler</span></div>
                                     <div class="field-hint-row"><span class="hint-cim">dest_host</span><span class="hint-logs">SSH</span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetMac">MAC Address</label>
-                                <input type="text" id="assetMac" name="mac" placeholder="00:11:22:33:44:55">
+                                <label for="entityMac">MAC Address</label>
+                                <input type="text" id="entityMac" name="mac" placeholder="00:11:22:33:44:55">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">src_mac</span><span class="hint-logs">Cisco IOS <em>(événements 802.1X AUTHMGR)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">src_mac</span><span class="hint-logs">Cisco IOS <em>(802.1X AUTHMGR)</em></span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetDns">FQDN</label>
-                                <input type="text" id="assetDns" name="dns" placeholder="dc01.contoso.local">
+                                <label for="entityFqdn">FQDN</label>
+                                <input type="text" id="entityFqdn" name="fqdn" placeholder="dc01.contoso.local">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">Computer</span><span class="hint-logs">Active Directory <em>(FQDN du Domain Controller)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">Computer</span><span class="hint-logs">Active Directory <em>(Domain Controller FQDN)</em></span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="assetOs">OS / Platform</label>
-                                <input type="text" id="assetOs" name="os" placeholder="Windows OS">
+                                <label for="entityOs">OS / Platform</label>
+                                <input type="text" id="entityOs" name="os" placeholder="Windows OS">
                                 <div class="field-hint">
                                     <div class="field-hint-row"><span class="hint-cim">deviceostype</span><span class="hint-logs">Zscaler <em>(Windows OS, Mac OS, iOS, Android…)</em></span></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Sourcetypes <span style="color: red;">*</span></label>
-                            <p class="hint-meta" style="margin: 2px 0 6px;">Cocher les logs dans lesquels cet asset doit apparaître</p>
-                            <div class="checkbox-group checkbox-group-compact" id="assetCategoryGroup"></div>
-                        </div>
                         <div class="form-actions">
-                            <button type="submit" id="submitAssetBtn" class="btn btn-primary">Add Asset</button>
-                            <button type="button" id="cancelAssetBtn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" id="submitEntityBtn" class="btn btn-primary">Add Entity</button>
+                            <button type="button" id="cancelEntityBtn" class="btn btn-secondary">Cancel</button>
                         </div>
                     </form>
                 </div>
 
-                <!-- Identity Form -->
-                <div id="identityFormCard" class="card" style="display: none;">
+                <!-- Account Form -->
+                <div id="accountFormCard" class="card" style="display: none;">
                     <div class="card-header">
-                        <h2 id="identityFormTitle">Add Identity</h2>
-                        <button id="closeIdentityForm" class="btn-close">×</button>
+                        <h2 id="accountFormTitle">Add Account</h2>
+                        <button id="closeAccountForm" class="btn-close">×</button>
                     </div>
-                    <form id="identityForm">
-                        <input type="hidden" id="identityId" name="id">
+                    <form id="accountForm">
+                        <input type="hidden" id="accountId" name="id">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="form-group">
-                                <label for="identityUsername">Username <span style="color: red;">*</span></label>
-                                <input type="text" id="identityUsername" name="identity" placeholder="jsmith" required>
+                                <label for="accountUsername">Username <span style="color: red;">*</span></label>
+                                <input type="text" id="accountUsername" name="username" placeholder="jsmith" required>
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Windows · SSH · Palo Alto · Cisco FTD · Cisco ASA · Cisco IOS · Cisco XR · Active Directory</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Windows · SSH · Palo Alto · FTD · ASA · IOS · Active Directory</span></div>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="identityEmail">Email</label>
-                                <input type="text" id="identityEmail" name="email" placeholder="j.smith@corp.com">
+                                <label for="accountEmail">Email</label>
+                                <input type="text" id="accountEmail" name="email" placeholder="j.smith@corp.com">
                                 <div class="field-hint">
-                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(email utilisé comme identifiant)</em></span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(email used as identifier)</em></span></div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Rôle</label>
-                            <p class="hint-meta" style="margin: 2px 0 6px;">Filtre de rôle — ex. seuls les comptes <em>privileged</em> apparaissent dans les logs d'admin réseau (Cisco IOS/XR)</p>
-                            <div class="checkbox-group checkbox-group-compact" id="identityCategoryGroup"></div>
-                        </div>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="identityWatchlist" name="watchlist">
-                                <span class="checkbox-text">
-                                    <strong>Watchlist</strong>
-                                    <small>Flag this identity as monitored / suspicious</small>
-                                </span>
-                            </label>
+                            <div class="form-group">
+                                <label for="accountType">Type</label>
+                                <select id="accountType" name="type">
+                                    <option value="standard">Standard User</option>
+                                    <option value="admin">Administrator / Privileged</option>
+                                    <option value="service_account">Service Account</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="accountLinkedEntity">Linked Entity</label>
+                                <select id="accountLinkedEntity" name="linked_entity">
+                                    <option value="">— None —</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" id="submitIdentityBtn" class="btn btn-primary">Add Identity</button>
-                            <button type="button" id="cancelIdentityBtn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" id="submitAccountBtn" class="btn btn-primary">Add Account</button>
+                            <button type="button" id="cancelAccountBtn" class="btn btn-secondary">Cancel</button>
                         </div>
                     </form>
                 </div>
 
-                <!-- Assets sub-tab -->
-                <div id="assetsSubTab" class="ai-subtab-content active">
-                    <div id="assetsEmptyState" class="empty-state" style="display: none;">
-                        <p>No assets configured. Add assets to represent hosts, servers, workstations, and network devices in your simulated environment.</p>
+                <!-- Entities sub-tab -->
+                <div id="entitiesSubTab" class="ai-subtab-content active">
+                    <div id="entitiesEmptyState" class="empty-state" style="display: none;">
+                        <p>No entities configured. Add entities to represent hosts, servers, firewalls, and routers in your simulated environment.</p>
                     </div>
-                    <div id="assetsTableContainer" style="display: none;">
+                    <div id="entitiesTableContainer" style="display: none;">
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
                                     <th>IP</th>
                                     <th>Hostname</th>
-                                    <th>MAC</th>
                                     <th>FQDN</th>
                                     <th>OS</th>
-                                    <th>Sourcetypes</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="assetsTableBody"></tbody>
+                            <tbody id="entitiesTableBody"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- Identities sub-tab -->
-                <div id="identitiesSubTab" class="ai-subtab-content">
-                    <div id="identitiesEmptyState" class="empty-state" style="display: none;">
-                        <p>No identities configured. Add identities to represent users, service accounts, and contractors in your simulated environment.</p>
+                <!-- Accounts sub-tab -->
+                <div id="accountsSubTab" class="ai-subtab-content">
+                    <div id="accountsEmptyState" class="empty-state" style="display: none;">
+                        <p>No accounts configured. Add accounts to represent users and service accounts in your simulated environment.</p>
                     </div>
-                    <div id="identitiesTableContainer" style="display: none;">
+                    <div id="accountsTableContainer" style="display: none;">
                         <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>Username</th>
                                     <th>Email</th>
-                                    <th>Rôle</th>
+                                    <th>Type</th>
+                                    <th>Linked Entity</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="identitiesTableBody"></tbody>
+                            <tbody id="accountsTableBody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -830,34 +874,6 @@
                             <input type="text" id="configurationToken" name="token" required
                                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-field-name="HEC token">
                             <small>Splunk HTTP Event Collector token</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="configurationIndex">Index (Optional):</label>
-                            <input type="text" id="configurationIndex" name="index"
-                                   placeholder="main" data-field-name="Index">
-                            <small>Splunk index name (leave empty to use default)</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="configurationSourcetype">Sourcetype (Optional):</label>
-                            <input type="text" id="configurationSourcetype" name="sourcetype"
-                                   placeholder="http:custom">
-                            <small>Custom sourcetype (leave empty to use default)</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="configurationHost">Host (Optional):</label>
-                            <input type="text" id="configurationHost" name="host"
-                                   placeholder="log-generator">
-                            <small>Custom host value (leave empty to use default)</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="configurationSource">Source (Optional):</label>
-                            <input type="text" id="configurationSource" name="source"
-                                   placeholder="http:log-generator">
-                            <small>Custom source value for events (leave empty to use default)</small>
                         </div>
 
                         <div class="form-actions">
@@ -1031,7 +1047,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/app.js?v=20260210a"></script>
-    <script type="module" src="/static/js/modules/assets-identities.js?v=20260210a"></script>
+    <script type="module" src="/static/js/app.js?v=20260408a"></script>
+    <script type="module" src="/static/js/modules/environment.js?v=20260408a"></script>
 </body>
 </html>

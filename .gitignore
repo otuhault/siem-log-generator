@@ -2,6 +2,7 @@ log-generator/configurations.json
 log-generator/senders_config.json
 log-generator/simulations_config.json
 log-generator/assets_identities.json
+log-generator/environment.json
 
 # Python cache
 __pycache__/

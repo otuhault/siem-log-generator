@@ -21,10 +21,6 @@ class WindowsEventLogGenerator:
         'single_param_name': 'source',
         'extra_params_keys': {'render_format': 'xml'},
     }
-    ASSET_IDENTITY_MAPPING = {
-        'usernames':    {'type': 'identity', 'field': 'identity',                               'cim_field': 'user'},
-        'workstations': {'type': 'asset',    'field': 'nt_host', 'categories': ['windows'],    'cim_field': 'src_nt_host'},
-    }
     METADATA = {
         'name': 'Windows Event Log',
         'description': 'Windows Event Logs - Security, Application, and System sources',

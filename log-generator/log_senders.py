@@ -16,9 +16,9 @@ from hec_sender import HECSender
 from syslog_sender import SyslogSender
 from configuration_manager import ConfigurationManager
 from attack_generators import ATTACK_REGISTRY, AttackGeneratorFactory
-from asset_identity_manager import AssetIdentityManager
+from environment_manager import EnvironmentManager
 
-_ai_manager = AssetIdentityManager()
+_env_manager = EnvironmentManager()
 
 
 class MultiSourceLogGenerator:
@@ -59,19 +59,24 @@ class SenderManager(JsonStore):
             protocol=sender_config.get('syslog_protocol', 'udp'),
         )
 
-    def _build_hec_sender(self, config_id: str) -> HECSender:
-        """Load a HEC config and return a ready HECSender, or raise ValueError."""
+    def _build_hec_sender(self, config_id: str, sender_options: dict = None) -> HECSender:
+        """Load a HEC config and return a ready HECSender, or raise ValueError.
+
+        sender_options may contain hec_index, hec_sourcetype, hec_host, hec_source
+        which override the values stored in the HEC destination config.
+        """
         hec_config = self._config_mgr.get_configuration(config_id)
         if not hec_config:
             raise ValueError(f"Configuration {config_id} not found")
+        opts = sender_options or {}
         return HECSender(
             url=hec_config['url'],
             port=hec_config['port'],
             token=hec_config['token'],
-            index=hec_config.get('index'),
-            sourcetype=hec_config.get('sourcetype'),
-            host=hec_config.get('host'),
-            source=hec_config.get('source'),
+            index=opts.get('hec_index') or hec_config.get('index'),
+            sourcetype=opts.get('hec_sourcetype') or hec_config.get('sourcetype'),
+            host=opts.get('hec_host') or hec_config.get('host'),
+            source=opts.get('hec_source') or hec_config.get('source'),
         )
 
     # ------------------------------------------------------------------
@@ -219,12 +224,12 @@ class SenderManager(JsonStore):
             ]
             if use_ai:
                 for gi in gen_instances:
-                    _ai_manager.inject_into(gi, generator_class, ratio=ai_ratio)
+                    _env_manager.inject_into(gi, log_type, ratio=ai_ratio)
             generator = MultiSourceLogGenerator(gen_instances)
         else:
             gen_instance = generator_class(**{config['param_key']: param_value})
             if use_ai:
-                _ai_manager.inject_into(gen_instance, generator_class, ratio=ai_ratio)
+                _env_manager.inject_into(gen_instance, log_type, ratio=ai_ratio)
             generator = MultiSourceLogGenerator(gen_instance)
 
         stop_event = threading.Event()
@@ -282,7 +287,7 @@ class SenderManager(JsonStore):
                 if not config_id:
                     self._fail_attack(sender_id, 'Error: No configuration')
                     return
-                hec = self._build_hec_sender(config_id)
+                hec = self._build_hec_sender(config_id, sender_config.get('options', {}))
                 try:
                     while not stop_event.is_set() and events_sent < events_count:
                         if hec.send_event(generator.generate()):
@@ -339,7 +344,7 @@ class SenderManager(JsonStore):
                 if not config_id:
                     print(f"[Sender] {sender_id}: No configuration_id")
                     return
-                hec = self._build_hec_sender(config_id)
+                hec = self._build_hec_sender(config_id, sender_config.get('options', {}))
                 try:
                     while not stop_event.is_set():
                         if hec.send_event(generator.generate()):

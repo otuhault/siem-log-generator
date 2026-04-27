@@ -6,64 +6,178 @@ import { LogTypesApi, AttacksApi } from './api.js';
 import { state, setLogTypes, setAttackTypes } from './state.js';
 import { showNotification } from './utils.js';
 
+// value → display name map, used by setLogTypeValue to restore trigger text
+const _displayMap = {};
+
 /**
- * Load log types and attacks into the state and populate the select dropdown
+ * Load log types and attacks, build the custom dropdown panel.
+ * Also initialises click-outside and keyboard handlers on first call.
  */
 export async function loadLogTypes() {
     try {
-        // Fetch both log types and attack types
-        const [logTypes, attackTypes] = await Promise.all([
+        const [logTypesMeta, attackTypes, envCountsRes] = await Promise.all([
             LogTypesApi.getAll(),
-            AttacksApi.getTypes()
+            AttacksApi.getTypes(),
+            fetch('/api/environment/counts'),
         ]);
+        const envCounts = await envCountsRes.json();
 
-        setLogTypes(logTypes);
+        setLogTypes(logTypesMeta);
         setAttackTypes(attackTypes);
 
-        // Populate log type select with optgroups
-        const select = document.getElementById('logType');
-        select.innerHTML = '<option value="">Select a sourcetype or attack...</option>';
+        // Build display map and panel HTML
+        const optionsEl = document.getElementById('logTypeOptions');
+        optionsEl.innerHTML = '';
 
-        // Add Sourcetypes optgroup
-        const sourcetypesGroup = document.createElement('optgroup');
-        sourcetypesGroup.label = 'Sourcetypes';
-
-        Object.keys(logTypes).sort().forEach(key => {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = logTypes[key].name;
-            sourcetypesGroup.appendChild(option);
+        // Sourcetypes group
+        optionsEl.appendChild(_buildGroupLabel('Sourcetypes'));
+        Object.keys(logTypesMeta).sort().forEach(key => {
+            const name = logTypesMeta[key].name;
+            _displayMap[key] = name;
+            const counts = envCounts[key];
+            optionsEl.appendChild(_buildOption(key, name, counts));
         });
-        select.appendChild(sourcetypesGroup);
 
-        // Add Attacks optgroups grouped by category
+        // Attack groups
         if (Object.keys(attackTypes).length > 0) {
             const categories = {};
             Object.entries(attackTypes).forEach(([key, type]) => {
-                const category = type.category || type.log_type.toUpperCase();
-                if (!categories[category]) {
-                    categories[category] = [];
-                }
-                categories[category].push({ key, ...type });
+                const cat = type.category || type.log_type.toUpperCase();
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push({ key, ...type });
             });
-
-            Object.keys(categories).sort().forEach(category => {
-                const group = document.createElement('optgroup');
-                group.label = `Attacks — ${category}`;
-
-                categories[category].forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type.key;
-                    option.textContent = `${type.name} — ${type.description}`;
-                    group.appendChild(option);
+            Object.keys(categories).sort().forEach(cat => {
+                optionsEl.appendChild(_buildGroupLabel(`Attacks — ${cat}`));
+                categories[cat].forEach(type => {
+                    const label = `${type.name} — ${type.description}`;
+                    _displayMap[type.key] = `${type.name} — ${type.description}`;
+                    const counts    = envCounts[type.key] ?? envCounts[type.log_type];
+                    // Resolve human-readable sourcetype name(s) for this attack
+                    const srcTypes = type.log_type
+                        ? [].concat(type.log_type).map(lt => logTypesMeta[lt]?.name || lt)
+                        : [];
+                    optionsEl.appendChild(_buildOption(type.key, label, counts, srcTypes));
                 });
-                select.appendChild(group);
             });
         }
+
+        _initDropdown();
     } catch (error) {
         console.error('Error loading log types:', error);
     }
 }
+
+/** Build an optgroup-style label row */
+function _buildGroupLabel(text) {
+    const div = document.createElement('div');
+    div.className = 'csd-group-label';
+    div.textContent = text;
+    return div;
+}
+
+/** Build a clickable option row with optional sourcetype + env-count badges */
+function _buildOption(value, name, counts, srcTypes = []) {
+    const div = document.createElement('div');
+    div.className = 'csd-option';
+    div.dataset.value = value;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'csd-option-name';
+    nameSpan.textContent = name;
+    div.appendChild(nameSpan);
+
+    const allBadges = [
+        ...srcTypes.map(st => {
+            const b = document.createElement('span');
+            b.className = 'env-badge env-badge-sourcetype';
+            b.textContent = st;
+            return b;
+        }),
+        ..._buildBadges(counts),
+    ];
+
+    if (allBadges.length) {
+        const badgeWrap = document.createElement('span');
+        badgeWrap.className = 'env-badges';
+        allBadges.forEach(b => badgeWrap.appendChild(b));
+        div.appendChild(badgeWrap);
+    }
+
+    div.addEventListener('click', () => _selectOption(value));
+    return div;
+}
+
+/** Return array of env-count badge nodes (entities + accounts), empty if nothing to show */
+function _buildBadges(counts) {
+    if (!counts) return [];
+    const parts = [];
+    if (counts.entities > 0) {
+        const b = document.createElement('span');
+        b.className = 'env-badge env-badge-entity';
+        b.textContent = `entities (${counts.entities})`;
+        parts.push(b);
+    }
+    if (counts.accounts > 0) {
+        const b = document.createElement('span');
+        b.className = 'env-badge env-badge-account';
+        b.textContent = `accounts (${counts.accounts})`;
+        parts.push(b);
+    }
+    return parts;
+}
+
+/** Select an option: update hidden input, trigger text, close panel, fire change */
+function _selectOption(value) {
+    const hidden  = document.getElementById('logType');
+    const display = document.getElementById('logTypeDisplay');
+    hidden.value  = value;
+    display.textContent = _displayMap[value] || value;
+    document.getElementById('logTypeWrapper').classList.remove('open');
+    document.getElementById('logTypePanel').style.display = 'none';
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Wire up open/close behaviour — idempotent */
+let _dropdownInited = false;
+function _initDropdown() {
+    if (_dropdownInited) return;
+    _dropdownInited = true;
+
+    const wrapper = document.getElementById('logTypeWrapper');
+    const trigger = document.getElementById('logTypeTrigger');
+    const panel   = document.getElementById('logTypePanel');
+
+    trigger.addEventListener('click', () => {
+        const open = wrapper.classList.toggle('open');
+        panel.style.display = open ? 'block' : 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!wrapper.contains(e.target)) {
+            wrapper.classList.remove('open');
+            panel.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            wrapper.classList.remove('open');
+            panel.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * Set the dropdown value programmatically (used by senders.js on edit restore).
+ * Updates hidden input, trigger text, and dispatches change.
+ */
+window.setLogTypeValue = function(value) {
+    const hidden  = document.getElementById('logType');
+    const display = document.getElementById('logTypeDisplay');
+    hidden.value  = value;
+    display.textContent = _displayMap[value] || value || 'Select a sourcetype or attack…';
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+};
 
 /**
  * Load and display sourcetypes in the Sourcetypes tab

@@ -1207,7 +1207,7 @@ tr.sender-form-row .card {
     cursor: pointer;
 }
 
-/* ── Assets & Identities Tab ── */
+/* ── Sub-tabs (Assets & Identities / Environment) ── */
 
 .ai-sub-tabs {
     display: flex;
@@ -1216,7 +1216,8 @@ tr.sender-form-row .card {
     overflow: hidden;
 }
 
-.ai-sub-tab-btn {
+.ai-sub-tab-btn,
+.env-sub-tab-btn {
     padding: 6px 18px;
     background: #f6f8fa;
     border: none;
@@ -1227,13 +1228,153 @@ tr.sender-form-row .card {
     transition: background 0.15s;
 }
 
-.ai-sub-tab-btn:not(:last-child) {
+.ai-sub-tab-btn:not(:last-child),
+.env-sub-tab-btn:not(:last-child) {
     border-right: 1px solid #d0d7de;
 }
 
-.ai-sub-tab-btn.active {
+.ai-sub-tab-btn.active,
+.env-sub-tab-btn.active {
     background: #0969da;
     color: #fff;
+}
+
+/* ── Custom sourcetype/attack dropdown ── */
+
+.csd-wrapper {
+    position: relative;
+}
+
+.csd-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: #1f2328;
+    text-align: left;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+
+.csd-trigger:hover,
+.csd-wrapper.open .csd-trigger {
+    border-color: #0969da;
+    outline: none;
+}
+
+.csd-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+}
+
+.csd-caret {
+    margin-left: 8px;
+    font-size: 0.8em;
+    color: #57606a;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+
+.csd-wrapper.open .csd-caret {
+    transform: rotate(180deg);
+}
+
+.csd-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    max-height: 340px;
+    overflow-y: auto;
+    z-index: 200;
+}
+
+.csd-group-label {
+    padding: 6px 12px 4px;
+    font-size: 0.72em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #57606a;
+    background: #f6f8fa;
+    border-bottom: 1px solid #eaeef2;
+    position: sticky;
+    top: 0;
+}
+
+.csd-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.1s;
+}
+
+.csd-option:last-child {
+    border-bottom: none;
+}
+
+.csd-option:hover {
+    background: #f0f6ff;
+}
+
+.csd-option-name {
+    font-size: 0.88em;
+    color: #1f2328;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Environment count badges inside the dropdown ── */
+
+.env-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.env-badge {
+    font-size: 0.72em;
+    padding: 1px 6px;
+    border-radius: 10px;
+    border: 1px solid;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.env-badge-sourcetype {
+    border-color: #9a6700;
+    color: #9a6700;
+    background: #fff8c5;
+}
+
+.env-badge-entity {
+    border-color: #0969da;
+    color: #0969da;
+    background: #ddf4ff;
+}
+
+.env-badge-account {
+    border-color: #1a7f37;
+    color: #1a7f37;
+    background: #dafbe1;
 }
 
 .ai-subtab-content {

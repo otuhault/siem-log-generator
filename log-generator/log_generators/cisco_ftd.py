@@ -23,12 +23,6 @@ class CiscoFTDLogGenerator:
         'defaults': ['connection', 'vpn', 'auth', 'acl', 'system'],
         'multi_instance': False,
     }
-    ASSET_IDENTITY_MAPPING = {
-        'devices':      {'type': 'asset',    'field': 'nt_host', 'categories': ['cisco_ftd'], 'cim_field': 'dvc'},
-        'internal_ips': {'type': 'asset',    'field': 'ip',      'categories': ['cisco_ftd'], 'cim_field': 'src_ip'},
-        'external_ips': {'type': 'asset',    'field': 'ip',      'categories': ['external'],  'cim_field': 'dest_ip'},
-        'users':        {'type': 'identity', 'field': 'identity',                             'cim_field': 'user'},
-    }
     METADATA = {
         'name': 'Cisco Secure Firewall (FTD)',
         'description': 'Cisco FTD EMBLEM syslog — %FTD- system messages (cisco:ftd, index: netfw)',

@@ -17,9 +17,6 @@ class ApacheLogGenerator:
         'multi_instance': True,
         'single_param_name': 'log_type',
     }
-    ASSET_IDENTITY_MAPPING = {
-        'ip_addresses': {'type': 'asset', 'field': 'ip', 'categories': ['apache'], 'cim_field': 'src_ip'},
-    }
     METADATA = {
         'name': 'Apache/Nginx Log',
         'description': 'Apache/Nginx web server logs in various formats',

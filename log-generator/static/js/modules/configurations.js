@@ -52,10 +52,6 @@ export async function loadConfigurations() {
                 <th>Name</th>
                 <th>URL</th>
                 <th>Port</th>
-                <th>Index</th>
-                <th>Sourcetype</th>
-                <th>Host</th>
-                <th>Source</th>
                 <th>Created</th>
                 <th>Actions</th>
             </tr>
@@ -103,26 +99,6 @@ function createConfigurationRow(config) {
     const portCell = document.createElement('td');
     portCell.textContent = config.port;
     row.appendChild(portCell);
-
-    // Index
-    const indexCell = document.createElement('td');
-    indexCell.textContent = config.index || '-';
-    row.appendChild(indexCell);
-
-    // Sourcetype
-    const sourcetypeCell = document.createElement('td');
-    sourcetypeCell.textContent = config.sourcetype || '-';
-    row.appendChild(sourcetypeCell);
-
-    // Host
-    const hostCell = document.createElement('td');
-    hostCell.textContent = config.host || '-';
-    row.appendChild(hostCell);
-
-    // Source
-    const sourceCell = document.createElement('td');
-    sourceCell.textContent = config.source || '-';
-    row.appendChild(sourceCell);
 
     // Created
     const createdCell = document.createElement('td');
@@ -185,10 +161,6 @@ export async function handleCreateConfiguration(e) {
         url: formData.get('url').trim(),
         port: parseInt(formData.get('port')),
         token: formData.get('token').trim(),
-        index: formData.get('index')?.trim() || undefined,
-        sourcetype: formData.get('sourcetype')?.trim() || undefined,
-        host: formData.get('host')?.trim() || undefined,
-        source: formData.get('source')?.trim() || undefined
     };
 
     try {
@@ -230,10 +202,6 @@ export async function editConfiguration(configId) {
             document.getElementById('configurationUrl').value = config.url;
             document.getElementById('configurationPort').value = config.port;
             document.getElementById('configurationToken').value = config.token;
-            document.getElementById('configurationIndex').value = config.index || '';
-            document.getElementById('configurationSourcetype').value = config.sourcetype || '';
-            document.getElementById('configurationHost').value = config.host || '';
-            document.getElementById('configurationSource').value = config.source || '';
 
             // Update form title and button
             document.getElementById('configurationFormTitle').textContent = 'Edit HEC Destination';
@@ -335,10 +303,6 @@ export async function testConnection() {
             url: url,
             port: parseInt(port),
             token: token,
-            index: document.getElementById('configurationIndex').value.trim() || undefined,
-            sourcetype: document.getElementById('configurationSourcetype').value.trim() || undefined,
-            host: document.getElementById('configurationHost').value.trim() || undefined,
-            source: document.getElementById('configurationSource').value.trim() || undefined
         };
 
         const result = await ConfigurationsApi.test(data);
