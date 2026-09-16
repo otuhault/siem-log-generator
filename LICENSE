@@ -1,0 +1,93 @@
+SIEM Log Generator — Noncommercial Use License
+
+Copyright (c) 2026 Olivier Tuhault. All rights reserved.
+
+This license lets you download, run and adapt the SIEM Log Generator (the
+"Software") for noncommercial purposes. Every right it does not expressly grant
+is reserved to the copyright holder.
+
+
+1. What you may do
+
+   Subject to the conditions of this license, you may, free of charge:
+
+   (a) download and install the Software;
+   (b) run it, and use the data it generates; and
+   (c) modify it for your own use;
+
+   in each case only for a noncommercial purpose.
+
+
+2. Noncommercial purpose
+
+   A purpose is noncommercial when neither you nor anyone else obtains a
+   commercial advantage or monetary compensation from the use.
+
+   Noncommercial uses include personal learning, a personal or home lab,
+   academic teaching and research, and evaluating the Software.
+
+   Commercial uses, which this license does not permit, include use by or on
+   behalf of a business for its own operations — such as testing, sizing or
+   demonstrating a security product or service — and use as part of paid work,
+   such as a consulting engagement.
+
+
+3. What you may not do
+
+   (a) redistribute, publish, share, sublicense, sell, rent or lend the
+       Software or any modified version of it, in whole or in part, including
+       by making it available to others over a network;
+   (b) use the Software, or data it generates, for a commercial purpose; or
+   (c) remove or alter this license or the copyright notice.
+
+   Nothing in this license limits what the terms of the hosting platform allow
+   its users to do with a public repository, such as viewing it or forking it
+   on that platform. Doing so grants no right beyond those in this license.
+
+
+4. Commercial use
+
+   Commercial use requires prior written permission from the copyright holder,
+   who can be contacted through the project's repository.
+
+
+5. Third-party names and software
+
+   This license covers only the Software's own code and documentation.
+
+   Product and company names such as Splunk, Cisco, Fortinet, Palo Alto
+   Networks, Microsoft and Zscaler are trademarks of their respective owners.
+   They are used only to identify the log formats the Software reproduces, and
+   imply no affiliation with or endorsement by those owners. Splunk add-ons are
+   not distributed with the Software.
+
+   Third-party software the Software depends on is governed by its own license.
+
+
+6. No warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+   THE DATA THE SOFTWARE GENERATES IS SYNTHETIC. IT SIMULATES DEVICE AND
+   SOFTWARE BEHAVIOUR FOR TESTING PURPOSES AND IS NOT GUARANTEED TO MATCH WHAT
+   ANY REAL DEVICE, VERSION OR CONFIGURATION PRODUCES.
+
+
+7. Limitation of liability
+
+   TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+   IN CONNECTION WITH THE SOFTWARE OR ITS USE, INCLUDING ANY EFFECT OF THE DATA
+   IT GENERATES ON A SYSTEM THAT DATA IS SENT TO.
+
+   You are solely responsible for choosing where the Software sends the data
+   it generates.
+
+
+8. Termination
+
+   Your permissions under this license end automatically if you breach any of
+   its conditions.

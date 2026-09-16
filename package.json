@@ -1,0 +1,13 @@
+{
+  "name": "siem-log-generator-dom-tests",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DOM regression tests for the sender form. The application itself is Python/Flask; this package exists only to run the browser-side suite.",
+  "scripts": {
+    "test": "node --test \"tests-js/**/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "27.0.0"
+  }
+}

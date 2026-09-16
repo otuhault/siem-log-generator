@@ -1,0 +1,4 @@
+# Pinned runtime dependencies (versions verified against the installed env).
+# The unpinned ranges are kept in log-generator/requirements.txt.
+Flask==3.0.0
+requests==2.31.0

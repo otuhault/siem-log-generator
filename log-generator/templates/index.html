@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Generator - SIEM Testing Tool</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260916-lastrun">
+    <meta name="color-scheme" content="dark">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SIEM Logs Generator</h1>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="senders">Senders</button>
+            <button class="tab-btn" data-tab="simulation">Simulations</button>
+            <button class="tab-btn" data-tab="configuration">Configuration</button>
+            <button class="tab-btn" data-tab="catalog">Catalog</button>
+            <button class="tab-btn" data-tab="readme">Read Me</button>
+        </nav>
+
+        <div class="main-content">
+            <!-- Senders Tab Content -->
+            <div id="sendersTab" class="tab-content active">
+                <!-- Add Sender Button -->
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Senders: <strong id="totalSenders">0</strong></span>
+                        <span class="stat-item">Enabled: <strong id="enabledSenders">0</strong></span>
+                        <span class="stat-item">Disabled: <strong id="disabledSenders">0</strong></span>
+                    </div>
+                    <button id="addSenderBtn" class="btn btn-primary">+ Add Sender</button>
+                </div>
+
+                <!-- Create Sender Form (Hidden by default) -->
+                <div id="senderFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="senderFormTitle">Create New Sender</h2>
+                        <button id="closeSenderForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createSenderForm">
+                        <input type="hidden" id="senderId" name="id">
+                        <div class="form-group">
+                            <label for="senderName">Sender Name:</label>
+                            <input type="text" id="senderName" name="name" required placeholder="e.g., Web Server Logs" data-field-name="Sender name">
+                        </div>
+
+                        <!-- Phase 4a: Source mode + Technology / Sourcetypes selector -->
+                        <div class="form-group">
+                            <label>Source mode:</label>
+                            <div class="seg-radio" id="sourceModeRadios">
+                                <label><input type="radio" name="source_mode" value="sourcetype" checked> By Sourcetype</label>
+                                <label><input type="radio" name="source_mode" value="datamodel"> By Datamodel</label>
+                                <label><input type="radio" name="source_mode" value="attack"> Attack (legacy)</label>
+                            </div>
+                        </div>
+
+                        <!-- By Sourcetype mode -->
+                        <div class="form-group" id="sourcetypeModeGroup">
+                            <div class="sender-tech-grid">
+                                <div>
+                                    <label for="techSelect">Technology:</label>
+                                    <select id="techSelect" data-field-name="Technology">
+                                        <option value="">Select a technology…</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Splunk Sourcetypes:</label>
+                                    <div id="techSourcetypesList" class="sender-sourcetype-list">
+                                        <p class="hint-meta">Select a technology first.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="sourcetypePreview" class="sender-st-preview"></div>
+                        </div>
+
+                        <!-- Datamodel mode (Phase 4d) -->
+                        <div class="form-group" id="datamodelModeGroup" style="display:none;">
+                            <div class="sender-tech-grid">
+                                <div>
+                                    <label for="datamodelSelect">Datamodel:</label>
+                                    <select id="datamodelSelect" data-field-name="Datamodel">
+                                        <option value="">Select a datamodel…</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Matching sourcetypes:</label>
+                                    <div id="datamodelSourcetypesList" class="sender-sourcetype-list">
+                                        <p class="hint-meta">Select a datamodel first.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="hint-meta" style="margin-top:8px;">
+                                Submitting will create one sender per checked sourcetype, all sharing the same destination, frequency and A&amp;I settings.
+                            </p>
+                        </div>
+
+                        <!-- Attack mode (legacy unified dropdown — Phase 5 will refactor) -->
+                        <div class="form-group" id="attackModeGroup" style="display:none;">
+                            <label for="logTypeTrigger">Attack:</label>
+                            <div class="csd-wrapper" id="logTypeWrapper">
+                                <button type="button" class="csd-trigger" id="logTypeTrigger" data-field-name="Log type">
+                                    <span class="csd-trigger-text" id="logTypeDisplay">Select an attack…</span>
+                                    <span class="csd-caret">▾</span>
+                                </button>
+                                <div class="csd-panel" id="logTypePanel">
+                                    <div class="csd-options" id="logTypeOptions"></div>
+                                </div>
+                            </div>
+                            <div id="logTypeDescription" class="description"></div>
+                        </div>
+
+                        <!-- Hidden input keeps value + triggers change events for existing listeners (sourcetype-config.js) -->
+                        <input type="hidden" id="logType" name="log_type" data-field-name="Log type">
+
+                        <!-- Environment toggle + ratio slider (hidden by default) -->
+                        <div class="form-group" id="useAssetsIdentitiesGroup" style="display: none;">
+                            <label class="checkbox-label" style="font-weight: 600;">
+                                <input type="checkbox" id="useAssetsIdentities" name="use_assets_identities">
+                                <span class="checkbox-text">
+                                    <strong>Use Environment</strong>
+                                    <small>Replace default data pools (IPs, usernames, hostnames) with your configured assets and identities</small>
+                                </span>
+                            </label>
+                            <div id="aiRatioGroup" style="display: none; margin-top: 12px;">
+                                <div class="ai-ratio-labels">
+                                    <span>Random defaults</span>
+                                    <span id="aiRatioValue">100%</span>
+                                    <span>Environment</span>
+                                </div>
+                                <input type="range" id="aiRatio" name="assets_identities_ratio"
+                                       min="0" max="100" value="100" step="5"
+                                       class="ai-ratio-slider">
+                            </div>
+                            <div id="aiImpactPanel" style="display: none; margin-top: 14px;">
+                                <div class="ai-impact-header">A&amp;I Impact</div>
+                                <div id="aiImpactRows"></div>
+                            </div>
+
+                            <!-- Phase 4c: per-direction pool selectors (shown when relevant fields exist) -->
+                            <div id="aiPoolSelectorsGroup" style="display:none; margin-top:16px;">
+                                <!-- SOURCE block -->
+                                <div class="ai-pool-block" id="srcPoolBlock" style="display:none;">
+                                    <div class="ai-pool-title">SOURCE <span class="hint-meta" id="srcPoolFieldsHint"></span></div>
+                                    <div class="seg-radio ai-pool-mode">
+                                        <label><input type="radio" name="src_pool_mode" value="entities" checked> Assets (A&amp;I)</label>
+                                        <label><input type="radio" name="src_pool_mode" value="pool"> Pool</label>
+                                        <label><input type="radio" name="src_pool_mode" value="both"> Both</label>
+                                    </div>
+                                    <div id="srcPoolPicker" style="display:none; margin-top:8px;">
+                                        <select id="srcPoolSelect" name="src_pool_id">
+                                            <option value="">— Select a pool —</option>
+                                        </select>
+                                    </div>
+                                    <div id="srcPoolMixGroup" style="display:none; margin-top:8px;">
+                                        <div class="ai-ratio-labels">
+                                            <span>Assets</span>
+                                            <span id="srcPoolMixValue">50%</span>
+                                            <span>Pool</span>
+                                        </div>
+                                        <input type="range" id="srcPoolMix" name="src_pool_ai_ratio"
+                                               min="0" max="100" value="50" step="5" class="ai-ratio-slider">
+                                    </div>
+                                </div>
+
+                                <!-- DESTINATION block -->
+                                <div class="ai-pool-block" id="destPoolBlock" style="display:none; margin-top:12px;">
+                                    <div class="ai-pool-title">DESTINATION <span class="hint-meta" id="destPoolFieldsHint"></span></div>
+                                    <div class="seg-radio ai-pool-mode">
+                                        <label><input type="radio" name="dest_pool_mode" value="entities" checked> Assets (A&amp;I)</label>
+                                        <label><input type="radio" name="dest_pool_mode" value="pool"> Pool</label>
+                                        <label><input type="radio" name="dest_pool_mode" value="both"> Both</label>
+                                    </div>
+                                    <div id="destPoolPicker" style="display:none; margin-top:8px;">
+                                        <select id="destPoolSelect" name="dest_pool_id">
+                                            <option value="">— Select a pool —</option>
+                                        </select>
+                                    </div>
+                                    <div id="destPoolMixGroup" style="display:none; margin-top:8px;">
+                                        <div class="ai-ratio-labels">
+                                            <span>Assets</span>
+                                            <span id="destPoolMixValue">50%</span>
+                                            <span>Pool</span>
+                                        </div>
+                                        <input type="range" id="destPoolMix" name="dest_pool_ai_ratio"
+                                               min="0" max="100" value="50" step="5" class="ai-ratio-slider">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- How fast, and for how long. Side by side, because what
+                             matters is the two together: the volume they produce. -->
+                        <div class="form-group" id="frequencyGroup" style="display: none;">
+                            <div class="rate-pair">
+                                <div class="rate-field">
+                                    <label for="frequency">Frequency (logs per second):</label>
+                                    <input type="number" id="frequency" name="frequency"
+                                           min="1" max="1000" value="10" data-field-name="Frequency">
+                                </div>
+                                <div class="rate-field">
+                                    <label for="senderDuration">Duration:</label>
+                                    <div class="duration-input">
+                                        <input type="number" id="senderDuration" name="duration"
+                                               min="0" max="100000" value="60" data-field-name="Duration">
+                                        <select id="senderDurationUnit" name="duration_unit"
+                                                aria-label="Duration unit">
+                                            <option value="seconds">seconds</option>
+                                            <option value="minutes">minutes</option>
+                                            <option value="hours">hours</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <small id="senderVolumeHint"></small>
+                        </div>
+
+                        <!-- Apache Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="apacheLogTypesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="access" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Access Log (Common)</strong>
+                                        <small>Common Log Format without referer and user-agent</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="error" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Error Log</strong>
+                                        <small>Apache error logs with various severity levels</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="apache_log_types" value="combined" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Access Log (Combined)</strong>
+                                        <small>Combined Log Format with referer and user-agent</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- SSH Event Categories Selection (hidden by default) -->
+                        <div class="form-group" id="sshEventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="auth_success" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Successful Authentication</strong>
+                                        <small>Accepted password and publickey authentications</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="auth_failed" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Failed Authentication</strong>
+                                        <small>Failed password, invalid users, max auth attempts</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="sessions" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Session Management</strong>
+                                        <small>Session opened and closed events (PAM)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="connections" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Connection Events</strong>
+                                        <small>Connection closed, disconnected, reset events</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ssh_event_categories" value="errors" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Errors & Other</strong>
+                                        <small>Protocol errors, identification issues, server events</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Windows Sources Selection (hidden by default) -->
+                        <div class="form-group" id="windowsSourcesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="Security" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Security</strong>
+                                        <small>Authentication, privileges, processes (4624, 4625, 4688, etc.)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="Application" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Application</strong>
+                                        <small>Application errors, installations, updates (1000, 1001, 11707, etc.)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="windows_sources" value="System" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System</strong>
+                                        <small>Service management, system events (6005, 7036, 7034, etc.)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Windows Render Format Option (hidden by default) -->
+                        <div class="form-group" id="renderFormatGroup" style="display: none;">
+                            <label for="renderFormat">Render Format:</label>
+                            <select id="renderFormat" name="render_format">
+                                <option value="xml">XML (Default)</option>
+                                <option value="classic">Classic (Text)</option>
+                            </select>
+                            <small>XML format is standard Windows Event XML. Classic format is the text format displayed in Event Viewer.</small>
+                            <div id="renderFormatWarning" style="display:none; margin-top:8px; padding:8px 11px; border-radius:6px; font-size:0.85em; line-height:1.5; color:var(--warning-color); background:var(--warning-soft); border:1px solid rgba(245,184,75,0.35);">
+                                <strong>Classic output is not parsed by the add-on.</strong>
+                                The generator emits the Event Viewer layout
+                                (<code>Log Name:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Security</code>),
+                                while Splunk_TA_windows keys its classic extractions on
+                                <code>^LogName=</code>. Events will be indexed but left
+                                unparsed, so no CIM field will populate. Use XML unless you
+                                only need the raw text.
+                            </div>
+                        </div>
+
+                        <!-- Delivery format — shown wherever the chosen destination offers a
+                             choice between the raw event and its framed form, as described by
+                             the API (`delivery.offered`). See syslog_framing.apply_delivery_format. -->
+                        <div class="form-group" id="deliveryFormatGroup" style="display: none;">
+                            <label for="deliveryFormat">Delivery Format:</label>
+                            <select id="deliveryFormat" name="delivery_format">
+                                <option value="uf">UF — raw event</option>
+                                <option value="syslog">Syslog — framed (RFC 3164)</option>
+                            </select>
+                            <small id="deliveryFormatHint">
+                                UF writes the event itself, as a forwarder reads it from disk.
+                                Syslog adds the priority and header a device sends to a collector such as SC4S.
+                            </small>
+                        </div>
+
+                        <!-- Palo Alto Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="paloaltoLogTypesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="traffic" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Traffic</strong>
+                                        <small>Network traffic logs (sessions, bytes, packets, actions)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="threat" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Threat</strong>
+                                        <small>Security threat logs (vulnerabilities, malware, spyware, URLs)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="paloalto_log_types" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System</strong>
+                                        <small>System events (authentication, configuration, HA, upgrades)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Active Directory event categories (hidden by default) -->
+                        <div class="form-group" id="adEventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ad_event_categories" value="account_management" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Account Management</strong>
+                                        <small>User created, enabled, disabled, deleted, changed, locked out (4720, 4722, 4725, 4726, 4738, 4740)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ad_event_categories" value="group_management" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Group Management</strong>
+                                        <small>Members added/removed from security groups (4728, 4729, 4732, 4733, 4756, 4757)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ad_event_categories" value="directory_service" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Directory Service</strong>
+                                        <small>LDAP object modifications, creations, access operations (5136, 5137, 4662)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ad_event_categories" value="authentication" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication</strong>
+                                        <small>Kerberos TGT/TGS, pre-auth failures, NTLM validation (4768, 4769, 4771, 4776)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="ad_event_categories" value="computer_management" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Computer Management</strong>
+                                        <small>Computer accounts created, changed, deleted (4741, 4742, 4743)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cisco IOS Event Categories Selection (hidden by default) -->
+                        <div class="form-group" id="ciscoIOSEventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="interface" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Interface & Link Status</strong>
+                                        <small>Interface and line protocol state changes (LINK, LINEPROTO)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System Events</strong>
+                                        <small>Configuration changes, restarts, memory/CPU (SYS, PARSER)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="authentication" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication & AAA</strong>
+                                        <small>Login success/failed, user sessions, 802.1X (SEC_LOGIN, AAA, AUTHMGR)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="acl_security" checked>
+                                    <span class="checkbox-text">
+                                        <strong>ACL & Security</strong>
+                                        <small>Access list permit/deny, zone-based firewall sessions (SEC, FW)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="routing" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Routing Protocols</strong>
+                                        <small>OSPF, BGP, EIGRP adjacency and neighbor changes</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="redundancy" checked>
+                                    <span class="checkbox-text">
+                                        <strong>HSRP/VRRP</strong>
+                                        <small>Hot Standby Router Protocol state transitions (STANDBY)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="spanning_tree" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Spanning Tree</strong>
+                                        <small>Topology changes, root guard, PVID inconsistency (SPANTREE)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_ios_event_categories" value="hardware" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Hardware & Environment</strong>
+                                        <small>SNMP events, NTP sync, fan failures, card insert/remove (SNMP, NTP, ENV, OIR)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cisco FTD Event Categories -->
+
+                        <!-- Cisco ASA Event Categories -->
+                        <div class="form-group" id="ciscoASAEventCategoriesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="connection" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Connection Events</strong>
+                                        <small>TCP/UDP session built/teardown (302013–302016)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="vpn" checked>
+                                    <span class="checkbox-text">
+                                        <strong>VPN Events</strong>
+                                        <small>IPsec/SSL VPN connect, disconnect, NAT-T (713xxx, 716xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="auth" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication</strong>
+                                        <small>AAA success/failure, SSH/HTTPS login (113xxx, 605xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="acl" checked>
+                                    <span class="checkbox-text">
+                                        <strong>ACL &amp; Policy</strong>
+                                        <small>Access-list permit/deny decisions (106xxx)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cisco_asa_event_categories" value="system" checked>
+                                    <span class="checkbox-text">
+                                        <strong>System Events</strong>
+                                        <small>CLI commands, SSL handshake, HA, failover (111xxx, 725xxx, 105xxx)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+
+                        <!-- Zscaler Log Types Selection (hidden by default) -->
+                        <div class="form-group" id="zscalerLogTypesGroup" style="display: none;">
+                            <label>Log type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="zscaler_log_types" value="web" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Web Proxy</strong>
+                                        <small>NSS web proxy transactions (URL categories, threats, DLP, users)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="zscaler_log_types" value="tunnel" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Tunnel</strong>
+                                        <small>IPSec/GRE tunnel session records (zscalernss-tunnel)</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Linux auditd Event Categories (hidden by default) -->
+                        <div class="form-group" id="auditdEventCategoriesGroup" style="display: none;">
+                            <label>Record type:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="auditd_event_categories" value="authentication" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Authentication</strong>
+                                        <small>PAM verdicts (USER_AUTH) — the acct= an analyst pivots on</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="auditd_event_categories" value="account_management" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Account Management</strong>
+                                        <small>User and group lifecycle (ADD_USER, DEL_USER, GRP_MGMT…)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="auditd_event_categories" value="privilege" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Privilege Escalation</strong>
+                                        <small>sudo invocations (USER_CMD) with the full command line</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="auditd_event_categories" value="execution" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Process Execution</strong>
+                                        <small>EXECVE records, stitched into execve_command by the add-on</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="auditd_event_categories" value="file_access" checked>
+                                    <span class="checkbox-text">
+                                        <strong>File Access</strong>
+                                        <small>Watched path access (PATH) — carries the modify tag</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="fortigateEventCategoriesGroup" style="display: none;">
+                            <label>Log category:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="traffic" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Traffic</strong>
+                                        <small>Forwarded sessions through a policy (type=traffic) — Network Traffic</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="utm_webfilter" checked>
+                                    <span class="checkbox-text">
+                                        <strong>UTM — Web Filter</strong>
+                                        <small>URL verdicts with category and profile — Web</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="utm_ips" checked>
+                                    <span class="checkbox-text">
+                                        <strong>UTM — IPS</strong>
+                                        <small>Inbound signature detections — Intrusion Detection</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="utm_virus" checked>
+                                    <span class="checkbox-text">
+                                        <strong>UTM — AntiVirus</strong>
+                                        <small>Blocked infected downloads — Malware</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="utm_appctrl" checked>
+                                    <span class="checkbox-text">
+                                        <strong>UTM — Application Control</strong>
+                                        <small>Application verdicts with bytes — Network Traffic</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="event_auth" checked>
+                                    <span class="checkbox-text">
+                                        <strong>User Authentication</strong>
+                                        <small>Firewall user logon verdicts (subtype=user) — Authentication</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="event_admin" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Admin Login</strong>
+                                        <small>Administrator login and logout — Authentication (privileged)</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="event_vpn" checked>
+                                    <span class="checkbox-text">
+                                        <strong>VPN</strong>
+                                        <small>IPsec negotiation, SSL tunnel up and down — Authentication, Network Sessions</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="event_config" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Configuration Change</strong>
+                                        <small>Object add, edit and delete — Change</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="event_perf" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Performance Stats</strong>
+                                        <small>Periodic CPU, memory and session counters — Performance</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="fortigate_event_categories" value="anomaly" checked>
+                                    <span class="checkbox-text">
+                                        <strong>DoS Anomaly</strong>
+                                        <small>DoS policy detections (type=anomaly) — Intrusion Detection</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Attack-specific options (hidden by default) -->
+                        <div class="form-group" id="attackOptionsGroup" style="display: none;">
+                            <label>Attack Configuration:</label>
+
+                            <!-- 0. What the reader has to know before running it -->
+                            <div id="attackWarning" class="attack-warning" role="note" hidden></div>
+
+                            <!-- 1. Sourcetypes — attacks that declare their data sources -->
+                            <div id="attackSourcesGroup" class="attack-block" hidden>
+                                <div class="attack-block-label">Sourcetypes</div>
+                                <div id="attackSourcesRows" class="attack-sources"></div>
+                                <small id="attackSourcesHint">Events are sent with exactly this sourcetype and source.</small>
+                            </div>
+
+                            <!-- 2. Environment -->
+                            <div id="attackEnvironmentGroup" class="attack-block" hidden>
+                                <!-- Attacks that set each field themselves: one scanner, many targets -->
+                                <div id="attackIdentityRows" class="attack-identity" hidden></div>
+                                <label id="attackUseEnvironmentLabel" class="checkbox-label" style="font-weight: 600;">
+                                    <input type="checkbox" id="attackUseEnvironment">
+                                    <span class="checkbox-text">
+                                        <strong>Use Environment</strong>
+                                        <small>The share of events — attack and noise alike — whose user and host come from your Assets &amp; Identities; the others keep random defaults</small>
+                                    </span>
+                                </label>
+                                <div id="attackAiRatioGroup" class="attack-ai-ratio" hidden>
+                                    <div class="ai-ratio-labels">
+                                        <span>Random defaults</span>
+                                        <span id="attackAiRatioValue">100%</span>
+                                        <span>Environment</span>
+                                    </div>
+                                    <input type="range" id="attackAiRatio" min="0" max="100" value="100" step="5"
+                                           class="ai-ratio-slider" aria-label="Share of targets drawn from the environment">
+                                </div>
+                                <div id="attackAiFields" class="attack-ai-fields" hidden>
+                                    <div class="ai-impact-header">Detection fields fed by the environment</div>
+                                    <div id="attackAiFieldRows"></div>
+                                </div>
+                            </div>
+
+                            <!-- 3. Number of events -->
+                            <div class="attack-block">
+                                <label for="attackEventsCount" id="attackEventsLabel" class="attack-input-label">Number of Events:</label>
+                                <input type="number" id="attackEventsCount" name="attack_events_count"
+                                       min="1" max="10000" value="100" data-field-name="Number of events">
+                                <small id="attackEventsHint" hidden>Events the detection matches.</small>
+                            </div>
+
+                            <!-- 3b. Extra threshold inputs (e.g. privileged ports) -->
+                            <div id="attackExtraCounts" class="attack-block" hidden></div>
+
+                            <!-- 4. Noise -->
+                            <div id="attackNoiseGroup" class="attack-block" hidden>
+                                <label class="checkbox-label" style="font-weight: 600;">
+                                    <input type="checkbox" id="attackNoise">
+                                    <span class="checkbox-text">
+                                        <strong>Noise</strong>
+                                        <small>Also send similar benign events, which the detection does not match</small>
+                                    </span>
+                                </label>
+                                <div id="attackNoiseCountGroup" class="attack-noise-count" hidden>
+                                    <label for="attackNoiseCount" class="attack-input-label">Number of benign events:</label>
+                                    <input type="number" id="attackNoiseCount" min="0" max="10000" value="20"
+                                           data-field-name="Number of benign events">
+                                </div>
+                            </div>
+
+                            <!-- 5. Duration -->
+                            <div class="attack-block">
+                                <label for="attackDuration" class="attack-input-label">Duration (seconds):</label>
+                                <input type="number" id="attackDuration" name="attack_duration"
+                                       min="1" max="3600" value="60" data-field-name="Duration">
+                                <span id="attackRate" class="attack-rate" hidden></span>
+                                <small id="attackDurationHint">Generate the specified number of events over the given duration</small>
+                            </div>
+
+                            <!-- Attack field overrides (shown dynamically based on fixed fields) -->
+                            <div id="attackFieldOverrides" style="display: none; margin-top: 12px;">
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <div id="attackUserGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackUser" style="font-size: 0.9em; font-weight: normal;">User:</label>
+                                        <input type="text" id="attackUser" name="attack_user"
+                                               placeholder="Random" style="width: 100%;"
+                                               title="Enter a username (e.g. jsmith)">
+                                    </div>
+                                    <div id="attackDestGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackDest" style="font-size: 0.9em; font-weight: normal;">Destination Host:</label>
+                                        <input type="text" id="attackDest" name="attack_dest"
+                                               placeholder="Random" style="width: 100%;"
+                                               title="Enter a hostname (e.g. DESKTOP-ABC123)">
+                                    </div>
+                                    <div id="attackSrcIpGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackSrcIp" style="font-size: 0.9em; font-weight: normal;">Source IP:</label>
+                                        <input type="text" id="attackSrcIp" name="attack_src_ip"
+                                               placeholder="Random" style="width: 100%;"
+                                               pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                                               title="Enter a valid IPv4 address (e.g. 10.0.1.50)">
+                                    </div>
+                                    <div id="attackDestIpGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackDestIp" style="font-size: 0.9em; font-weight: normal;">Destination IP:</label>
+                                        <input type="text" id="attackDestIp" name="attack_dest_ip"
+                                               placeholder="Random" style="width: 100%;"
+                                               pattern="^(\d{1,3}\.){3}\d{1,3}$"
+                                               title="Enter a valid IPv4 address (e.g. 192.168.1.100)">
+                                    </div>
+                                    <div id="attackDestPortGroup" style="flex: 1; display: none; min-width: 140px;">
+                                        <label for="attackDestPort" style="font-size: 0.9em; font-weight: normal;">Destination Port:</label>
+                                        <input type="number" id="attackDestPort" name="attack_dest_port"
+                                               placeholder="Random" style="width: 100%;"
+                                               min="1" max="65535"
+                                               title="Enter a port number (1-65535, e.g. 445)">
+                                    </div>
+                                </div>
+                                <small>Leave empty for random values, or enter specific values for the attack. A value entered here always wins over the environment.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Destination Type:</label>
+                            <small id="attackDestinationNote" class="attack-destination-note" hidden></small>
+                            <div style="display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap;">
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="radio" name="destination_type" value="file" checked>
+                                    <span>Local File</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="radio" name="destination_type" value="configuration">
+                                    <span>HEC (Splunk)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="radio" name="destination_type" value="syslog">
+                                    <span>Syslog TCP/UDP</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- File Destination -->
+                        <div class="form-group" id="fileDestinationGroup">
+                            <label for="destination">Destination File Path:</label>
+                            <input type="text" id="destination" name="destination"
+                                   placeholder="/tmp/logs/apache_access.log" data-field-name="Destination path">
+                            <small>Full path where logs will be written</small>
+                        </div>
+
+                        <!-- Configuration (HEC) Destination -->
+                        <div class="form-group" id="configurationDestinationGroup" style="display: none;">
+                            <label for="configurationSelect">Select Configuration:</label>
+                            <select id="configurationSelect" name="configuration_id" data-field-name="HEC configuration">
+                                <option value="">Select a configuration...</option>
+                            </select>
+                            <small>Choose a pre-configured HEC destination</small>
+                        </div>
+
+                        <!-- HEC Metadata Overrides (shown when HEC destination is selected) -->
+                        <div id="hecOverridesGroup" style="display: none;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="hecIndex">Index (optional):</label>
+                                    <input type="text" id="hecIndex" name="hec_index" placeholder="e.g. main">
+                                </div>
+                                <div class="form-group" id="hecSourcetypeSingleGroup">
+                                    <label for="hecSourcetype">Sourcetype (optional):</label>
+                                    <input type="text" id="hecSourcetype" name="hec_sourcetype" placeholder="e.g. pan:traffic">
+                                </div>
+                                <div class="form-group" id="hecHostGroup">
+                                    <label for="hecHost">Host (optional):</label>
+                                    <input type="text" id="hecHost" name="hec_host" placeholder="e.g. pa-fw-01">
+                                    <small>Leave empty — Splunk/SC4S extracts host from the log</small>
+                                </div>
+                                <div class="form-group" id="hecSourceSingleGroup">
+                                    <label for="hecSource">Source (optional):</label>
+                                    <input type="text" id="hecSource" name="hec_source" placeholder="e.g. http:log-generator">
+                                </div>
+                            </div>
+
+                            <!-- One Splunk sourcetype per selected sourcetype, prefilled
+                                 with the registry name and editable. -->
+                            <div class="form-group" id="hecSourcetypeMapGroup" style="display:none;">
+                                <label>Sourcetype sent to Splunk, per selected sourcetype:</label>
+                                <div id="hecSourcetypeMapRows" class="hec-st-map"></div>
+                                <small>
+                                    Defaults to the sourcetype itself. Override it to send several
+                                    sourcetypes under one name and let Splunk split them at index
+                                    time (e.g. everything as <code>pan:log</code>).
+                                </small>
+                            </div>
+
+                            <!-- One `source` per selected sourcetype, prefilled from the
+                                 TA registry and editable. Only shown for TAs that actually
+                                 document a source value. -->
+                            <div class="form-group" id="hecSourceMapGroup" style="display:none;">
+                                <label>Source sent to Splunk, per selected sourcetype:</label>
+                                <div id="hecSourceMapRows" class="hec-st-map"></div>
+                                <small>
+                                    Prefilled with the value the add-on expects. The Windows
+                                    add-on classifies events almost entirely on
+                                    <code>source</code>, so changing it breaks field extraction.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Syslog Destination — Phase 4b: dropdown of persisted destinations -->
+                        <div class="form-group" id="syslogDestinationGroup" style="display: none;">
+                            <label for="syslogDestinationSelect">Select Syslog Destination:</label>
+                            <select id="syslogDestinationSelect" name="syslog_destination_id"
+                                    data-field-name="Syslog destination">
+                                <option value="">Select a syslog destination…</option>
+                            </select>
+                            <small>Manage destinations in <strong>Configuration → Syslog Destinations</strong>.</small>
+                            <div id="syslogViabilityWarning" style="display:none; margin-top:8px; padding:8px 11px; border-radius:6px; font-size:0.85em; line-height:1.5; color:var(--warning-color); background:var(--warning-soft); border:1px solid rgba(245,184,75,0.35);">
+                                <strong>This technology is not collected over syslog.</strong>
+                                Windows events reach Splunk through a universal forwarder or
+                                HEC, which carries the <code>source</code> metadata the add-on
+                                classifies on. A syslog transport drops it, so the add-on will
+                                not recognise these events. Use a HEC destination.
+                            </div>
+                        </div>
+
+                        <button type="submit" id="submitSenderBtn" class="btn btn-primary">Create Sender</button>
+                        <button type="button" id="cancelSenderForm" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+
+                <!-- Senders, then attacks. Each title filters its own table down
+                     to what is running; a running row is green and sits on top. -->
+                <div class="card" id="sendersCard" hidden>
+                    <h2><button type="button" class="group-toggle" id="sendersToggle"
+                                aria-pressed="false">Senders<span class="group-filter"></span></button></h2>
+                    <div id="sendersContainer"></div>
+                </div>
+
+                <div class="card" id="attacksCard" hidden>
+                    <h2><button type="button" class="group-toggle" id="attacksToggle"
+                                aria-pressed="false">Attacks<span class="group-filter"></span></button></h2>
+                    <div id="attacksContainer"></div>
+                </div>
+            </div>
+
+            <!-- Configuration Tab (umbrella) -->
+            <div id="configurationTab" class="tab-content">
+                <nav class="config-sub-tabs" id="configSubNav">
+                    <button class="config-subtab-btn active" data-subtab="hec">HEC Destinations</button>
+                    <button class="config-subtab-btn" data-subtab="syslog">Syslog Destinations</button>
+                    <button class="config-subtab-btn" data-subtab="network">Network Pools</button>
+                    <button class="config-subtab-btn" data-subtab="ai">Assets &amp; Identities</button>
+                </nav>
+
+                <!-- Syslog Destinations sub-tab -->
+                <div id="syslogTab" class="config-subtab-content">
+                    <div class="tab-header">
+                        <div class="sender-stats">
+                            <span class="stat-item">Syslog Destinations: <strong id="totalSyslogDestinations">0</strong></span>
+                        </div>
+                        <button id="addSyslogDestinationBtn" class="btn btn-primary">+ Add Syslog Destination</button>
+                    </div>
+
+                    <div id="syslogDestinationFormCard" class="card" style="display:none;">
+                        <div class="card-header">
+                            <h2 id="syslogDestinationFormTitle">Create New Syslog Destination</h2>
+                            <button id="closeSyslogDestinationForm" class="btn-close">×</button>
+                        </div>
+                        <form id="createSyslogDestinationForm">
+                            <input type="hidden" id="syslogDestinationId">
+                            <div class="form-group">
+                                <label for="syslogDestinationName">Destination Name</label>
+                                <input type="text" id="syslogDestinationName" required placeholder="e.g., SC4S Lab">
+                            </div>
+                            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:15px;">
+                                <div class="form-group">
+                                    <label for="syslogDestinationHost">Host</label>
+                                    <input type="text" id="syslogDestinationHost" required placeholder="syslog.example.com or 10.0.0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="syslogDestinationPort">Port</label>
+                                    <input type="number" id="syslogDestinationPort" required min="1" max="65535" value="514">
+                                </div>
+                                <div class="form-group">
+                                    <label for="syslogDestinationProtocol">Protocol</label>
+                                    <select id="syslogDestinationProtocol">
+                                        <option value="udp">UDP</option>
+                                        <option value="tcp">TCP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" id="submitSyslogDestinationBtn" class="btn btn-primary">Save Destination</button>
+                                <button type="button" id="testSyslogConnectionBtn" class="btn btn-secondary">Test Connection</button>
+                                <button type="button" id="cancelSyslogDestinationForm" class="btn btn-secondary">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h2>Syslog Destinations</h2>
+                        <div id="syslogDestinationsContainer">
+                            <p class="no-senders">No syslog destinations yet. Click "Add Syslog Destination" to create one.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Pools sub-tab -->
+                <div id="networkTab" class="config-subtab-content">
+                    <div class="tab-header">
+                        <div class="sender-stats">
+                            <span class="stat-item">Pools: <strong id="totalNetworkPools">0</strong></span>
+                        </div>
+                        <button id="addNetworkPoolBtn" class="btn btn-primary">+ Add Pool</button>
+                    </div>
+
+                    <div id="networkPoolFormCard" class="card" style="display:none;">
+                        <div class="card-header">
+                            <h2 id="networkPoolFormTitle">Create New Pool</h2>
+                            <button id="closeNetworkPoolForm" class="btn-close">×</button>
+                        </div>
+                        <form id="createNetworkPoolForm">
+                            <input type="hidden" id="npOriginalCategory">
+                            <input type="hidden" id="npOriginalName">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+                                <div class="form-group">
+                                    <label for="npCategory">Category</label>
+                                    <input type="text" id="npCategory" required placeholder="internal, external, malicious…">
+                                    <small>Lowercase. Reuse an existing category to group pools, or create a new one.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="npName">Pool Name</label>
+                                    <input type="text" id="npName" required placeholder="corporate_internal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="npRange">Range</label>
+                                    <input type="text" id="npRange" required placeholder="192.168.1.0/24 or 10.0.0.1-10.0.0.254">
+                                    <small>CIDR (e.g. <code>192.168.1.0/24</code>) or start–end range (e.g. <code>10.0.0.1-10.0.0.254</code>).</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="npType">Type</label>
+                                    <select id="npType">
+                                        <option value="cidr">CIDR</option>
+                                        <option value="range">Range</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Save Pool</button>
+                                <button type="button" id="cancelNetworkPoolForm" class="btn btn-secondary">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="networkPoolsContainer">
+                        <p class="no-senders">Loading network pools…</p>
+                    </div>
+                </div>
+
+            <!-- A&I sub-tab Content -->
+            <div id="environmentTab" class="config-subtab-content">
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Assets: <strong id="totalEntities">0</strong></span>
+                        <span class="stat-item">Identities: <strong id="totalAccounts">0</strong></span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div class="ai-sub-tabs">
+                            <button class="env-sub-tab-btn active" data-subtab="entities">Assets</button>
+                            <button class="env-sub-tab-btn" data-subtab="accounts">Identities</button>
+                        </div>
+                        <button id="addEntityBtn" class="btn btn-primary">+ Add Asset</button>
+                        <button id="addAccountBtn" class="btn btn-primary" style="display: none;">+ Add Identity</button>
+                    </div>
+                </div>
+
+                <!-- Environment-wide settings: facts that belong to no single
+                     entity or account. The AD domain is not a per-machine
+                     attribute, and only Windows / Active Directory have any
+                     notion of it, so it lives here rather than on every row. -->
+                <div class="card" id="envSettingsCard">
+                    <div class="card-header">
+                        <h2>Environment</h2>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
+                        <div class="form-group">
+                            <label for="adDomain">AD domain (NetBIOS)</label>
+                            <input type="text" id="adDomain" placeholder="CONTOSO">
+                            <small>Fills <code>SubjectDomainName</code> / <code>TargetDomainName</code>
+                                   on Windows and Active Directory events. Leave empty to keep the
+                                   generators' own sample domains.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="adDomainDns">AD domain (DNS)</label>
+                            <input type="text" id="adDomainDns" placeholder="contoso.local">
+                            <small>Used by Active Directory for domain controller FQDNs.</small>
+                        </div>
+                        <div class="form-group">
+                            <button id="saveEnvSettingsBtn" type="button" class="btn btn-primary">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Asset Form -->
+                <div id="entityFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="entityFormTitle">Add Asset</h2>
+                        <button id="closeEntityForm" class="btn-close">×</button>
+                    </div>
+                    <form id="entityForm">
+                        <input type="hidden" id="entityId" name="id">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label for="entityName">Name <span style="color: red;">*</span></label>
+                                <input type="text" id="entityName" name="name" placeholder="DESKTOP-JSMITH" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityType">Type <span style="color: red;">*</span></label>
+                                <select id="entityType" name="type" required>
+                                    <option value="">— Select type —</option>
+                                    <option value="endpoint">Endpoint / Workstation</option>
+                                    <option value="server">Server</option>
+                                    <option value="domain_controller">Domain Controller</option>
+                                    <option value="firewall">Firewall / NGFW</option>
+                                    <option value="router">Router / Switch</option>
+                                    <option value="external">External / Internet</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityIp">IP Address</label>
+                                <input type="text" id="entityIp" name="ip" placeholder="192.168.1.10">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">src_ip</span><span class="hint-logs">Apache · Palo Alto · FTD · ASA · IOS · SSH · Zscaler</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_ip</span><span class="hint-logs">Palo Alto · FTD · ASA <em>(external)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityHostname">Hostname</label>
+                                <input type="text" id="entityHostname" name="nt_host" placeholder="DESKTOP-JSMITH">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">dvc</span><span class="hint-logs">Palo Alto · FTD · ASA · IOS · XR</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">src_nt_host</span><span class="hint-logs">Windows · Active Directory · Zscaler</span></div>
+                                    <div class="field-hint-row"><span class="hint-cim">dest_host</span><span class="hint-logs">SSH</span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityMac">MAC Address</label>
+                                <input type="text" id="entityMac" name="mac" placeholder="00:11:22:33:44:55">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">src_mac</span><span class="hint-logs">Cisco IOS <em>(802.1X AUTHMGR)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityFqdn">FQDN</label>
+                                <input type="text" id="entityFqdn" name="fqdn" placeholder="dc01.contoso.local">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">Computer</span><span class="hint-logs">Active Directory <em>(Domain Controller FQDN)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="entityOs">OS / Platform</label>
+                                <input type="text" id="entityOs" name="os" placeholder="Windows OS">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">deviceostype</span><span class="hint-logs">Zscaler <em>(Windows OS, Mac OS, iOS, Android…)</em></span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="submitEntityBtn" class="btn btn-primary">Add Asset</button>
+                            <button type="button" id="cancelEntityBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Identity Form -->
+                <div id="accountFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="accountFormTitle">Add Identity</h2>
+                        <button id="closeAccountForm" class="btn-close">×</button>
+                    </div>
+                    <form id="accountForm">
+                        <input type="hidden" id="accountId" name="id">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label for="accountUsername">Username <span style="color: red;">*</span></label>
+                                <input type="text" id="accountUsername" name="username" placeholder="jsmith" required>
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Windows · SSH · Palo Alto · FTD · ASA · IOS · Active Directory</span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="accountEmail">Email</label>
+                                <input type="text" id="accountEmail" name="email" placeholder="j.smith@corp.com">
+                                <div class="field-hint">
+                                    <div class="field-hint-row"><span class="hint-cim">user</span><span class="hint-logs">Zscaler <em>(email used as identifier)</em></span></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="accountType">Type</label>
+                                <select id="accountType" name="type">
+                                    <option value="standard">Standard User</option>
+                                    <option value="admin">Administrator / Privileged</option>
+                                    <option value="service_account">Service Account</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="accountLinkedEntity">Linked Asset</label>
+                                <select id="accountLinkedEntity" name="linked_entity">
+                                    <option value="">— None —</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="submitAccountBtn" class="btn btn-primary">Add Identity</button>
+                            <button type="button" id="cancelAccountBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Assets sub-tab -->
+                <div id="entitiesSubTab" class="ai-subtab-content active">
+                    <div id="entitiesEmptyState" class="empty-state" style="display: none;">
+                        <p>No assets configured. Add assets to represent hosts, servers, firewalls, and routers in your simulated environment.</p>
+                    </div>
+                    <div id="entitiesTableContainer" style="display: none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>IP</th>
+                                    <th>Hostname</th>
+                                    <th>FQDN</th>
+                                    <th>OS</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entitiesTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Identities sub-tab -->
+                <div id="accountsSubTab" class="ai-subtab-content">
+                    <div id="accountsEmptyState" class="empty-state" style="display: none;">
+                        <p>No identities configured. Add identities to represent users and service accounts in your simulated environment.</p>
+                    </div>
+                    <div id="accountsTableContainer" style="display: none;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Type</th>
+                                    <th>Linked Asset</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HEC Destinations sub-tab Content -->
+            <div id="configurationsTab" class="config-subtab-content active">
+                <!-- Add Configuration Button -->
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">HEC Destinations: <strong id="totalConfigurations">0</strong></span>
+                    </div>
+                    <button id="addConfigurationBtn" class="btn btn-primary">+ Add HEC Destination</button>
+                </div>
+
+                <!-- Create Configuration Form (Hidden by default) -->
+                <div id="configurationFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="configurationFormTitle">Create New HEC Destination</h2>
+                        <button id="closeConfigurationForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createConfigurationForm">
+                        <input type="hidden" id="configurationId" name="id">
+                        <div class="form-group">
+                            <label for="configurationName">Destination Name:</label>
+                            <input type="text" id="configurationName" name="name" required placeholder="e.g., Splunk HEC Production" data-field-name="Destination name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationUrl">URL:</label>
+                            <input type="text" id="configurationUrl" name="url" required
+                                   placeholder="https://splunk.example.com:8088" data-field-name="URL">
+                            <small>Full URL of the Splunk HEC endpoint</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationPort">Port:</label>
+                            <input type="number" id="configurationPort" name="port" required
+                                   min="1" max="65535" value="8088" data-field-name="Port">
+                            <small>HEC port (default: 8088)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configurationToken">HEC Token:</label>
+                            <input type="text" id="configurationToken" name="token" required
+                                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-field-name="HEC token">
+                            <small>Splunk HTTP Event Collector token</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="submitConfigurationBtn" class="btn btn-primary">Create HEC Destination</button>
+                            <button type="button" id="testConnectionBtn" class="btn btn-secondary">Test Connection</button>
+                            <button type="button" id="cancelConfigurationForm" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Configurations Table -->
+                <div class="card">
+                    <h2>HEC Destinations</h2>
+                    <div id="configurationsContainer">
+                        <p class="no-senders">No HEC destinations created yet. Click "Add HEC Destination" to create one!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sourcetype Mapping sub-tab Content -->
+            </div><!-- /configurationTab -->
+
+            <!-- Simulation Tab Content -->
+            <div id="simulationTab" class="tab-content">
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Simulations: <strong id="totalSimulations">0</strong></span>
+                        <span class="stat-item">Running: <strong id="runningSimulations">0</strong></span>
+                    </div>
+                    <button id="addSimulationBtn" class="btn btn-primary">+ New Simulation</button>
+                </div>
+
+                <!-- Create Simulation Form -->
+                <div id="simulationFormCard" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="simulationFormTitle">Create New Simulation</h2>
+                        <button id="closeSimulationForm" class="btn-close">×</button>
+                    </div>
+                    <form id="createSimulationForm">
+                        <div class="form-group">
+                            <label for="simName">Simulation Name:</label>
+                            <input type="text" id="simName" required placeholder="e.g., Client ACME — 1TB/day baseline">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="simDuration">Duration:</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="number" id="simDurationValue" min="1" step="1" value="24" style="width: 100px;">
+                                <select id="simDurationUnit">
+                                    <option value="1">second(s)</option>
+                                    <option value="60">minute(s)</option>
+                                    <option value="3600" selected>hour(s)</option>
+                                    <option value="86400">day(s)</option>
+                                    <option value="604800">week(s)</option>
+                                </select>
+                            </div>
+                            <small>Duration over which the total volume will be spread</small>
+                        </div>
+
+                        <!-- Destination -->
+                        <div class="form-group">
+                            <label>Destination:</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="sim_destination_type" value="file" checked>
+                                    <span>File</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="sim_destination_type" value="configuration">
+                                    <span>HEC (Splunk)</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="sim_destination_type" value="syslog">
+                                    <span>Syslog TCP/UDP</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="simFileDestGroup">
+                            <label for="simDestination">Output File Path:</label>
+                            <input type="text" id="simDestination" placeholder="/tmp/simulation.log">
+                        </div>
+
+                        <div class="form-group" id="simHecDestGroup" style="display: none;">
+                            <label for="simConfigurationSelect">HEC Destination:</label>
+                            <select id="simConfigurationSelect">
+                                <option value="">Select a destination...</option>
+                            </select>
+                            <div style="margin-top: 12px;">
+                                <label for="simHecIndex">Index:</label>
+                                <input type="text" id="simHecIndex" placeholder="e.g. main">
+                                <small>Stamped on every line of the simulation. Sourcetypes
+                                       stay the ones each source declares.
+                                       Not sent over syslog — a collector such as SC4S
+                                       decides the index itself.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="simSyslogDestGroup" style="display: none;">
+                            <label for="simSyslogHost">Syslog Host:</label>
+                            <input type="text" id="simSyslogHost" placeholder="192.168.1.100 or sc4s.company.com">
+                            <div style="display: flex; gap: 12px; margin-top: 8px;">
+                                <div style="flex: 1;">
+                                    <label for="simSyslogPort">Port:</label>
+                                    <input type="number" id="simSyslogPort" value="514" min="1" max="65535">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label for="simSyslogProtocol">Protocol:</label>
+                                    <select id="simSyslogProtocol">
+                                        <option value="udp">UDP</option>
+                                        <option value="tcp">TCP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <small>Compatible with SC4S, rsyslog, syslog-ng</small>
+                        </div>
+
+                        <!-- Sourcetype volumes -->
+                        <div class="form-group">
+                            <label>Volume per Sourcetype:</label>
+                            <small>Enter the volume in GB for each sourcetype over the configured duration. Leave at 0 to exclude.</small>
+                            <div id="simSourcetypesGrid" class="sim-sourcetypes-grid">
+                                <p class="loading">Loading sourcetypes...</p>
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div id="simSummary" class="sim-summary" style="display: none;">
+                            <div class="sim-summary-row">
+                                <span>Total volume:</span>
+                                <strong id="simTotalGB">0 GB</strong>
+                            </div>
+                            <div class="sim-summary-row">
+                                <span>Average rate:</span>
+                                <strong id="simTotalRate">0 logs/sec</strong>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="submitSimulationBtn" class="btn btn-primary">Create Simulation</button>
+                            <button type="button" id="cancelSimulationForm" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Simulations List -->
+                <div class="card">
+                    <h2>Simulations</h2>
+                    <div id="simulationsContainer">
+                        <p class="no-senders">No simulations yet. Click "+ New Simulation" to create one!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Catalog Tab Content -->
+            <div id="catalogTab" class="tab-content">
+                <nav class="config-sub-tabs" id="catalogSubNav">
+                    <button class="catalog-subtab-btn active" data-subtab="sourcetypes">Sourcetypes</button>
+                    <button class="catalog-subtab-btn" data-subtab="datamodels">Data Models</button>
+                    <button class="catalog-subtab-btn" data-subtab="attacks">Attacks</button>
+                </nav>
+
+                <div class="tab-header">
+                    <div class="sender-stats">
+                        <span class="stat-item">Data sources: <strong id="catalogSourceCount">–</strong></span>
+                        <span class="stat-item">Sourcetypes: <strong id="catalogSourcetypeCount">–</strong></span>
+                        <span class="stat-item">Data models: <strong id="catalogDatamodelCount">–</strong></span>
+                        <span class="stat-item">Attacks: <strong id="catalogAttackCount">–</strong></span>
+                    </div>
+                </div>
+
+                <!-- Sourcetypes sub-tab -->
+                <div id="catalogSourcetypesTab" class="catalog-subtab-content active">
+                    <div class="card">
+                        <h2>Sourcetypes</h2>
+                        <p class="catalog-intro">
+                            Each source is modelled on its official Splunk add-on, at the version shown beside it —
+                            follow the link to install the same one. The datamodels listed are the ones
+                            the add-on's own eventtypes and tags grant — a sourcetype with <em>no datamodel</em> parses
+                            correctly but is not mapped to CIM by its add-on. <em>SC4S compatible</em> marks a source
+                            Splunk Connect for Syslog parses on its own, and links to its page there.
+                            Open a sourcetype for the rules that map it to CIM and the fields it carries.
+                        </p>
+                        <div id="catalogSources" class="catalog-grid">
+                            <p class="no-senders">Loading…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Models sub-tab -->
+                <div id="catalogDatamodelsTab" class="catalog-subtab-content">
+                    <div class="card">
+                        <h2>Data Models</h2>
+                        <p class="catalog-intro">
+                            The CIM datamodels these sources reach, and what reaches each one. A datamodel is
+                            listed only because some add-on's eventtypes and tags grant it to a sourcetype
+                            generated here — so this is what a <code>| tstats … from datamodel=…</code> search
+                            would actually find, not the full CIM.
+                        </p>
+                        <div id="catalogDatamodels" class="catalog-grid">
+                            <p class="no-senders">Loading…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attacks sub-tab -->
+                <div id="catalogAttacksTab" class="catalog-subtab-content">
+                    <div class="card">
+                        <h2>Attacks</h2>
+                        <p class="catalog-intro">
+                            Attacks replay a detection scenario on top of a source, in the shape the detection
+                            reads: the events are built to satisfy its search, and the benign noise beside them
+                            to miss it.
+                        </p>
+                        <div id="catalogAttacks">
+                            <p class="no-senders">Loading…</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Read Me Tab Content -->
+            <div id="readmeTab" class="tab-content">
+                <div class="card readme">
+                    <h2>Read Me</h2>
+                    <p class="readme-lead">
+                        The SIEM Log Generator produces realistic security logs — firewalls, Windows, Linux,
+                        network devices, cloud proxies — in the exact format each Splunk add-on expects, and ships
+                        them to a file, to Splunk over HEC, or to a syslog collector such as SC4S. Use it to feed a
+                        lab, test detections, or size an infrastructure.
+                    </p>
+
+                    <aside class="readme-notice" role="note" aria-label="Disclaimer">
+                        <strong>Simulated data, for testing.</strong>
+                        The logs this application produces are synthetic. They follow each vendor's documented
+                        format and the field extractions of its Splunk add-on, so they parse and map to CIM the way
+                        real events would — but they simulate behaviour for testing purposes, and may differ from
+                        what a specific device, firmware version or configuration emits in production. Validate
+                        detections, dashboards and sizing against real data before relying on them.
+                    </aside>
+
+                    <nav class="readme-toc" aria-label="Contents">
+                        <a href="#readme-quickstart">Quick start</a>
+                        <a href="#readme-destinations">Destinations</a>
+                        <a href="#readme-senders">Senders</a>
+                        <a href="#readme-environment">Environment</a>
+                        <a href="#readme-attacks">Attacks</a>
+                        <a href="#readme-simulation">Simulation</a>
+                        <a href="#readme-troubleshooting">Troubleshooting</a>
+                    </nav>
+
+                    <section id="readme-quickstart">
+                        <h3>Quick start</h3>
+                        <ol>
+                            <li><strong>Create a destination.</strong> <em>Configuration → HEC Destinations</em>
+                                (or <em>Syslog Destinations</em>), then <em>Test Connection</em>.</li>
+                            <li><strong>Create a sender.</strong> <em>Senders → + Add Sender</em>: pick a
+                                <em>Technology</em>, tick its <em>Splunk Sourcetypes</em>, set a
+                                <em>Frequency</em> and choose the destination.</li>
+                            <li><strong>Start it</strong> with the ▶ button. The <em>Logs Generated</em> counter
+                                starts climbing.</li>
+                            <li><strong>Check Splunk</strong>: <code>index=&lt;your index&gt; earliest=-15m latest=+1h</code>,
+                                with no sourcetype filter first.</li>
+                        </ol>
+                    </section>
+
+                    <section id="readme-destinations">
+                        <h3>Destinations</h3>
+                        <dl class="readme-dl">
+                            <dt>Local File</dt>
+                            <dd>Appends one event per line to a path on this machine. Useful to inspect the raw
+                                format, or to be read by a Splunk Universal Forwarder.</dd>
+                            <dt>HEC (Splunk)</dt>
+                            <dd>Sends straight to Splunk's HTTP Event Collector with the sourcetype and source each
+                                add-on expects. Configure the URL, port and token once under
+                                <em>Configuration → HEC Destinations</em>; each sender can override the index.</dd>
+                            <dt>Syslog TCP/UDP</dt>
+                            <dd>Sends to a syslog collector — typically SC4S, which identifies the source and
+                                forwards it to Splunk itself. No sourcetype or index is sent: the collector decides.</dd>
+                        </dl>
+                        <p>
+                            <strong>Delivery format</strong> chooses between the two shapes of an event.
+                            <em>UF</em> is the event itself, as a forwarder reads it from disk; <em>Syslog</em>
+                            adds the priority and header a device sends to a collector. A <em>Local File</em>
+                            can hold either, so it offers the choice for every source collected over syslog —
+                            defaulting to the shape the source already has. Over <em>HEC</em> the event is always
+                            sent as itself, and a <em>Syslog</em> destination offers the choice only where there is
+                            one: a source that writes its own priority, or has no forwarder path, is always framed.
+                            Windows sources choose <em>Render Format</em> (XML or classic) instead.
+                        </p>
+                    </section>
+
+                    <section id="readme-senders">
+                        <h3>Senders</h3>
+                        <p>A sender is one continuous stream of events. Three ways to define what it produces:</p>
+                        <dl class="readme-dl">
+                            <dt>By Sourcetype</dt>
+                            <dd>Pick a technology and the sourcetypes you want. Some technologies add their own
+                                options — Windows' <em>Render Format</em> (XML or classic), for instance.</dd>
+                            <dt>By Datamodel</dt>
+                            <dd>Pick a CIM datamodel; one sender is created for every sourcetype that reaches it.
+                                The quickest way to populate <em>Authentication</em> or <em>Network_Traffic</em>
+                                from every source at once.</dd>
+                            <dt>Attack</dt>
+                            <dd>Runs a finite attack scenario — see <a href="#readme-attacks">Attacks</a>.</dd>
+                        </dl>
+                        <p>
+                            Senders are grouped into <em>Active</em> and <em>Inactive</em>; ▶/⏸ starts and stops
+                            them, and clicking <em>Name</em> sorts both tables. Editing a running sender restarts it
+                            with the new settings.
+                        </p>
+                    </section>
+
+                    <section id="readme-environment">
+                        <h3>Environment</h3>
+                        <p>
+                            By default every source invents its own hostnames, IPs and users, so nothing lines up
+                            across sources. Describe your lab once and every sender draws from it:
+                        </p>
+                        <ul>
+                            <li><em>Configuration → Assets &amp; Identities</em>: assets (endpoints, servers,
+                                domain controllers, firewalls, routers…) with their IP, hostname and FQDN, and
+                                identities optionally linked to an asset.</li>
+                            <li><em>Configuration → Network Pools</em>: IP ranges for the source and destination
+                                ends of network traffic.</li>
+                        </ul>
+                        <p>
+                            Then tick <strong>Use Environment</strong> on a sender. The slider mixes your
+                            environment with random defaults — 100% means every event is about one of your
+                            entities. Within an event, a machine's hostname, IP and linked account always stay
+                            together, so correlations work across sources.
+                        </p>
+                    </section>
+
+                    <section id="readme-attacks">
+                        <h3>Attacks</h3>
+                        <p>
+                            An attack emits a set <em>Number of Events</em> over a <em>Duration</em>, in the format
+                            of its source, then stops and shows <em>Done</em> under its name. Run it against a
+                            normal sender on the same source: the baseline is the noise, the attack is what a
+                            detection should pick out of it. Any field marked <em>fixed</em> can be pinned — the
+                            targeted user, the attacker IP. The <em>Catalog</em> lists every attack with the
+                            datamodel it lands in and a link to the matching Splunk detection.
+                        </p>
+                        <p>
+                            A few detections need more than the events: one may end in a lookup against
+                            Enterprise Security's own identity list, and stays silent until that list holds
+                            what the attack sends. No generator can write those identities, so the attack
+                            shows a warning above its configuration with the steps and the exact value to
+                            copy — add that one row once and every run after it matches.
+                        </p>
+                        <p>
+                            An attack that several products record — a port scan seen by Palo Alto, FortiGate and
+                            Cisco ASA — lets you untick the sourcetypes you don't run. The count you ask for is the
+                            count sent: the events are <strong>shared evenly</strong> between the sourcetypes ticked,
+                            each probe recorded by one device, so the detection still sees the whole scan. Such an
+                            attack goes to <strong>HEC or a Local File</strong>, never syslog, where one stream would
+                            carry every sourcetype under one; a file receives the events exactly as HEC sends them.
+                        </p>
+                    </section>
+
+                    <section id="readme-simulation">
+                        <h3>Simulation</h3>
+                        <p>
+                            A simulation reproduces a daily volume rather than a rate: give it a duration and a
+                            volume per source (GB, MB or KB), and it computes the rate from the measured size of
+                            each source's events. Over HEC, set a default index and override it per source.
+                            The countdown replaces the running status and the simulation stops itself at zero.
+                        </p>
+                    </section>
+
+                    <section id="readme-troubleshooting">
+                        <h3>Troubleshooting</h3>
+                        <dl class="readme-dl">
+                            <dt>The counter climbs but nothing shows in Splunk</dt>
+                            <dd>HEC answering <code>200</code> means <em>queued</em>, not indexed. Most often the
+                                events are there but <strong>in the future</strong>: when Splunk's clock is behind
+                                this machine's, every relative search ending at <code>now</code> misses them. Search
+                                with <code>latest=+1d</code>, and sync both clocks with NTP.</dd>
+                            <dt>A syslog source isn't recognised by SC4S</dt>
+                            <dd>Look at <code>sourcetype=sc4s:fallback</code>. An event there with
+                                <code>PRI=13</code> arrived with no syslog priority at all — check the sender's
+                                <em>Delivery format</em>. Nothing at all? Check the collector is receiving:
+                                <code>syslog-ng-ctl stats</code> inside the container.</dd>
+                        </dl>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/static/js/app.js?v=20260916-lastrun"></script>
+    <script type="module" src="/static/js/modules/environment.js?v=20260915-rename"></script>
+</body>
+</html>

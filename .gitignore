@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Runtime state — written by the app at runtime, never versioned
+# ---------------------------------------------------------------------------
+# Every configuration created through the app — senders, HEC and syslog
+# destinations, Assets & Identities, network pools, simulations — is persisted
+# as a JSON file, and holds whatever HEC token, lab address or account name it
+# was given.
+#
+# Ignoring the whole of log-generator/ catches a store added later without
+# anyone naming it here. But that directory is not the only place they land:
+# store_path() honours LOG_GENERATOR_STATE_DIR, and an earlier version resolved
+# bare names against the working directory, so launching the app from the
+# repository root wrote every store — tokens included — where nothing ignored
+# them. Two HEC tokens reached a public repository exactly that way. So the
+# stores are also named on their own, which matches them at any depth.
+log-generator/*.json
+log-generator/*.json.bak-*
+
+senders_config.json
+configurations.json
+syslog_destinations.json
+simulations_config.json
+environment.json
+network_pools.json
+assets_identities.json
+
+# Any backup taken before editing one of those.
+*.bak-*
+
+# ---------------------------------------------------------------------------
+# Splunk Technical Add-ons — reference material (39 MB), out of scope
+# ---------------------------------------------------------------------------
+TAs/
+
+# ---------------------------------------------------------------------------
+# OS / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+
+# ---------------------------------------------------------------------------
+# Test artefacts
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# JS DOM test harness (Node)
+# ---------------------------------------------------------------------------
+node_modules/
+package-lock.json
