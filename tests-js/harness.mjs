@@ -66,6 +66,20 @@ const REGISTRY = {
         datamodel_conditions: [], fields: [] },
     ],
   },
+  // An umbrella TA: five categories, one sourcetype. The sourcetype selector
+  // cannot express which of them you want, so the category group has to stay.
+  sysmon: {
+    name: 'sysmon', full_name: 'Splunk Add-on for Sysmon', display_name: 'Sysmon',
+    vendor: 'Microsoft',
+    hec_default_sourcetype: 'XmlWinEventLog',
+    syslog_viable: false,
+    delivery: {"default":"uf","offered":{"file":[],"syslog":[],"configuration":[]}},
+    sourcetypes: [
+      { name: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational', description: '',
+        datamodels: ['Endpoint'], hec_source: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+        datamodel_conditions: [], fields: [] },
+    ],
+  },
   ssh: {
     name: 'ssh', full_name: 'SSH (syslog-based)', display_name: 'SSH (Linux)',
     vendor: 'OpenSSH / Linux',
@@ -91,6 +105,18 @@ const LOG_TYPES = {
     { id: 'Security', name: 'Security', sourcetype: 'WinEventLog:Security' },
     { id: 'Application', name: 'Application', sourcetype: 'WinEventLog:Application' },
     { id: 'System', name: 'System', sourcetype: 'WinEventLog:System' },
+  ]},
+  sysmon: { name: 'Sysmon', description: 'Sysmon events', sources: [
+    { id: 'process_creation', name: 'Process creation',
+      sourcetype: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational' },
+    { id: 'file_create', name: 'File created',
+      sourcetype: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational' },
+    { id: 'registry_set', name: 'Registry value set',
+      sourcetype: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational' },
+    { id: 'registry_key', name: 'Registry key added or deleted',
+      sourcetype: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational' },
+    { id: 'registry_rename', name: 'Registry object renamed',
+      sourcetype: 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational' },
   ]},
   ssh: { name: 'SSH Auth Log', description: 'auth.log', sources: [
     { id: 'auth_success', name: 'Success' },

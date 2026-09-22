@@ -17,6 +17,7 @@ from .cisco_asa import CiscoASALogGenerator
 from .auditd import AuditdLogGenerator
 from .zscaler import ZscalerLogGenerator
 from .fortigate import FortiGateLogGenerator
+from .sysmon import SysmonLogGenerator
 
 # Ordered list of all generator classes.
 GENERATORS = [
@@ -30,6 +31,7 @@ GENERATORS = [
     ZscalerLogGenerator,
     AuditdLogGenerator,
     FortiGateLogGenerator,
+    SysmonLogGenerator,
 ]
 
 # log_type -> generator class

@@ -111,6 +111,9 @@ SPLUNKBASE_APPS = {
     "paloalto": 7523,         # Splunk Add-on for Palo Alto Networks — not the
                               # deprecated 2757, which is a different package
     "cisco_ios": 7538,        # Cisco Enterprise Networking Add-on for Splunk
+    "sysmon": 5709,           # Splunk Add-on for Sysmon — the package is
+                              # Splunk_TA_microsoft_sysmon, and its app.conf
+                              # version matches what 5709 publishes
 }
 
 
@@ -120,6 +123,27 @@ def test_every_source_links_to_the_add_on_that_parses_it(catalog):
     for source in catalog["sources"]:
         assert source["add_on_url"] == \
             f"https://splunkbase.splunk.com/app/{SPLUNKBASE_APPS[source['key']]}", source["key"]
+
+
+#: The section each detection lives under on research.splunk.com, which is the
+#: folder it sits in inside splunk/security_content. Checked against the
+#: repository on 2026-09-22. It is a second copy on purpose: the URL format test
+#: below passes on a wrong section, and one attack shipped pointing at
+#: /endpoint/ when its detection is filed under /network/ — a 404 for the reader.
+DETECTION_SECTIONS = {
+    "cisco_traffic_mirroring": "network",
+    "paloalto_horizontal_port_scan": "network",
+    "paloalto_vertical_port_scan": "network",
+    "sysmon_ngrok_dns": "network",
+    "sysmon_connection_from_suspect_path": "endpoint",
+    "sysmon_firewall_rule_registry": "endpoint",
+    "sysmon_renamed_powershell": "endpoint",
+    "sysmon_sip_provider_registry": "endpoint",
+    "sysmon_temp_path_executable": "endpoint",
+    "windows_ad_sid_history_addition": "endpoint",
+    "windows_syswow64_runs_system32": "endpoint",
+    "windows_tor_client_execution": "endpoint",
+}
 
 
 def test_an_attack_links_only_to_a_real_detection_page(catalog):
@@ -134,6 +158,27 @@ def test_an_attack_links_only_to_a_real_detection_page(catalog):
 
     ssh = [a for a in catalog["attacks"] if a["key"].startswith("ssh_")]
     assert ssh and all(not a["research_url"] for a in ssh), "the SSH attacks have no detection page"
+
+
+def test_the_link_points_at_the_section_the_detection_is_filed_under():
+    """research.splunk.com serves a detection under one section only, so the
+    wrong one is a 404 rather than a redirect."""
+    linked = {key for key, a in ATTACK_REGISTRY.items() if a.get("splunk_research_url")}
+    assert linked == set(DETECTION_SECTIONS), \
+        "an attack gained or lost its detection link without its section"
+    for key, section in DETECTION_SECTIONS.items():
+        url = ATTACK_REGISTRY[key]["splunk_research_url"]
+        assert url.startswith(f"https://research.splunk.com/{section}/"), (key, url)
+
+
+def test_the_link_carries_the_same_id_the_detection_records():
+    """The URL and the detection block are written by hand, minutes apart."""
+    for key, attack in ATTACK_REGISTRY.items():
+        url = attack.get("splunk_research_url")
+        detection_id = (attack.get("detection") or {}).get("id")
+        if not url or not detection_id:
+            continue
+        assert url.rstrip("/").endswith(detection_id), (key, url, detection_id)
 
 
 def test_the_catalog_no_longer_carries_field_behaviours(catalog):

@@ -14,6 +14,7 @@ from .cisco_asa import CiscoASALogGenerator
 from .auditd import AuditdLogGenerator
 from .zscaler import ZscalerLogGenerator
 from .fortigate import FortiGateLogGenerator
+from .sysmon import SysmonLogGenerator
 from .registry import REGISTRY, GENERATORS
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     'ZscalerLogGenerator',
     'AuditdLogGenerator',
     'FortiGateLogGenerator',
+    'SysmonLogGenerator',
     'REGISTRY',
     'GENERATORS',
 ]

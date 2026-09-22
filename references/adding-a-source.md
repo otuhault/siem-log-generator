@@ -309,6 +309,141 @@ provide the anomaly that has to stand out against it.
       .conf and lookup files, and require the attack to fire and the noise not
       to.
 
+### When one sourcetype means several things
+
+Sysmon is the first source here whose datamodel depends on a field rather than
+on the sourcetype. One channel, one sourcetype, and the EventID decides
+everything: the add-on's seven eventtypes split ~29 IDs into groups, each
+granting different tags and so a different datamodel — Processes, Registry,
+Filesystem, Services, Network_Traffic, Network_Resolution, Change.
+
+- [ ] **The registry already models this.** `datamodel_conditions` takes a
+      `when`, and FortiGate (`subtype == …`) and Cisco ASA (`message_id in …`)
+      were already using it. Check before inventing a new shape.
+- [ ] **Describe only the groups you generate.** Declaring all six datamodels
+      because the add-on grants them would claim datamodels no sender reaches.
+      Add each as its event IDs are implemented.
+- [ ] **Priorities come from the detections, not from intuition.** Counted over
+      `splunk/security_content`: Processes 630 detections, Registry 194,
+      Filesystem 112, Network_Traffic 24, Network_Resolution 23, Change 2,
+      Services 0. That reordered the plan — Registry and Filesystem are worth
+      far more than the network groups, and Services is not worth building.
+
+### A null BY field does not always drop the row — CIM defaults it
+
+The costliest wrong conclusion in this file so far, kept because the reasoning
+looked sound the whole way down.
+
+- [ ] An add-on leaving a field empty is real and worth knowing: Sysmon reports
+      no hash, size or ACL on an EventID 11, and `registry_value_type` needs a
+      `TYPE (value)` Details that a firewall rule never has. Both were read
+      correctly off the .conf files.
+- [ ] The conclusion drawn from it was wrong. **Splunk_SA_CIM gives its fields a
+      default**, so an empty one reaches the datamodel as `"unknown"` and a
+      tstats `BY` keeps the row. Measured on a real install:
+
+      | datamodel Endpoint Registry search | stats count by registry_value_type
+          REG_DWORD  217
+          unknown    892
+
+      So 40 Filesystem detections counted as unreachable are reachable, and an
+      attack that shipped with a warning saying it might not fire, does.
+- [ ] **What a `BY` field needs is a value, not a meaningful one.** Reserve the
+      "this cannot fire" conclusion for a field nothing defines anywhere —
+      `ProcessPath`, which no add-on produces and no datamodel knows. For a
+      field the datamodel *has*, the answer depends on the CIM install, and one
+      search settles it in seconds. Run it before writing the warning.
+
+### Pick the attacks by what the source already reaches
+
+- [ ] Count first. Over `splunk/security_content`, filtering to production
+      detections whose declared sources are *entirely* what you generate, and to
+      a search with one `tstats` and no threshold, left 287 candidates for
+      Sysmon — enough to choose on merit rather than on what turns up.
+- [ ] Prefer one per datamodel for the first batch. Each exercises a different
+      part of what was just built, and a failure points at one group.
+- [ ] **The clause is rarely a field the source writes.** `action` on a file
+      creation is a comparison of two timestamps; `registry_value_name` is the
+      last segment of TargetObject; `answer_count` is mvcount over a field
+      extracted from QueryResults; `app` is Image. Find the EVAL before writing
+      the generator — it decides what the event must carry.
+- [ ] A shared base is worth extracting at the second attack, not the fourth.
+      Four Sysmon attacks repeat the same three methods; `SysmonAttackGenerator`
+      holds them so a subclass is a `plan_identities` and a `_build`.
+
+### One sourcetype, several datamodels
+
+- [ ] Sysmon ends up declaring three: Endpoint (process, image load, file,
+      registry), Network_Traffic (connections) and Network_Resolution (DNS) —
+      all on one sourcetype, sorted by EventCode through `datamodel_conditions`.
+      The registry already supported that; nothing new was needed.
+- [ ] Stop where the detections stop. Two of the add-on's seven eventtypes were
+      left out: WMI (19, 20, 21) has two published detections between them and
+      service state (4, 16, 255) has none. Emitting events nothing looks at is
+      cost with no reader.
+
+### A rename can hand you fields the add-on never defines
+
+- [ ] Sysmon's own add-on produces no `user_id` at all — and every
+      Endpoint.Processes detection groups by it, so a null would drop every row.
+      It arrives anyway: `rename = XmlWinEventLog` sends these events through
+      Splunk_TA_windows' generic stanza, where
+      `FIELDALIAS-user_id_for_windows = UserID AS user_id` picks up the
+      `<Security UserID=…>` attribute. Before concluding a field is missing,
+      check the stanza the rename lands in as well as the add-on's own.
+- [ ] That extraction is `<Security UserID=['"](?<UserID>[^<'"]+)['"]`, which
+      takes either quote style — unlike the Sysmon add-on's `[sysmon-sid]`,
+      which insists on single quotes and therefore misses the real events, whose
+      attribute is double-quoted. Read the regex, not the field name.
+
+### `source::` stanzas, and the rename that hides the real work
+
+- [ ] **`rename = X` on the sourcetype means the work is somewhere else.**
+      Splunk_TA_microsoft_sysmon's sourcetype stanza is one line,
+      `rename = XmlWinEventLog`, so field extraction is Splunk_TA_windows' job.
+      All 62 of the add-on's own EVALs live in a `[source::…]` stanza instead,
+      and all seven eventtypes match on `source=`. Send those events under the
+      right sourcetype and the wrong source and they index, parse, and produce
+      nothing.
+- [ ] **`inputs.conf` may set no sourcetype at all.** Sysmon's sets only
+      `source` and `renderXml = 1`; splunkd settles the sourcetype. The value to
+      emit is what splunkd would have chosen, not what the stanza name suggests.
+- [ ] **Quote style can be load-bearing.** The add-on lifts RegistryValueData
+      with `<Data Name='Details'>\w+\s\((.+)\)</Data>` — single quotes. Emit
+      `<Data Name="Details">` and the field is simply absent, with no error.
+
+### Fetch the detection's own test data
+
+- [ ] A `security_content` detection names its True Positive dataset under
+      `tests:`, hosted in `splunk/attack_data`. Download it. It settles in one
+      command what the vendor's real events look like — the exact XML envelope,
+      the quoting, and the field values a detection was actually written
+      against. The firewall-rule attack is modelled on
+      `T1112/firewall_modify_delete` line for line, which is why its Details is
+      `v2.26|Action=Allow|…` rather than something plausible-looking.
+- [ ] It also shows what the detection was *not* tested against. That dataset
+      pairs one EventID 13 with one EventID 12, and only the 13 matches
+      `action = modified` — so the near-miss noise writes itself.
+
+### A published detection can be wrong
+
+- [ ] Check every field a `stats … by` names, not just the filter clauses.
+      `Windows Downdate Registry Activity` groups by `ProcessPath`, which no
+      add-on produces and which appears in one detection out of 1523; the
+      add-on maps `Image` to `process_path` instead. Events can satisfy every
+      filter and the search still returns nothing, because `| fillnull` does not
+      create a field absent from every event. Verify before building an attack
+      around a detection, not after.
+- [ ] The failure is not always the detection's. `Windows Modify Registry to
+      Add or Modify Firewall Rule` groups by `registry_value_type`, which the
+      add-on builds as `"REG_" + RegistryValueType` — and RegistryValueType is
+      extracted only from a Details shaped `TYPE (value)`. A firewall rule is a
+      string, so it is empty, in our events and in Splunk's own test data
+      alike. Twelve of the thirteen grouped fields are satisfiable and the
+      thirteenth is not, so the attack ships with a warning and a search to
+      check it with. Faking a `DWORD (0x…)` would fire the detection and be a
+      firewall rule Windows never wrote.
+
 ## The datamodel
 
 - [ ] `'datamodel'` must be one the TA **actually grants** for the events you

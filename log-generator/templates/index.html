@@ -591,6 +591,68 @@
                             </div>
                         </div>
 
+                        <div class="form-group" id="sysmonEventCategoriesGroup" style="display: none;">
+                            <label>Sysmon event:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="process_creation" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Process creation</strong>
+                                        <small>EventID 1 — command line, hashes and parent. Endpoint.Processes, and what most detections read</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="image_load" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Image loaded</strong>
+                                        <small>EventID 7 — a DLL was mapped into a process, with its hashes and signature. Endpoint.Processes</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="network_connect" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Network connection</strong>
+                                        <small>EventID 3 — a process opened a connection. Network Traffic</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="dns_query" checked>
+                                    <span class="checkbox-text">
+                                        <strong>DNS query</strong>
+                                        <small>EventID 22 — a process resolved a name. Network Resolution</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="file_create" checked>
+                                    <span class="checkbox-text">
+                                        <strong>File created</strong>
+                                        <small>EventID 11 — a file was written. Endpoint.Filesystem; Sysmon carries no hash, size or ACL on it, and the datamodel defaults those</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="registry_set" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Value set</strong>
+                                        <small>EventID 13 — a value was written. Carries the value itself, so it is the one most detections read</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="registry_key" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Key added or deleted</strong>
+                                        <small>EventID 12 — CreateKey, DeleteKey or DeleteValue. No value payload</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="sysmon_event_categories" value="registry_rename" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Object renamed</strong>
+                                        <small>EventID 14 — RenameKey or RenameValue</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-group" id="fortigateEventCategoriesGroup" style="display: none;">
                             <label>Log category:</label>
                             <div class="checkbox-group">

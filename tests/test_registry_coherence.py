@@ -9,7 +9,7 @@ from ta_registry import TA_REGISTRY, list_tas
 EXPECTED_LOG_TYPES = {
     "active_directory", "apache",
     "auditd", "cisco_asa", "cisco_ios",
-    "fortigate", "paloalto", "ssh", "windows", "zscaler",
+    "fortigate", "paloalto", "ssh", "sysmon", "windows", "zscaler",
 }
 
 EXPECTED_CLASS_NAMES = {
@@ -18,14 +18,14 @@ EXPECTED_CLASS_NAMES = {
     "CiscoIOSLogGenerator",
     "PaloAltoLogGenerator", "SSHAuthLogGenerator", "WindowsEventLogGenerator",
     "ZscalerLogGenerator",
-    "FortiGateLogGenerator",
+    "FortiGateLogGenerator", "SysmonLogGenerator",
 }
 
 
 def test_registry_and_generators_hold_the_same_classes():
     """REGISTRY is derived from GENERATORS and must not drift from it."""
     assert set(REGISTRY.values()) == set(GENERATORS)
-    assert len(REGISTRY) == len(GENERATORS) == 10
+    assert len(REGISTRY) == len(GENERATORS) == 11
     assert set(REGISTRY) == EXPECTED_LOG_TYPES
     assert {cls.__name__ for cls in GENERATORS} == EXPECTED_CLASS_NAMES
 
@@ -82,7 +82,7 @@ def test_every_sourcetype_is_reachable_from_a_log_type():
             assert sourcetype.get("name"), f"{ta_name} has an unnamed sourcetype"
             assert isinstance(sourcetype.get("datamodels", []), list)
             reachable += 1
-    assert reachable == 20, f"expected 20 sourcetypes in the registry, found {reachable}"
+    assert reachable == 21, f"expected 21 sourcetypes in the registry, found {reachable}"
 
 
 def test_generator_declared_sourcetypes_exist_in_ta_registry():

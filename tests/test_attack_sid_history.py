@@ -280,9 +280,15 @@ def test_the_warning_hands_over_the_very_sid_the_field_will_send():
     assert "privileged" in warning["text"]
     assert warning["text"][0].islower(), "it continues the form's 'Before you run this —' lead"
     assert field["mode"] == "text", "a plain pre-filled input, not a Random/A&I choice"
-    assert all(a.get("warning") is None
-               for key, a in AttackGeneratorFactory.get_available_attack_types().items()
-               if key != ATTACK), "only this attack needs one so far"
+    # A warning means the reader has to do something the generator cannot. Only
+    # this attack is in that position: it needs an ES lookup populated by hand.
+    # The firewall-rule one carried one for a while, on the theory that a field
+    # Sysmon leaves empty would stop its search; CIM defaults that field, so it
+    # does not, and the warning went. Listing them makes a second an explicit
+    # decision rather than a drift.
+    warned = {key for key, a in AttackGeneratorFactory.get_available_attack_types().items()
+              if a.get("warning")}
+    assert warned == {ATTACK}, warned
 
 
 @pytest.fixture

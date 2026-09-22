@@ -24,6 +24,7 @@ from datetime import datetime
 from log_generators.cisco_asa import CiscoASALogGenerator
 from log_generators.cisco_ios import CiscoIOSLogGenerator
 from log_generators.fortigate import FortiGateLogGenerator
+from log_generators.sysmon import SysmonLogGenerator
 from log_generators.windows_xml import render as render_windows_xml
 from xml.sax.saxutils import escape
 
@@ -1949,6 +1950,16 @@ class WindowsSysWow64Generator(Windows4688Generator):
 
     FIELD_DEFAULTS = {}
 
+    def __init__(self, field_behaviors, options=None):
+        super().__init__(field_behaviors, options)
+        # Which of the two declared sources this instance renders. The detection
+        # reads process_path and process, and both add-ons build that pair: the
+        # Windows one from NewProcessName and CommandLine on a 4688, the Sysmon
+        # one from Image and CommandLine on an EventID 1. Same two values, two
+        # envelopes.
+        self.source_log_type = (options or {}).get('source_log_type') or 'windows'
+        self._sysmon = SysmonLogGenerator() if self.source_log_type == 'sysmon' else None
+
     # ── planning ────────────────────────────────────────────────────────────
 
     @classmethod
@@ -2029,6 +2040,15 @@ class WindowsSysWow64Generator(Windows4688Generator):
 
     def _from_identity(self, identity):
         e = {**self._standalone(), **(identity or {})}
+        if self._sysmon is not None:
+            # Sysmon reports the same two values under Image and CommandLine,
+            # so the redirection reads identically once the add-on has mapped
+            # them to process_path and process.
+            return self._sysmon.render(self._sysmon.process_event(
+                image=e['process_path'], command_line=e['command_line'],
+                parent_image=e['parent_process_path'],
+                original_file_name=e['process_path'].rsplit('\\', 1)[-1],
+                dest=e['dest'], user=e['user']))
         return self._render(self._event(
             user=e['user'], dest=e['dest'], process_path=e['process_path'],
             command_line=e['command_line'], parent_process_path=e['parent_process_path']))
@@ -2053,14 +2073,20 @@ WINDOWS_SYSWOW64_ATTACK_TYPES = {
         'category': 'Endpoint',
         'datamodel': 'Endpoint',
         'splunk_research_url': 'https://research.splunk.com/endpoint/e4602172-db86-4315-86df-da66fb40bcde/',
-        # The detection also lists Sysmon EventID 1. No Sysmon add-on ships in
-        # TAs/, so there is nothing to check a Sysmon event's CIM mapping
-        # against, and declaring the source would be a claim this repository
-        # cannot verify. Add Splunk_TA_microsoft_sysmon and it can be declared.
+        # Both sources the detection lists. Sysmon reports the redirection the
+        # same way — Image against CommandLine — and the add-on maps them to the
+        # same process_path and process the Windows one does. user_id, which the
+        # search groups by, comes from Splunk_TA_windows' generic
+        # [XmlWinEventLog] stanza, which Sysmon events reach through
+        # `rename = XmlWinEventLog`; the Sysmon add-on produces none itself.
         'data_sources': [
             {'log_type': 'windows', 'sourcetype': 'WinEventLog:Security',
              'label': 'Windows Security · process creation (4688)',
              'formats': ['xml', 'classic']},
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · process creation (EventID 1)',
+             'formats': ['xml']},
         ],
         # splunk/security_content detections/endpoint/
         # windows_unusual_syswow64_process_run_system32_executable.yml
@@ -2112,6 +2138,1084 @@ WINDOWS_SYSWOW64_ATTACK_TYPES = {
 ATTACK_REGISTRY: dict = {}
 
 
+#: Where Windows keeps each firewall rule: one REG_SZ value per rule, named by
+#: the rule's GUID. Splunk's own test data for this detection writes exactly
+#: here (attack_data T1112/firewall_modify_delete).
+FIREWALL_RULES_KEY = ('HKLM\\System\\CurrentControlSet\\Services\\SharedAccess'
+                      '\\Parameters\\FirewallPolicy\\FirewallRules')
+
+#: A rule's value, in the pipe-delimited form netsh writes. `v2.26` is the
+#: schema version the tested build emits.
+FIREWALL_RULE_SHAPES = [
+    'v2.26|Action=Allow|Active=TRUE|Dir=In|App={app}|Name={name}|',
+    'v2.30|Action=Allow|Active=TRUE|Dir=In|Protocol=6|LPort={port}|Name={name}|',
+    'v2.30|Action=Allow|Active=TRUE|Dir=Out|Protocol=6|RPort={port}|App={app}|Name={name}|',
+    'v2.26|Action=Block|Active=TRUE|Dir=In|Protocol=17|LPort={port}|Name={name}|',
+]
+
+#: What an attacker opens, and what they call it.
+FIREWALL_RULE_NAMES = ['Mytestfirewal1', 'Windows Update Helper', 'RDP-Inbound',
+                       'SysHelper', 'Remote Assistance', 'Chrome Update Service']
+FIREWALL_RULE_APPS = ['C:\\MyApp\\MyApp1.exe', 'C:\\Users\\Public\\svc.exe',
+                      'C:\\Windows\\Temp\\update.exe', 'C:\\ProgramData\\host\\agent.exe']
+FIREWALL_RULE_PORTS = ['3389', '445', '4444', '8080', '5985']
+
+#: netsh and the firewall service both write through svchost, which is what the
+#: real dataset shows; the others are how a rule gets added by hand.
+FIREWALL_WRITERS = ['C:\\Windows\\system32\\svchost.exe',
+                    'C:\\Windows\\system32\\netsh.exe',
+                    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe']
+
+#: Registry writes that are not firewall rules — the first clause missed.
+ELSEWHERE_KEYS = [
+    'HKLM\\System\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\'
+    'FirewallPolicy\\StandardProfile\\EnableFirewall',
+    'HKLM\\System\\CurrentControlSet\\Services\\Dnscache\\Start',
+    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\OneDrive',
+]
+
+
+class SysmonAttackGenerator(BaseAttackGenerator):
+    """Shared plumbing for an attack whose events are Sysmon.
+
+    Every one of them renders through the source's own generator, so one place
+    decides what a Sysmon event looks like and the benign noise is literally
+    what the sender already emits. A subclass supplies `plan_identities` and
+    `_build`, which turns one planned identity into the call that renders it.
+    """
+
+    FIELD_DEFAULTS = {}
+
+    def __init__(self, field_behaviors, options=None):
+        super().__init__(field_behaviors, options)
+        self._sysmon = SysmonLogGenerator()
+
+    def generate(self) -> str:
+        self.event_count += 1
+        return self._render(self._identity)
+
+    def generate_noise(self) -> str:
+        return self._render(self._identity)
+
+    def _render(self, event):
+        event = event or self._standalone()
+        if event.get('ordinary'):
+            return self._sysmon.generate()
+        return self._sysmon.render(self._build(event))
+
+    def _build(self, event):
+        raise NotImplementedError
+
+
+class SysmonFirewallRuleGenerator(SysmonAttackGenerator):
+    """A firewall rule written straight into the registry (T1562.004).
+
+    The detection is a tstats over Endpoint.Registry:
+
+        WHERE Registry.registry_path = "*\\System\\CurrentControlSet\\Services
+              \\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules\\*"
+              Registry.action = modified
+        BY  action dest process_guid process_id registry_hive registry_path
+            registry_key_name registry_value_data registry_value_name
+            registry_value_type status user vendor_product
+
+    There is no `fillnull` here, and a tstats `BY` drops every row where one BY
+    field is null — the trap the port scans already hit. Twelve of the thirteen
+    are satisfied by construction: an EventID 13 gives action=modified and
+    status=success, the HKLM\\System\\ prefix fills registry_hive, and the rest
+    come from fields every Sysmon registry event carries.
+
+    The thirteenth, `registry_value_type`, the add-on leaves empty. It builds it
+    as `"REG_" + RegistryValueType`, and RegistryValueType is extracted only
+    from a Details of the form `TYPE (value)` — a DWORD or a QWORD. A firewall
+    rule is a REG_SZ whose Details is the rule itself, `v2.26|Action=Allow|…`,
+    so nothing is extracted. Splunk's own True Positive dataset for this
+    detection (attack_data T1112/firewall_modify_delete) has the same shape.
+
+    That does not stop the search. Splunk_SA_CIM gives the field a default, so
+    it arrives as "unknown" rather than null and the BY keeps the row —
+    measured on a real install: 217 rows REG_DWORD, 892 unknown. The events
+    here are modelled on that dataset exactly rather than given a
+    `DWORD (0x…)`, which would fill the field with a firewall rule no Windows
+    ever wrote.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        One endpoint and one account for the run. Each attack event writes one
+        rule under FirewallRules. The noise misses one clause at a time: the
+        same key with an action other than modified — which is the EventID 12
+        DeleteValue Splunk's own dataset pairs it with — and modified values
+        somewhere else in the registry.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        def rule_value():
+            return rng.choice(FIREWALL_RULE_SHAPES).format(
+                app=rng.choice(FIREWALL_RULE_APPS),
+                port=rng.choice(FIREWALL_RULE_PORTS),
+                name=rng.choice(FIREWALL_RULE_NAMES))
+
+        def guid():
+            return ('{%08X-%04X-%04X-%04X-%012X}' % (
+                rng.randint(0, 0xFFFFFFFF), rng.randint(0, 0xFFFF), rng.randint(0, 0xFFFF),
+                rng.randint(0, 0xFFFF), rng.randint(0, 0xFFFFFFFFFFFF)))
+
+        def event(**extra):
+            return {'dest': dest, 'user': user,
+                    'image': rng.choice(FIREWALL_WRITERS), **extra}
+
+        attack_identities = [
+            event(event_id=13, event_type='SetValue',
+                  target_object=f'{FIREWALL_RULES_KEY}\\{guid()}',
+                  details=rule_value())
+            for _ in range(attacks)
+        ]
+
+        noise_identities = []
+        for _ in range(noise):
+            draw = rng.random()
+            if draw < 0.4:
+                # The same key, but removed rather than written: action=deleted.
+                noise_identities.append(event(
+                    event_id=12, event_type='DeleteValue',
+                    target_object=f'{FIREWALL_RULES_KEY}\\{guid()}', details=None))
+            elif draw < 0.7:
+                # A value modified, somewhere that is not a firewall rule.
+                noise_identities.append(event(
+                    event_id=13, event_type='SetValue',
+                    target_object=rng.choice(ELSEWHERE_KEYS),
+                    details=f'DWORD (0x{rng.randint(0, 4):08x})'))
+            else:
+                noise_identities.append(event(ordinary=True))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.registry_event(
+            event['event_id'], target_object=event['target_object'],
+            image=event['image'], details=event.get('details'),
+            event_type=event['event_type'], dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        """An event rendered outside a plan — a preview, or a format test."""
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': random.choice(FIREWALL_WRITERS),
+                'event_id': 13, 'event_type': 'SetValue',
+                'target_object': f'{FIREWALL_RULES_KEY}\\{{0D807408-8157-49B9-ACFC-0B5C15B1119E}}',
+                'details': FIREWALL_RULE_SHAPES[0].format(
+                    app=FIREWALL_RULE_APPS[0], port='3389', name=FIREWALL_RULE_NAMES[0])}
+
+
+SYSMON_ATTACK_TYPES = {
+    'sysmon_firewall_rule_registry': {
+        'name': 'Windows Modify Registry to Add or Modify Firewall Rule',
+        'description': 'A firewall rule written straight into the registry under '
+                       'FirewallPolicy\\FirewallRules, the way netsh does it '
+                       '(T1562.004)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Endpoint',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/43254751-e2ce-409a-b6b4-4f851e8dcc26/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · registry value set (EventID 13)',
+             'formats': ['xml']},
+        ],
+        # splunk/security_content detections/endpoint/
+        # windows_modify_registry_to_add_or_modify_firewall_rule.yml
+        'detection': {
+            'name': 'Windows Modify Registry to Add or Modify Firewall Rule',
+            'id': '43254751-e2ce-409a-b6b4-4f851e8dcc26',
+            'datamodel': 'Endpoint.Registry',
+            'where': 'Registry.registry_path = "*\\\\System\\\\CurrentControlSet\\\\Services'
+                     '\\\\SharedAccess\\\\Parameters\\\\FirewallPolicy\\\\FirewallRules\\\\*" '
+                     'Registry.action = modified',
+            'by': ['action', 'dest', 'process_guid', 'process_id', 'registry_hive',
+                   'registry_path', 'registry_key_name', 'registry_value_data',
+                   'registry_value_name', 'registry_value_type', 'status', 'user',
+                   'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each rule written triggers the detection on its own — '
+                      'no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the rule was written on (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account the writing process ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the firewall rule was written on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account the writing process ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': [
+            "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name=\"Microsoft-Windows-Sysmon\" Guid=\"5770385F-C22A-43E0-BF4C-06F5698FFBD9\"/><EventID>13</EventID><Version>2</Version><Level>4</Level><Task>13</Task><Opcode>0</Opcode><Keywords>0x8000000000000000</Keywords><TimeCreated SystemTime='2026-02-18T10:30:01.000000Z'/><EventRecordID>13249</EventRecordID><Correlation/><Execution ProcessID=\"1992\" ThreadID=\"2400\"/><Channel>Microsoft-Windows-Sysmon/Operational</Channel><Computer>WKS-FIN01</Computer><Security UserID=\"S-1-5-18\"/></System><EventData><Data Name='RuleName'>-</Data><Data Name='EventType'>SetValue</Data><Data Name='UtcTime'>2026-02-18 10:30:01.000</Data><Data Name='ProcessGuid'>848A6B75-314B-6675-1500-000000000B03</Data><Data Name='ProcessId'>1128</Data><Data Name='Image'>C:\\Windows\\system32\\svchost.exe</Data><Data Name='TargetObject'>HKLM\\System\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules\\{0D807408-8157-49B9-ACFC-0B5C15B1119E}</Data><Data Name='Details'>v2.26|Action=Allow|Active=TRUE|Dir=In|App=C:\\MyApp\\MyApp1.exe|Name=Mytestfirewal1|</Data><Data Name='User'>CORP\\jsmith</Data></EventData></Event>",
+        ],
+    },
+}
+
+
+#: The three binaries the detection watches, each with the OriginalFileName its
+#: PE header carries and the process name that is legitimate for it. Renaming
+#: the file changes Image; it does not touch the header.
+POWERSHELL_IDENTITIES = [
+    ('PowerShell.EXE', 'powershell.exe', 'Windows PowerShell'),
+    ('pwsh.dll', 'pwsh.exe', 'PowerShell'),
+    ('powershell_ise.EXE', 'powershell_ise.exe', 'Windows PowerShell ISE'),
+]
+
+#: What a renamed copy gets called, and where it is dropped. RelTekAudio.exe
+#: under ProgramData is the one in Splunk's own test data.
+RENAMED_POWERSHELL = [
+    'C:\\ProgramData\\RelTekAudio.exe',
+    'C:\\Users\\Public\\svchost.exe',
+    'C:\\Windows\\Temp\\winlogon.exe',
+    'C:\\ProgramData\\Intel\\DrvUpdate.exe',
+    'C:\\Users\\Public\\Downloads\\chrome_update.exe',
+]
+
+#: Where the real ones live, for the benign half.
+POWERSHELL_REAL_PATHS = {
+    'powershell.exe': 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'pwsh.exe': 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+    'powershell_ise.exe': 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell_ise.exe',
+}
+
+#: Ordinary binaries whose OriginalFileName is their own — the third kind of
+#: noise, neither PowerShell nor renamed.
+UNRELATED_BINARIES = [
+    ('C:\\Windows\\System32\\svchost.exe', 'svchost.exe'),
+    ('C:\\Windows\\System32\\taskhostw.exe', 'taskhostw.exe'),
+    ('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'chrome.exe'),
+]
+
+
+class SysmonRenamedPowershellGenerator(SysmonAttackGenerator):
+    """PowerShell running under another name (T1036.003).
+
+    The detection pairs two fields that come from different places:
+
+        Processes.original_file_name = PowerShell.EXE
+        Processes.process_name      != powershell.exe
+
+    `original_file_name` is the OriginalFileName in the binary's PE header,
+    which renaming the file leaves untouched; `process_name` is the basename of
+    Image. Copy powershell.exe to RelTekAudio.exe and the two stop agreeing —
+    which is the whole finding, and the same shape as the SysWOW64 attack.
+
+    Two conditions the add-on imposes. `EVAL-original_file_name` covers
+    EventCode 1 and 7 only, and refuses the value "-", so the field has to carry
+    a real name. And the twenty fields the search groups by must all be present,
+    or the tstats BY drops the row; Sysmon fills nineteen and
+    Splunk_TA_windows' generic stanza supplies user_id off the Security element.
+
+    Modelled on attack_data T1036.003/renamed_powershell, where a
+    `C:\\ProgramData\\RelTekAudio.exe` carrying OriginalFileName PowerShell.EXE
+    sits beside a genuine powershell.exe carrying the same header — which is
+    exactly the near miss the noise needs.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        One endpoint and one account for the run. Each attack event is one of
+        the three binaries running under a name that is not its own.
+
+        The noise misses the clause from either side: the same binary under its
+        real name — the pair Splunk's dataset ships — and ordinary processes
+        whose OriginalFileName matches their own.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        def event(**extra):
+            return {'dest': dest, 'user': user, **extra}
+
+        attack_identities = []
+        for _ in range(attacks):
+            original, _real_name, _desc = rng.choice(POWERSHELL_IDENTITIES)
+            image = rng.choice(RENAMED_POWERSHELL)
+            attack_identities.append(event(
+                image=image, original_file_name=original,
+                command_line=f'"{image}" '))
+
+        noise_identities = []
+        for _ in range(noise):
+            if rng.random() < 0.5:
+                # The same header, under the name it is supposed to have.
+                original, real_name, _desc = rng.choice(POWERSHELL_IDENTITIES)
+                image = POWERSHELL_REAL_PATHS[real_name]
+                noise_identities.append(event(
+                    image=image, original_file_name=original,
+                    command_line=f'"{image}" -NoProfile -Command Get-Date'))
+            else:
+                image, original = rng.choice(UNRELATED_BINARIES)
+                noise_identities.append(event(
+                    image=image, original_file_name=original,
+                    command_line=f'{image} -k netsvcs'))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.process_event(
+            image=event['image'], command_line=event['command_line'],
+            original_file_name=event['original_file_name'],
+            dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        """An event rendered outside a plan — a preview, or a format test."""
+        image = RENAMED_POWERSHELL[0]
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': image, 'original_file_name': 'PowerShell.EXE',
+                'command_line': f'"{image}" '}
+
+
+SYSMON_PROCESS_ATTACK_TYPES = {
+    'sysmon_renamed_powershell': {
+        'name': 'Windows Renamed Powershell Execution',
+        'description': 'PowerShell copied to another filename and run from it — the '
+                       'PE header still says PowerShell.EXE while the image does not '
+                       '(T1036.003)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Endpoint',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/c08014de-cc5a-42de-9775-76ecd5b37bbd/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · process creation (EventID 1)',
+             'formats': ['xml']},
+        ],
+        # splunk/security_content detections/endpoint/
+        # windows_renamed_powershell_execution.yml
+        'detection': {
+            'name': 'Windows Renamed Powershell Execution',
+            'id': 'c08014de-cc5a-42de-9775-76ecd5b37bbd',
+            'datamodel': 'Endpoint.Processes',
+            'where': 'Processes.original_file_name = PowerShell.EXE '
+                     'Processes.process_name != powershell.exe',
+            'by': ['action', 'dest', 'original_file_name', 'parent_process',
+                   'parent_process_exec', 'parent_process_guid', 'parent_process_id',
+                   'parent_process_name', 'parent_process_path', 'process',
+                   'process_exec', 'process_guid', 'process_hash', 'process_id',
+                   'process_integrity_level', 'process_name', 'process_path', 'user',
+                   'user_id', 'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each renamed execution triggers the detection on its own — '
+                      'no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the renamed binary ran on (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account it ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the renamed PowerShell ran on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account it ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': [
+            "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name=\"Microsoft-Windows-Sysmon\" Guid=\"5770385F-C22A-43E0-BF4C-06F5698FFBD9\"/><EventID>1</EventID><Version>5</Version><Level>4</Level><Task>1</Task><Opcode>0</Opcode><Keywords>0x8000000000000000</Keywords><TimeCreated SystemTime='2026-02-18T10:30:01.000000Z'/><EventRecordID>1588086</EventRecordID><Correlation/><Execution ProcessID=\"3372\" ThreadID=\"4656\"/><Channel>Microsoft-Windows-Sysmon/Operational</Channel><Computer>WKS-FIN01</Computer><Security UserID=\"S-1-5-18\"/></System><EventData><Data Name='RuleName'>-</Data><Data Name='UtcTime'>2026-02-18 10:30:01.000</Data><Data Name='ProcessGuid'>F51F9151-D6B4-671B-5506-000000001600</Data><Data Name='ProcessId'>3020</Data><Data Name='Image'>C:\\ProgramData\\RelTekAudio.exe</Data><Data Name='FileVersion'>10.0.19041.1</Data><Data Name='Description'>Windows PowerShell</Data><Data Name='Product'>Microsoft\u00ae Windows\u00ae Operating System</Data><Data Name='Company'>Microsoft Corporation</Data><Data Name='OriginalFileName'>PowerShell.EXE</Data><Data Name='CommandLine'>\"C:\\ProgramData\\RelTekAudio.exe\" </Data><Data Name='CurrentDirectory'>C:\\Windows\\system32\\</Data><Data Name='User'>CORP\\jsmith</Data><Data Name='LogonGuid'>F51F9151-D420-671B-E503-000000000000</Data><Data Name='LogonId'>0x3e5</Data><Data Name='TerminalSessionId'>1</Data><Data Name='IntegrityLevel'>High</Data><Data Name='Hashes'>MD5=F586835082F632DC8D9404D83BC16316,SHA256=643EC58E82E0272C97C2A59F6020970D881AF19C0AD5029DB9C958C13B6558C7,IMPHASH=F9BBD96FAE53B7A31264A703CAFA0666</Data><Data Name='ParentProcessGuid'>F51F9151-D420-671B-0B00-000000001600</Data><Data Name='ParentProcessId'>708</Data><Data Name='ParentImage'>C:\\Windows\\explorer.exe</Data><Data Name='ParentCommandLine'>C:\\Windows\\Explorer.EXE</Data><Data Name='ParentUser'>CORP\\jsmith</Data></EventData></Event>",
+        ],
+    },
+}
+
+
+#: Extensions the temp-path detection watches, and the paths it watches them in.
+DROPPED_EXTENSIONS = ['.exe', '.dll', '.ps1', '.bat', '.vbs', '.js', '.cmd', '.sys']
+TEMP_PATHS = [
+    'C:\\Users\\{user}\\AppData\\Local\\Temp',
+    'C:\\Windows\\Temp',
+    'D:\\Temp',
+]
+#: Written by PowerShell every time it checks its execution policy, and the one
+#: thing the search excludes by name.
+PS_POLICY_TEST = 'C:\\Users\\{user}\\AppData\\Local\\Temp\\__PSScriptPolicyTest_{stem}.ps1'
+#: Files dropped in a temp path that are not executable, and executables dropped
+#: somewhere ordinary — one near miss per clause.
+HARMLESS_TEMP_FILES = ['.tmp', '.log', '.txt', '.dat', '.etl']
+ORDINARY_PATHS = [
+    'C:\\Program Files\\Internal\\bin',
+    'C:\\Users\\{user}\\Documents',
+    'C:\\Windows\\System32',
+]
+DROPPERS = [
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\Windows\\System32\\cmd.exe',
+    'C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE',
+    'C:\\Windows\\System32\\certutil.exe',
+]
+
+
+class SysmonTempPathDropGenerator(SysmonAttackGenerator):
+    """An executable or script written into a temp directory (T1036).
+
+        Filesystem.action = "created"
+        Filesystem.file_name IN ("*.exe", "*.ps1", "*.dll", …)
+        Filesystem.file_path IN ("*:\\Temp\\*", "*\\AppData\\Local\\Temp\\*", …)
+        NOT Filesystem.file_path IN ("*\\__PSScriptPolicyTest_*")
+
+    `action` is the part worth knowing. The add-on reads no field for it on an
+    EventID 11: it compares UtcTime with CreationUtcTime, so a file written for
+    the first time reads as "created" and one replaced in place as "modified".
+    Only the first satisfies this search, so every attack event is a new file
+    and the noise includes overwrites.
+
+    This detection also settles an earlier mistake. Its BY names file_hash,
+    file_size, file_acl, file_access_time and file_modify_time — none of which
+    Sysmon reports on a file creation — and that was read as making it
+    unreachable. Splunk_SA_CIM defaults its fields, so they arrive as "unknown"
+    and the BY keeps the row. Measured: file_hash came back 109 rows of
+    "unknown" on a real install.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        The noise misses one clause at a time: a harmless extension in the same
+        temp path, an executable written somewhere ordinary, the PowerShell
+        policy-test file the search excludes by name, and overwrites rather than
+        creations.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+        bare = str(user).split('\\')[-1]
+
+        def stem():
+            return f'{rng.choice(["svc", "upd", "run", "tmp", "hlp"])}{rng.randint(100, 999)}'
+
+        def event(**extra):
+            return {'dest': dest, 'user': user,
+                    'image': rng.choice(DROPPERS), **extra}
+
+        attack_identities = [
+            event(target_filename=(rng.choice(TEMP_PATHS).format(user=bare)
+                                   + f'\\{stem()}{rng.choice(DROPPED_EXTENSIONS)}'),
+                  overwrite=False)
+            for _ in range(attacks)
+        ]
+
+        noise_identities = []
+        for _ in range(noise):
+            draw = rng.random()
+            temp = rng.choice(TEMP_PATHS).format(user=bare)
+            if draw < 0.3:
+                # Right place, harmless extension.
+                noise_identities.append(event(
+                    target_filename=f'{temp}\\{stem()}{rng.choice(HARMLESS_TEMP_FILES)}',
+                    overwrite=False))
+            elif draw < 0.55:
+                # Right extension, ordinary place.
+                noise_identities.append(event(
+                    target_filename=(rng.choice(ORDINARY_PATHS).format(user=bare)
+                                     + f'\\{stem()}{rng.choice(DROPPED_EXTENSIONS)}'),
+                    overwrite=False))
+            elif draw < 0.8:
+                # The file the search excludes by name.
+                noise_identities.append(event(
+                    target_filename=PS_POLICY_TEST.format(user=bare, stem=stem()),
+                    overwrite=False))
+            else:
+                # An overwrite, so action is "modified" rather than "created".
+                noise_identities.append(event(
+                    target_filename=f'{temp}\\{stem()}{rng.choice(DROPPED_EXTENSIONS)}',
+                    overwrite=True))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.file_event(
+            target_filename=event['target_filename'], image=event['image'],
+            overwrite=event['overwrite'], dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': DROPPERS[0], 'overwrite': False,
+                'target_filename': 'C:\\Windows\\Temp\\svc417.exe'}
+
+
+#: The names the ngrok detection watches, and the addresses a tunnel resolves to.
+NGROK_QUERIES = [
+    '{stem}.ngrok.io', '{stem}.ngrok.com',
+    'ngrok.{stem}.tunnel.com', 'korgn.{stem}.lennut.com',
+]
+NGROK_STEMS = ['4f2a91bc', 'a1b2c3d4', 'tunnel-7', 'edge01', '9d8e7f6a']
+#: A tunnel answers with several addresses, which is what makes answer_count
+#: worth grouping by.
+NGROK_ANSWERS = [
+    'type:  1 3.14.22.90;type:  1 18.191.44.7;',
+    'type:  5 tunnel.ngrok.agent;type:  1 52.14.201.33;',
+    'type:  1 3.20.115.4;',
+]
+#: Names a workstation resolves all day, for the noise.
+BENIGN_QUERIES = [
+    ('outlook.office365.com', 'type:  5 outlook.ha.office365.com;type:  1 52.109.8.22;'),
+    ('www.google.com', 'type:  1 142.250.75.196;'),
+    ('update.microsoft.com', 'type:  1 20.42.65.92;'),
+    ('corp.local', 'type:  1 10.20.1.10;'),
+]
+#: Near misses on the glob: ngrok in the wrong position.
+NGROK_NEAR_MISSES = ['ngrok.io.example.com', 'notngrok.net', 'myngrok.internal.corp']
+
+#: What reaches a tunnel — the client itself, or whatever it was launched from.
+NGROK_CLIENTS = [
+    'C:\\Users\\Public\\ngrok.exe',
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\ProgramData\\svc\\tunnel.exe',
+]
+
+
+class SysmonNgrokDnsGenerator(SysmonAttackGenerator):
+    """A host resolving an ngrok tunnel (T1572, T1090).
+
+        WHERE DNS.query IN ("*.ngrok.com","*.ngrok.io",
+                            "ngrok.*.tunnel.com","korgn.*.lennut.com")
+        BY DNS.answer DNS.answer_count DNS.query DNS.query_count
+           DNS.reply_code_id DNS.src DNS.vendor_product
+
+    The grouping is what makes this one worth generating: `answer` is not a
+    field Sysmon writes. The add-on pulls it out of QueryResults with a
+    repeating match on `type:  <n>  <value>;`, and `answer_count` is
+    mvcount(answer) — so an entry missing its semicolon costs both fields, and
+    a tunnel that resolves to two addresses has to keep both to count as two.
+
+    `src` is not the workstation's IP either: `EVAL-src` takes Computer for
+    EventCode 22, so it is the hostname.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        The noise is ordinary resolution plus the names that look like ngrok
+        without matching the globs — `ngrok.io.example.com` has it as a label
+        rather than a suffix.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        def event(**extra):
+            return {'dest': dest, 'user': user,
+                    'image': rng.choice(NGROK_CLIENTS), **extra}
+
+        attack_identities = [
+            event(query_name=rng.choice(NGROK_QUERIES).format(stem=rng.choice(NGROK_STEMS)),
+                  query_results=rng.choice(NGROK_ANSWERS), query_status='0')
+            for _ in range(attacks)
+        ]
+
+        noise_identities = []
+        for _ in range(noise):
+            if rng.random() < 0.7:
+                name, results = rng.choice(BENIGN_QUERIES)
+                noise_identities.append(event(query_name=name, query_results=results,
+                                              query_status='0'))
+            else:
+                noise_identities.append(event(
+                    query_name=rng.choice(NGROK_NEAR_MISSES),
+                    query_results='-', query_status='9003'))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.dns_event(
+            query_name=event['query_name'], query_results=event['query_results'],
+            query_status=event['query_status'], image=event['image'],
+            dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': NGROK_CLIENTS[0], 'query_name': '4f2a91bc.ngrok.io',
+                'query_results': NGROK_ANSWERS[0], 'query_status': '0'}
+
+
+#: The four keys the SIP detection watches. A subject interface package tells
+#: Windows how to verify a signature, so a DLL registered here is trusted to
+#: say a file is signed.
+SIP_KEYS = [
+    'HKLM\\SOFTWARE\\Microsoft\\Cryptography\\Providers\\{guid}',
+    'HKLM\\SOFTWARE\\Microsoft\\Cryptography\\OID\\EncodingType 0\\'
+    'CryptSIPDllVerifyIndirectData\\{guid}',
+    'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Cryptography\\Providers\\{guid}',
+    'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Cryptography\\OID\\EncodingType 0\\'
+    'CryptSIPDllGetSignedDataMsg\\{guid}',
+]
+#: The two value names the search reads. Anything else under the same key is
+#: configuration and not the hijack.
+SIP_VALUE_NAMES = ['Dll', '$DLL']
+SIP_OTHER_VALUES = ['FuncName', 'CryptSIPDllVerifyIndirectData', 'Dll32']
+#: What gets registered, and what a legitimate provider points at.
+SIP_ROGUE_DLLS = [
+    'C:\\Users\\Public\\sip.dll', 'C:\\Windows\\Temp\\cryptsip.dll',
+    'C:\\ProgramData\\Intel\\drvsip.dll', 'MySIP.dll',
+]
+SIP_REAL_DLLS = ['WINTRUST.DLL', 'C:\\Windows\\System32\\wintrust.dll', 'PWRSHSIP.DLL']
+#: Registry keys that are not SIP at all, for the other half of the noise.
+NON_SIP_KEYS = [
+    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\OneDrive',
+    'HKLM\\System\\CurrentControlSet\\Services\\Dnscache\\Start',
+    'HKLM\\SOFTWARE\\Microsoft\\Cryptography\\MachineGuid',
+]
+SIP_WRITERS = [
+    'C:\\Windows\\System32\\reg.exe',
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\Windows\\System32\\regsvr32.exe',
+]
+
+
+class SysmonSipProviderGenerator(SysmonAttackGenerator):
+    """A subject interface package pointed at another DLL (T1553.003).
+
+        WHERE Registry.registry_path IN
+              ("*\\SOFTWARE\\Microsoft\\Cryptography\\Providers\\*",
+               "*\\SOFTWARE\\Microsoft\\Cryptography\\OID\\EncodingType*", … WOW6432Node)
+              Registry.registry_value_name IN ("Dll","$DLL")
+
+    A SIP tells Windows how to verify a signature. Register your own DLL under
+    one of these keys and Windows asks it whether a file is signed, so anything
+    it vouches for passes.
+
+    `registry_value_name` is the second clause and it is not a field Sysmon
+    writes: for an EventID 13 the add-on takes the last segment of TargetObject.
+    So the path has to end in `\\Dll` or `\\$DLL`, which is also what the real
+    technique writes.
+
+    The detection lists Sysmon EventID 7 alongside 13, because the DLL is loaded
+    once it is registered, but its search reads Endpoint.Registry only. The
+    attack therefore emits the registry write — an image load would be faithful
+    to the technique and would not fire this search.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        The noise misses one clause at a time: the same keys with a value name
+        the search ignores, and writes to keys that are not SIP at all.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        def guid():
+            return ('{%08X-%04X-%04X-%04X-%012X}' % (
+                rng.randint(0, 0xFFFFFFFF), rng.randint(0, 0xFFFF), rng.randint(0, 0xFFFF),
+                rng.randint(0, 0xFFFF), rng.randint(0, 0xFFFFFFFFFFFF)))
+
+        def event(**extra):
+            return {'dest': dest, 'user': user,
+                    'image': rng.choice(SIP_WRITERS), 'event_id': 13,
+                    'event_type': 'SetValue', **extra}
+
+        attack_identities = [
+            event(target_object=(rng.choice(SIP_KEYS).format(guid=guid())
+                                 + '\\' + rng.choice(SIP_VALUE_NAMES)),
+                  details=rng.choice(SIP_ROGUE_DLLS))
+            for _ in range(attacks)
+        ]
+
+        noise_identities = []
+        for _ in range(noise):
+            draw = rng.random()
+            if draw < 0.45:
+                # A SIP key, but a value the search does not read.
+                noise_identities.append(event(
+                    target_object=(rng.choice(SIP_KEYS).format(guid=guid())
+                                   + '\\' + rng.choice(SIP_OTHER_VALUES)),
+                    details=rng.choice(SIP_REAL_DLLS)))
+            elif draw < 0.8:
+                # A Dll value, somewhere that is not a SIP key.
+                noise_identities.append(event(
+                    target_object=rng.choice(NON_SIP_KEYS),
+                    details=f'DWORD (0x{rng.randint(0, 4):08x})'))
+            else:
+                noise_identities.append(event(ordinary=True))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.registry_event(
+            event['event_id'], target_object=event['target_object'],
+            image=event['image'], details=event['details'],
+            event_type=event['event_type'], dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': SIP_WRITERS[0], 'event_id': 13, 'event_type': 'SetValue',
+                'target_object': SIP_KEYS[0].format(
+                    guid='{603BCC1F-4B59-4E08-B724-D2C6297EF351}') + '\\Dll',
+                'details': SIP_ROGUE_DLLS[0]}
+
+
+#: The nine locations the detection treats as suspect for a program that opens
+#: a socket. None of them is where software is supposed to live.
+SUSPECT_PROGRAM_PATHS = [
+    'C:\\$Recycle.Bin\\S-1-5-21-1004336348-1177238915-682003330-1001\\{name}.exe',
+    'C:\\Windows\\System32\\Config\\SystemProfile\\AppData\\Local\\{name}.exe',
+    'C:\\PerfLogs\\{name}.exe',
+    'C:\\Users\\All Users\\{name}.exe',
+    'C:\\Users\\Default\\AppData\\Roaming\\{name}.exe',
+    'C:\\Users\\Public\\{name}.exe',
+    'C:\\Windows\\addins\\{name}.exe',
+    'C:\\Windows\\Fonts\\{name}.exe',
+    'C:\\Windows\\IME\\{name}.exe',
+]
+SUSPECT_PROGRAM_NAMES = ['svchost', 'updater', 'winhost', 'audiodg', 'taskmgr', 'runtime']
+#: Where a program that opens a socket normally lives.
+ORDINARY_PROGRAMS = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Windows\\System32\\svchost.exe',
+    'C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE',
+    'C:\\Windows\\System32\\lsass.exe',
+]
+#: Where a beacon goes, and on what.
+BEACON_PEERS = [
+    ('45.83.220.14', 'cdn-eu-3.example.net', '443', 'tcp'),
+    ('185.199.108.153', 'raw.contents.example', '443', 'tcp'),
+    ('91.219.236.10', '-', '8443', 'tcp'),
+    ('194.26.29.84', 'sync.updates.example', '80', 'tcp'),
+]
+
+
+class SysmonSuspectLocationConnectionGenerator(SysmonAttackGenerator):
+    """A program in a place software does not live, opening a socket (T1011).
+
+        FROM datamodel=Network_Traffic.All_Traffic
+        WHERE All_Traffic.app IN ("*\\$Recycle.Bin\\*", "*\\PerfLogs\\*",
+                                  "*\\Users\\Public\\*", "*\\Windows\\Fonts\\*", …)
+
+    `app` is the only clause, and on an EventID 3 the add-on builds it straight
+    from Image — so what decides the match is where the program lives, not what
+    it talks to.
+
+    Two of the fields it groups by are worth knowing about. `src` is not the
+    source address: EVAL-src falls through to SourceHostname before SourceIp,
+    so it is the workstation's name. And `protocol_version` is derived, not
+    reported — "ipv4" unless DestinationIsIpv6 says otherwise.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        One clause means one kind of near miss: the same connections made by a
+        program living where it should. The sender's ordinary traffic fills the
+        rest.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        def peer():
+            ip, _name, port, _transport = rng.choice(BEACON_PEERS)
+            return {'dest_ip': ip, 'dest_port': port}
+
+        def event(**extra):
+            return {'dest': dest, 'user': user, **extra}
+
+        attack_identities = [
+            event(image=rng.choice(SUSPECT_PROGRAM_PATHS).format(
+                      name=rng.choice(SUSPECT_PROGRAM_NAMES)), **peer())
+            for _ in range(attacks)
+        ]
+
+        noise_identities = []
+        for _ in range(noise):
+            if rng.random() < 0.6:
+                noise_identities.append(event(image=rng.choice(ORDINARY_PROGRAMS), **peer()))
+            else:
+                noise_identities.append(event(ordinary=True))
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        return self._sysmon.network_event(
+            image=event['image'], dest_ip=event['dest_ip'], dest_port=event['dest_port'],
+            dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'image': 'C:\\Users\\Public\\svchost.exe',
+                'dest_ip': BEACON_PEERS[0][0], 'dest_port': BEACON_PEERS[0][2]}
+
+
+SYSMON_FILE_ATTACK_TYPES = {
+    'sysmon_temp_path_executable': {
+        'name': 'Executables Or Script Creation In Temp Path',
+        'description': 'An executable or script written into a temp directory — how a dropper stages its payload (T1036)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Endpoint',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/e0422b71-2c05-4f32-8754-01fb415f49c9/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · file creation (EventID 11)',
+             'formats': ['xml']},
+        ],
+        'detection': {
+            'name': 'Executables Or Script Creation In Temp Path',
+            'id': 'e0422b71-2c05-4f32-8754-01fb415f49c9',
+            'datamodel': 'Endpoint.Filesystem',
+            'where': 'Filesystem.action = "created" Filesystem.file_name IN ("*.exe","*.ps1",…) Filesystem.file_path IN ("*:\\\\Temp\\\\*","*\\\\AppData\\\\Local\\\\Temp\\\\*",…)',
+            'by': ['action', 'dest', 'file_access_time', 'file_create_time', 'file_hash', 'file_modify_time', 'file_name', 'file_path', 'file_acl', 'file_size', 'process_guid', 'process_id', 'user', 'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each event triggers the detection on its own — no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the event came from (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account the process ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the activity happened on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account the process ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': ["<Event…><EventID>11</EventID>…<Data Name='TargetFilename'>C:\\Windows\\Temp\\svc417.exe</Data>…</Event>"],
+    },
+}
+
+
+SYSMON_DNS_ATTACK_TYPES = {
+    'sysmon_ngrok_dns': {
+        'name': 'Ngrok Reverse Proxy on Network',
+        'description': 'A host resolving an ngrok tunnel — a reverse proxy out of the network (T1572, T1090)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Network_Resolution',
+        'splunk_research_url': 'https://research.splunk.com/network/5790a766-53b8-40d3-a696-3547b978fcf0/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · DNS query (EventID 22)',
+             'formats': ['xml']},
+        ],
+        'detection': {
+            'name': 'Ngrok Reverse Proxy on Network',
+            'id': '5790a766-53b8-40d3-a696-3547b978fcf0',
+            'datamodel': 'Network_Resolution',
+            'where': 'DNS.query IN ("*.ngrok.com","*.ngrok.io","ngrok.*.tunnel.com","korgn.*.lennut.com")',
+            'by': ['answer', 'answer_count', 'query', 'query_count', 'reply_code_id', 'src', 'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each event triggers the detection on its own — no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the event came from (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account the process ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the activity happened on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account the process ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': ["<Event…><EventID>22</EventID>…<Data Name='QueryName'>4f2a91bc.ngrok.io</Data>…</Event>"],
+    },
+}
+
+
+SYSMON_SIP_ATTACK_TYPES = {
+    'sysmon_sip_provider_registry': {
+        'name': 'Windows Registry SIP Provider Modification',
+        'description': 'A subject interface package pointed at another DLL, so Windows asks it whether a file is signed (T1553.003)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Endpoint',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/3b4e18cb-497f-4073-85ad-1ada7c2107ab/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · registry value set (EventID 13)',
+             'formats': ['xml']},
+        ],
+        'detection': {
+            'name': 'Windows Registry SIP Provider Modification',
+            'id': '3b4e18cb-497f-4073-85ad-1ada7c2107ab',
+            'datamodel': 'Endpoint.Registry',
+            'where': 'Registry.registry_path IN ("*\\\\SOFTWARE\\\\Microsoft\\\\Cryptography\\\\Providers\\\\*","*\\\\SOFTWARE\\\\Microsoft\\\\Cryptography\\\\OID\\\\EncodingType*",…) Registry.registry_value_name IN ("Dll","$DLL")',
+            'by': ['action', 'dest', 'process_guid', 'process_id', 'registry_hive', 'registry_path', 'registry_key_name', 'registry_value_data', 'registry_value_name', 'registry_value_type', 'status', 'user', 'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each event triggers the detection on its own — no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the event came from (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account the process ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the activity happened on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account the process ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': ["<Event…><EventID>13</EventID>…<Data Name='TargetObject'>HKLM\\SOFTWARE\\Microsoft\\Cryptography\\Providers\\{…}\\Dll</Data>…</Event>"],
+    },
+}
+
+
+SYSMON_NETWORK_ATTACK_TYPES = {
+    'sysmon_connection_from_suspect_path': {
+        'name': 'Windows Network Connection From Program In Suspect Location',
+        'description': 'A program living where software does not, opening a socket (T1011)',
+        'log_type': 'sysmon',
+        'category': 'Endpoint',
+        'datamodel': 'Network_Traffic',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/90fd571b-78d4-409e-a2de-0f0a80c75a84/',
+        'data_sources': [
+            {'log_type': 'sysmon',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-Sysmon/Operational',
+             'label': 'Sysmon · network connection (EventID 3)',
+             'formats': ['xml']},
+        ],
+        'detection': {
+            'name': 'Windows Network Connection From Program In Suspect Location',
+            'id': '90fd571b-78d4-409e-a2de-0f0a80c75a84',
+            'datamodel': 'Network_Traffic.All_Traffic',
+            'where': 'All_Traffic.app IN ("*\\\\$Recycle.Bin\\\\*","*\\\\PerfLogs\\\\*","*\\\\Users\\\\Public\\\\*",…)',
+            'by': ['dest', 'dest_ip', 'dest_port', 'src', 'src_ip', 'src_port', 'transport', 'protocol', 'protocol_version', 'direction', 'action', 'app', 'dvc', 'user', 'vendor_product'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 1, 'noise_events': 20, 'duration': 30},
+        'count_label': 'Number of Events',
+        'count_hint': 'Each event triggers the detection on its own — no threshold to reach.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine the event came from (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account the process ran as (User).'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint the activity happened on'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account the process ran as'},
+        },
+        'field_behaviors': {},
+        'sample_logs': ["<Event…><EventID>3</EventID>…<Data Name='Image'>C:\\Users\\Public\\svchost.exe</Data>…</Event>"],
+    },
+}
+
+
 def _register(attack_types_dict: dict, generator_class) -> None:
     """Register a group of attack-type definitions with their generator class."""
     for key, defn in attack_types_dict.items():
@@ -2127,6 +3231,12 @@ _register(WINDOWS_ATTACK_TYPES,  WindowsTorClientGenerator)
 _register(WINDOWS_AD_ATTACK_TYPES, WindowsSidHistoryGenerator)
 _register(CISCO_ATTACK_TYPES,    CiscoTrafficMirroringGenerator)
 _register(WINDOWS_SYSWOW64_ATTACK_TYPES, WindowsSysWow64Generator)
+_register(SYSMON_ATTACK_TYPES,   SysmonFirewallRuleGenerator)
+_register(SYSMON_PROCESS_ATTACK_TYPES, SysmonRenamedPowershellGenerator)
+_register(SYSMON_FILE_ATTACK_TYPES,    SysmonTempPathDropGenerator)
+_register(SYSMON_DNS_ATTACK_TYPES,     SysmonNgrokDnsGenerator)
+_register(SYSMON_SIP_ATTACK_TYPES,     SysmonSipProviderGenerator)
+_register(SYSMON_NETWORK_ATTACK_TYPES, SysmonSuspectLocationConnectionGenerator)
 
 # Backward-compat alias used by log_senders.py
 ALL_ATTACK_TYPES = ATTACK_REGISTRY

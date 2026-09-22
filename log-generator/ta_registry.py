@@ -1722,6 +1722,208 @@ TA_REGISTRY = {
             _enrich_sourcetype(deepcopy(FORTIGATE_ANOMALY)),
         ],
     },
+    "sysmon": {
+        # Sysmon publishes one channel and says what an event means with its
+        # EventID. The add-on follows that: seven eventtypes split the ~29 IDs
+        # into groups, each granting different tags and so a different
+        # datamodel. This entry describes the five the generator emits. The two
+        # left — WMI (19, 20, 21) and service state (4, 16, 255) — carry two
+        # published detections between them and none respectively, so they are
+        # not worth the events; declaring them would claim datamodels no sender
+        # here reaches.
+        #
+        # The wire metadata is the part to get right. inputs.conf sets no
+        # sourcetype — with renderXml = 1 splunkd settles on XmlWinEventLog —
+        # and everything that matters keys on the *source*: all 62 EVALs live in
+        # a [source::XmlWinEventLog:Microsoft-Windows-Sysmon/Operational] stanza
+        # and all seven eventtypes match on source=. The sourcetype stanza is
+        # only `rename = XmlWinEventLog`, so field extraction itself is done by
+        # Splunk_TA_windows' generic XML handling, the same path the 4688
+        # attacks already use.
+        "name": "Splunk Add-on for Sysmon",
+        "splunkbase_url": "https://splunkbase.splunk.com/app/5709",
+        "add_on_package": "Splunk_TA_microsoft_sysmon",
+        "add_on_version": "5.0.1",
+        "display_name": "Sysmon",
+        "vendor": "Microsoft",
+        "description": "Sysinternals Sysmon — registry activity from Windows endpoints",
+        # Windows event logs do not travel as syslog, and this add-on ships no
+        # non-XML stanza at all: renderXml = 1 on both inputs, zero
+        # [WinEventLog:Microsoft-Windows-Sysmon...] stanzas. So there is no
+        # render_format choice here, unlike the Windows add-on.
+        "hec_default_sourcetype": "XmlWinEventLog",
+        "syslog_viable": False,
+        "sourcetypes": [
+            _enrich_sourcetype({
+                "name": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+                "hec_source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+                "datamodels": ["Endpoint", "Network_Traffic", "Network_Resolution"],
+                "eventtypes": ["ms-sysmon-process", "ms-sysmon-network",
+                               "ms-sysmon-dns", "ms-sysmon-filemod",
+                               "ms-sysmon-regmod"],
+                "tags": ["process", "report", "network", "communicate", "resolution",
+                         "dns", "endpoint", "filesystem", "registry"],
+                "description": "Sysmon process creation and image load (EventID 1, 7), "
+                               "network connection (3), DNS query (22), file creation "
+                               "(11) and registry events (12, 13, 14)",
+                "entity_types": ["endpoint", "server", "domain_controller"],
+                "account_types": ["standard", "admin", "service_account"],
+                "datamodel_conditions": [
+                    {
+                        "when": "EventCode in (1, 7) — a process started or loaded an image",
+                        "eventtype": "ms-sysmon-process",
+                        "tags": ["process", "report"],
+                        "datamodels": ["Endpoint"],
+                    },
+                    {
+                        "when": "EventCode == 3 — a process opened a connection",
+                        "eventtype": "ms-sysmon-network",
+                        "tags": ["network", "communicate"],
+                        "datamodels": ["Network_Traffic"],
+                    },
+                    {
+                        "when": "EventCode == 22 — a process resolved a name",
+                        "eventtype": "ms-sysmon-dns",
+                        "tags": ["network", "resolution", "dns"],
+                        "datamodels": ["Network_Resolution"],
+                    },
+                    {
+                        "when": "EventCode == 11 — a file was written",
+                        "eventtype": "ms-sysmon-filemod",
+                        "tags": ["endpoint", "filesystem"],
+                        "datamodels": ["Endpoint"],
+                    },
+                    {
+                        "when": "EventCode in (12, 13, 14) — a registry event",
+                        "eventtype": "ms-sysmon-regmod",
+                        "tags": ["endpoint", "registry"],
+                        "datamodels": ["Endpoint"],
+                    },
+                ],
+                "fields": [
+                    {
+                        "raw_field": "Computer",
+                        "cim_field": "dest",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "entity", "entity_type": "endpoint",
+                                      "entity_field": "nt_host"},
+                        "direction": None,
+                        "description": "Endpoint the registry was written on "
+                                       "(<System><Computer>) — on every event",
+                        "mutable": True,
+                    },
+                    {
+                        "raw_field": "User",
+                        "cim_field": "user",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "account", "account_type": "standard",
+                                      "account_field": "username"},
+                        "direction": None,
+                        "description": "Account the writing process ran as; the add-on "
+                                       "strips the domain prefix",
+                        "mutable": True,
+                    },
+                    {
+                        "raw_field": "Image",
+                        "cim_field": "process_path",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Process that touched the registry. Note the "
+                                       "add-on reads Image, not ProcessPath — no "
+                                       "add-on produces a field by that name",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "TargetObject",
+                        "cim_field": "registry_path",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Full registry path. Also feeds registry_hive, "
+                                       "but only under HKLM\\System\\, HKU\\ or "
+                                       "HKLM\\SOFTWARE\\ — other hives leave it empty",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Details",
+                        "cim_field": "registry_value_data",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Value written (EventID 13 only). A transform "
+                                       "lifts the payload out of `DWORD (0x...)`; any "
+                                       "other shape is passed through verbatim",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "EventType",
+                        "cim_field": "action",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "CreateKey / DeleteKey / DeleteValue / SetValue / "
+                                       "RenameKey. Decides `action` on an EventID 12: "
+                                       "created or deleted",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "CommandLine",
+                        "cim_field": "process",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Full command line of the process created "
+                                       "(EventID 1 only)",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "ParentImage",
+                        "cim_field": "parent_process_path",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Process that started it; also feeds "
+                                       "parent_process_name and parent_process_exec",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "TargetFilename",
+                        "cim_field": "file_path",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "File written (EventID 11); also feeds "
+                                       "file_name. Sysmon carries no hash, size or "
+                                       "ACL on a file creation; the datamodel "
+                                       "defaults those to \"unknown\"",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "CreationUtcTime",
+                        "cim_field": "file_create_time",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "When the file was created. The add-on compares "
+                                       "it with UtcTime to decide whether action is "
+                                       "created or modified",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "ProcessGuid",
+                        "cim_field": "process_guid",
+                        "datamodels": ["Endpoint"],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Sysmon's per-process identifier, passed through "
+                                       "untouched — detections group by it",
+                        "mutable": False,
+                    },
+                ],
+            }),
+        ],
+    },
 }
 
 

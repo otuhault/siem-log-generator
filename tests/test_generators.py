@@ -23,9 +23,9 @@ MULTI_INSTANCE = {"apache", "windows", "zscaler"}
 # Registry-wide smoke properties
 # ---------------------------------------------------------------------------
 
-def test_registry_exposes_ten_generators():
-    assert len(REGISTRY) == 10
-    assert len(GENERATORS) == 10
+def test_registry_exposes_every_generator_once():
+    assert len(REGISTRY) == len(GENERATORS), "a generator is registered twice or not at all"
+    assert len(REGISTRY) == 11
 
 
 @pytest.mark.parametrize("log_type", ALL_LOG_TYPES)

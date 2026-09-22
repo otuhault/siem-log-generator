@@ -90,7 +90,7 @@ def install_category_spy(instance, log_type):
     elif log_type == "active_directory":
         _wrap_ad_event_generators(instance, seen)
 
-    elif log_type in ("auditd", "fortigate"):
+    elif log_type in ("auditd", "fortigate", "sysmon"):
         # Dispatch is a dict of bound builders, so wrap the entries in place.
         for category, builder in list(instance._builders.items()):
             instance._builders[category] = _recording(builder, category, seen)

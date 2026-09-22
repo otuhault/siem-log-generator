@@ -259,13 +259,18 @@ def test_the_two_windows_forms_are_never_mixed():
 
 
 def test_syslog_viability_is_declared_not_inferred():
-    """Windows-family TAs are flagged non-viable over syslog; others default True."""
+    """Windows-family TAs are flagged non-viable over syslog; others default True.
+
+    Sysmon joins them: it is a Windows event channel, collected by the same
+    forwarder, and its add-on ships no syslog path at all.
+    """
     from ta_registry import get_ta, list_tas
 
-    assert get_ta("windows")["syslog_viable"] is False
-    assert get_ta("active_directory")["syslog_viable"] is False
+    windows_family = ("windows", "active_directory", "sysmon")
+    for ta_name in windows_family:
+        assert get_ta(ta_name)["syslog_viable"] is False, ta_name
     for ta_name in list_tas():
-        if ta_name in ("windows", "active_directory"):
+        if ta_name in windows_family:
             continue
         assert get_ta(ta_name).get("syslog_viable", True) is True, ta_name
 

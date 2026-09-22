@@ -903,9 +903,18 @@ function syncLegacyCategoryCheckboxes(sourcetypes) {
     const meta = state.logTypes[_activeTA];
     if (!meta || !meta.sources || !meta.sources.length) return;
 
-    // Detect alignment: do all generator sources declare a `sourcetype`?
-    const aligned = meta.sources.every(s => !!s.sourcetype);
-    if (!aligned) return;
+    // The sourcetype selector can only stand in for the category group when the
+    // two say the same thing — one sourcetype per category. Several categories
+    // sharing one sourcetype is an umbrella TA: Sysmon puts five event IDs on
+    // XmlWinEventLog:Microsoft-Windows-Sysmon/Operational, FortiGate eleven
+    // subtypes on four sourcetypes. Ticking the sourcetype cannot express which
+    // of them you want, so the category group stays and stays visible. Testing
+    // only that each source declares *a* sourcetype hid it anyway, and every
+    // category came back checked — a Sysmon sender emitted all five event IDs
+    // with no way to narrow it.
+    const names = meta.sources.map(s => s.sourcetype);
+    const onePerCategory = names.every(Boolean) && new Set(names).size === names.length;
+    if (!onePerCategory) return;
 
     // Find the legacy checkbox group for this generator (e.g. paloalto_log_types)
     const firstId = meta.sources[0].id;

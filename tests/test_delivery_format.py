@@ -25,7 +25,7 @@ HAS_PRI = re.compile(r"^<\d+>")
 
 FRAMING_ADDED = {"apache", "auditd", "cisco_ios", "fortigate", "ssh", "zscaler"}
 SELF_FRAMED = {"cisco_asa", "paloalto"}
-NOT_SYSLOG = {"active_directory", "windows"}
+NOT_SYSLOG = {"active_directory", "windows", "sysmon"}
 
 
 def _build(log_type):

@@ -233,13 +233,55 @@ def test_the_api_describes_one_windows_source_in_both_renderings():
     assert api["warning"] is None
 
 
-def test_sysmon_is_not_claimed_without_an_add_on_to_check_it_against():
-    """The detection also lists Sysmon EventID 1. Nothing in TAs/ maps a Sysmon
-    event to Endpoint.Processes, so declaring the source would be a claim this
-    repository cannot verify."""
-    sysmon_add_ons = list((TA.parents[1]).glob("*ysmon*")) if TA.parents[1].exists() else []
-    assert not sysmon_add_ons, "a Sysmon add-on is present now — the source can be declared"
-    assert [s["sourcetype"] for s in DEFINITION["data_sources"]] == ["WinEventLog:Security"]
+def test_both_sources_the_detection_lists_are_declared():
+    """Sysmon EventID 1 arrived, so the second source could finally be checked.
+
+    It reports the redirection the same way — Image against CommandLine — and
+    the add-on maps that pair to the same process_path and process the Windows
+    one builds from NewProcessName and CommandLine. The one field that gave
+    pause, `user_id`, is produced by no part of the Sysmon add-on; it comes from
+    Splunk_TA_windows' generic [XmlWinEventLog] stanza, which Sysmon events
+    reach through `rename = XmlWinEventLog`.
+    """
+    from log_generators.sysmon import SysmonLogGenerator
+
+    assert 1 in set(SysmonLogGenerator.CATEGORY_EVENT_ID.values()), \
+        "the Sysmon source no longer emits EventID 1"
+    assert [(s["log_type"], s["sourcetype"]) for s in DEFINITION["data_sources"]] == [
+        ("windows", "WinEventLog:Security"),
+        ("sysmon", "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"),
+    ]
+
+
+@needs_ta
+def test_the_sysmon_rendering_satisfies_the_same_clause():
+    """Same two values, a different envelope."""
+    from test_sysmon_cim import process_cim_fields
+
+    generator = AttackGeneratorFactory.get_generator(ATTACK, {"source_log_type": "sysmon"})
+    for _ in range(60):
+        fields = process_cim_fields(generator.generate())
+        assert matches({"process_path": fields["process_path"],
+                        "process": fields["process"]}), fields
+
+
+@needs_ta
+def test_the_sysmon_events_carry_every_field_the_search_groups_by():
+    """A tstats BY drops a row on any null, and this search names twenty."""
+    from test_sysmon_cim import PROCESS_BY_FIELDS, process_cim_fields
+
+    assert set(DEFINITION["detection"]["by"]) == set(PROCESS_BY_FIELDS), \
+        "the detection's BY list and the fields checked here have drifted apart"
+    generator = AttackGeneratorFactory.get_generator(ATTACK, {"source_log_type": "sysmon"})
+    for _ in range(60):
+        fields = process_cim_fields(generator.generate())
+        missing = [name for name in PROCESS_BY_FIELDS if not fields.get(name)]
+        assert not missing, missing
+
+
+def test_declaring_two_sources_takes_syslog_away():
+    """Neither is collected over syslog, and a two-source attack has one shape."""
+    assert attack_destinations(DEFINITION) == ["file", "configuration"]
 
 
 def test_one_event_is_enough():

@@ -53,6 +53,11 @@ export const SOURCETYPE_CONFIG = {
         checkboxGroup: 'fortigate_event_categories',
         optionKey: 'event_categories',
         formGroups: ['fortigateEventCategoriesGroup']
+    },
+    'sysmon': {
+        checkboxGroup: 'sysmon_event_categories',
+        optionKey: 'event_categories',
+        formGroups: ['sysmonEventCategoriesGroup']
     }
 };
 

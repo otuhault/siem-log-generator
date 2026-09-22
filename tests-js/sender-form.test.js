@@ -180,3 +180,29 @@ describe('no state leaks across create → edit → create', () => {
       'the in-progress creation leaked into the edit');
   });
 });
+
+describe('an umbrella TA keeps its category group', () => {
+  let h;
+
+  before(async () => { h = await createHarness({ senders: SENDERS }); });
+  after(() => h.close());
+
+  it('shows the categories when one sourcetype covers several of them', async () => {
+    // Sysmon puts five event IDs on one sourcetype, so ticking the sourcetype
+    // says nothing about which you want. The group hid anyway, every category
+    // came back checked, and a sender emitted all five event IDs with no way
+    // to narrow it.
+    await selectTechnology(h.document, 'sysmon');
+    assert.deepEqual(checkedSourcetypes(h.document),
+      ['XmlWinEventLog:Microsoft-Windows-Sysmon/Operational']);
+    assert.ok(isVisible(h.document, 'sysmonEventCategoriesGroup'),
+      'the only control that can pick an event ID is hidden');
+  });
+
+  it('still hides it when the sourcetype selector says the same thing', async () => {
+    // Windows is one sourcetype per category, so the group would be a duplicate.
+    await selectTechnology(h.document, 'windows');
+    assert.ok(!isVisible(h.document, 'windowsSourcesGroup'),
+      'a 1:1 mapping should leave the sourcetype selector to it');
+  });
+});
