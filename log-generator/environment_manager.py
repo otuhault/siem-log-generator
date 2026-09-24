@@ -76,6 +76,14 @@ ENTITY_TYPE_ROLES = {
         'zscaler':          [('_INTERNAL_IPS',      'ip',      'src_ip'),
                              ('_device_names',      'nt_host', 'src_nt_host'),
                              ('_device_os_types',   'os',      'deviceostype')],
+        # Sysmon and PowerShell both describe one machine only: the endpoint
+        # the agent runs on, which the add-on reads as `dest`. They carry no
+        # address of their own, so the host is their single role. An account
+        # pinned to an entity rides the src side and therefore is not paired
+        # with its machine here — it is still emitted, just not guaranteed to
+        # land on its own host.
+        'sysmon':           [('hostnames',          'nt_host', 'dest')],
+        'powershell':       [('hostnames',          'nt_host', 'dest')],
     },
     'server': {
         # Apache logs name the client only; the server is what `host` and the
@@ -88,10 +96,14 @@ ENTITY_TYPE_ROLES = {
         'paloalto':         [('internal_ips',       'ip',      'dest_ip')],
         'cisco_asa':        [('internal_ips',       'ip',      'dest_ip')],
         'fortigate':        [('internal_ips',       'ip',      'dest_ip')],
+        'sysmon':           [('hostnames',          'nt_host', 'dest')],
+        'powershell':       [('hostnames',          'nt_host', 'dest')],
     },
     'domain_controller': {
         'active_directory': [('domain_controllers', 'fqdn',    'Computer')],
         'windows':          [('ip_addresses',       'ip',      'dest_ip')],
+        'sysmon':           [('hostnames',          'nt_host', 'dest')],
+        'powershell':       [('hostnames',          'nt_host', 'dest')],
     },
     'firewall': {
         'paloalto':         [('hostnames',          'nt_host', 'dvc')],
@@ -160,6 +172,8 @@ ACCOUNT_TYPE_ROLES = {
         'fortigate':        'users',
         'active_directory': 'target_users',
         'zscaler':          '_USERS',
+        'sysmon':           'usernames',
+        'powershell':       'usernames',
     },
     'admin': {
         'windows':          'usernames',
@@ -170,12 +184,16 @@ ACCOUNT_TYPE_ROLES = {
         'cisco_ios':        'admin_users',
         'fortigate':        'admin_users',
         'active_directory': 'target_users',
+        'sysmon':           'usernames',
+        'powershell':       'usernames',
     },
     'service_account': {
         'windows':          'usernames',
         'auditd':           'acct_users',
         'ssh':              'valid_users',
         'active_directory': 'target_users',
+        'sysmon':           'usernames',
+        'powershell':       'usernames',
     },
 }
 

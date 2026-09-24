@@ -1924,6 +1924,185 @@ TA_REGISTRY = {
             }),
         ],
     },
+    "powershell": {
+        # The odd one out: a Windows source that reaches no datamodel at all.
+        #
+        # Splunk_TA_windows grants this channel exactly two lines, in a
+        # [source::XmlWinEventLog:Microsoft-Windows-PowerShell/Operational]
+        # stanza — Computer_as_dest, and an EVAL-signature covering 4103 and
+        # 4104. No eventtype matches the channel beyond the two every Windows
+        # event gets (windows_event_signature on sourcetype=XmlWinEventLog,
+        # windows_ta_data on source=XmlWinEventLog:*), and between them they
+        # carry one tag, track_event_signatures, which is not a CIM tag. So
+        # there is no datamodel to declare here, and none is declared.
+        #
+        # That is not a gap in the coverage: all 121 published detections on
+        # this data source are raw searches over ScriptBlockText, and
+        # security_content's own data_sources entry lists no supported_TA.
+        # The value of the channel is the script text itself.
+        #
+        # Everything else is extracted by the generic [XmlWinEventLog] stanza,
+        # the same path the 4688 attacks and Sysmon already use.
+        "name": "Splunk Add-on for Microsoft Windows",
+        "splunkbase_url": "https://splunkbase.splunk.com/app/742",
+        "add_on_package": "Splunk_TA_windows",
+        "add_on_version": "11.0.2",
+        "display_name": "PowerShell",
+        "vendor": "Microsoft",
+        "description": "Windows PowerShell script block logging (EventID 4104)",
+        # Windows event logs do not travel as syslog. inputs.conf ships no
+        # PowerShell channel input at all, so there is no classic/XML choice to
+        # offer either: the channel is generated as XML, which is what the
+        # 121 detections and the `powershell` macro expect.
+        "hec_default_sourcetype": "XmlWinEventLog",
+        "syslog_viable": False,
+        "sourcetypes": [
+            _enrich_sourcetype({
+                "name": "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational",
+                "hec_source": "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational",
+                "datamodels": [],
+                "eventtypes": ["windows_event_signature", "windows_ta_data"],
+                "tags": ["track_event_signatures"],
+                "description": "PowerShell script block logging (EventID 4104) — the "
+                               "source text of every block the engine compiled. Reaches "
+                               "no CIM datamodel; the 121 published detections read the "
+                               "raw fields directly",
+                "entity_types": ["endpoint", "server", "domain_controller"],
+                "account_types": ["standard", "admin", "service_account"],
+                # Deliberately empty. The two eventtypes this channel matches
+                # grant one tag between them, and it is not a CIM tag.
+                "datamodel_conditions": [],
+                "fields": [
+                    {
+                        "raw_field": "Computer",
+                        "cim_field": "dest",
+                        "datamodels": [],
+                        "ai_source": {"type": "entity", "entity_type": "endpoint",
+                                      "entity_field": "nt_host"},
+                        "direction": None,
+                        "description": "Endpoint the block was compiled on "
+                                       "(<System><Computer>). The add-on's only "
+                                       "REPORT for this channel, Computer_as_dest, "
+                                       "builds `dest` from it; 109 detections group "
+                                       "by one or the other",
+                        "mutable": True,
+                    },
+                    {
+                        "raw_field": "UserID",
+                        "cim_field": "user_id",
+                        "datamodels": [],
+                        "ai_source": {"type": "account", "account_type": "standard",
+                                      "account_field": "username"},
+                        "direction": None,
+                        "description": "The caller's SID, from <Security UserID=...>. "
+                                       "This channel carries no user *name* anywhere, "
+                                       "so an A&I account is represented as a SID "
+                                       "derived from it — stable, so the same account "
+                                       "always groups together. Scripts run by a "
+                                       "management agent carry S-1-5-18",
+                        "mutable": True,
+                    },
+                    {
+                        "raw_field": "ScriptBlockText",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "The block's source text — the field the whole "
+                                       "channel exists for, read by all 121 detections "
+                                       "and by 377 clauses among them. No CIM mapping: "
+                                       "searches read it under this name. Note the "
+                                       "add-on excludes it from indexed extraction "
+                                       "(XML_IE_EXCLUDE), so it is built at search "
+                                       "time by eventdata_xml_data",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Path",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Script file the block was compiled from, empty "
+                                       "for anything typed at a prompt. Both are real "
+                                       "states and both are generated; one detection "
+                                       "groups by Path with no fillnull, so only "
+                                       "file-backed blocks can reach it",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "ScriptBlockId",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Per-block GUID. A block over ~20 KB is split "
+                                       "across several events sharing this id, with "
+                                       "MessageNumber counting to MessageTotal; "
+                                       "nothing here is that large, so every event is "
+                                       "1 of 1",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "EventID",
+                        "cim_field": "signature_id",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "4104. Becomes EventCode, which every detection "
+                                       "filters on, and signature_id through the "
+                                       "generic stanza's EVAL",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Provider Name",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "Microsoft-Windows-PowerShell. Extracted as "
+                                       "`Name` from the System block's attributes; "
+                                       "107 detections group by it",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Provider Guid",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "{A0C1853B-5C40-4B15-8766-3CF1C58F985A}, "
+                                       "extracted as `Guid`. Grouped by, so it has to "
+                                       "be the real provider GUID",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Opcode",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "15 on a 4104. Carries no meaning for the "
+                                       "searches but 107 of them group by it, so it "
+                                       "has to be present",
+                        "mutable": False,
+                    },
+                    {
+                        "raw_field": "Execution ProcessID",
+                        "cim_field": "",
+                        "datamodels": [],
+                        "ai_source": {"type": "random"},
+                        "direction": None,
+                        "description": "The PowerShell host process, extracted as "
+                                       "`ProcessID` from the System block. Grouped by, "
+                                       "and distinct from the CIM `process_id` no "
+                                       "eventtype here produces",
+                        "mutable": False,
+                    },
+                ],
+            }),
+        ],
+    },
 }
 
 

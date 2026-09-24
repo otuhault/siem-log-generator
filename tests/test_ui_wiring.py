@@ -95,3 +95,62 @@ def test_nothing_imports_the_modules_those_views_took_with_them():
         for dead in ("attacks.js", "sourcetype-mapping.js"):
             assert f"'./{dead}'" not in text and f"'./modules/{dead}'" not in text, \
                 f"{path.name} still imports {dead}"
+
+
+def _js_sourcetype_config():
+    """The SOURCETYPE_CONFIG map from sourcetype-config.js, as {log_type: {...}}."""
+    js = (APP / "static" / "js" / "modules" / "sourcetype-config.js").read_text()
+    body = re.search(r"SOURCETYPE_CONFIG\s*=\s*\{(.*?)\n\};", js, re.S).group(1)
+    config = {}
+    for entry in re.finditer(
+            r"'([^']+)':\s*\{(.*?)\}", body, re.S):
+        fields = entry.group(2)
+        config[entry.group(1)] = {
+            "checkboxGroup": (re.search(r"checkboxGroup:\s*'([^']+)'", fields) or [None, None])[1]
+            if re.search(r"checkboxGroup:\s*'([^']+)'", fields) else None,
+            "formGroups": re.findall(r"'(\w+Group)'", fields),
+        }
+    return config
+
+
+def test_every_source_that_offers_categories_has_them_in_the_form():
+    """REGISTRY → sourcetype-config.js → index.html → senders.js, end to end.
+
+    A source can be complete on the Python side, appear in the catalog, and
+    still offer the user no way to pick its categories, because the checkboxes
+    are markup in index.html rather than rendered from METADATA. Sysmon shipped
+    that way once and PowerShell did it again in this session: nothing failed,
+    the group simply was not there. Each link below is the one that was missing.
+    """
+    import sys
+    sys.path.insert(0, str(APP))
+    from log_generators import REGISTRY
+
+    html = (APP / "templates" / "index.html").read_text()
+    senders_js = (APP / "static" / "js" / "modules" / "senders.js").read_text()
+    js_config = _js_sourcetype_config()
+
+    offers_choices = {
+        log_type: cls.SOURCETYPE_CONFIG for log_type, cls in REGISTRY.items()
+        if len(cls.SOURCETYPE_CONFIG.get("defaults") or []) >= 1
+        and not cls.SOURCETYPE_CONFIG.get("multi_instance")
+    }
+    missing = sorted(set(offers_choices) - set(js_config))
+    assert not missing, f"no entry in sourcetype-config.js: {missing}"
+
+    for log_type, config in offers_choices.items():
+        entry = js_config[log_type]
+        group = entry["checkboxGroup"]
+        assert group, f"{log_type}: no checkboxGroup declared"
+
+        values = set(re.findall(
+            rf'name="{re.escape(group)}"\s+value="([^"]+)"', html))
+        assert values == set(config["defaults"]), (
+            f"{log_type}: the form offers {sorted(values)}, "
+            f"the generator defaults to {sorted(config['defaults'])}")
+
+        for form_group in entry["formGroups"]:
+            assert f'id="{form_group}"' in html, \
+                f"{log_type}: index.html has no #{form_group}"
+            assert f"getElementById('{form_group}')" in senders_js, \
+                f"{log_type}: #{form_group} is never hidden when another source is picked"

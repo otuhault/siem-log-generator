@@ -92,8 +92,11 @@ Get the real TA and read it. Not the docs, the `.conf` files.
 
 > **The trap.** Wiring the field accessors without calling `_new_entity()` makes
 > every lookup fall through to the generator's own values, silently. It shipped
-> once. `tests/test_entity_pairing.py` now catches it for every add-on
-> automatically.
+> once. `tests/test_nothing_ships_half_wired.py` catches it for every source
+> automatically — it is parametrised over `REGISTRY`. `test_entity_pairing.py`
+> goes further for generators that read several fields off one entity, but it
+> sweeps a hand-written `MULTI_FIELD` list, so a new source has to be added to
+> it by hand.
 
 ## Phase 2 — Registry
 
@@ -141,6 +144,45 @@ want|={m[lt] for m in ACCOUNT_TYPE_ROLES.values() if m.get(lt)}
 print('pools morts :', sorted(p for p in want if not hasattr(g,p)) or 'aucun')"
 ```
 
+- [ ] **The dead-pool check above passes vacuously when the source is in neither
+      table.** `want` is then empty and it prints "aucun" — a clean bill of health
+      for a source that receives nothing at all. Sysmon shipped in v1.1.0 that
+      way: `ta_registry.py` declared `ai_source` for `Computer` and `User`, the
+      Catalog displayed them, and a Sysmon sender still emitted 0 A&I values out
+      of 80 events. **`ai_source` in `ta_registry.py` is documentation. It drives
+      nothing.** Only `ENTITY_TYPE_ROLES` / `ACCOUNT_TYPE_ROLES` inject.
+      So assert on the output, not on the tables:
+
+```bash
+python3 -c "
+import tempfile, os
+from environment_manager import EnvironmentManager
+from log_generators import REGISTRY
+lt='<ta>'
+env=EnvironmentManager(config_file=os.path.join(tempfile.mkdtemp(),'environment.json'))
+env.create_entity('probe','endpoint',nt_host='AI-HOST-01',ip='10.9.9.9')
+env.create_account('ai.user',account_type='standard')
+g=REGISTRY[lt](); env.inject_into(g, lt, 100)
+lines=[g.generate() for _ in range(200)]
+print('host :', sum('AI-HOST-01' in l for l in lines), '/200')
+print('user :', sum('ai.user' in l for l in lines), '/200')"
+```
+
+Both counts must be non-zero. They will not be 200/200: a fresh environment is
+seeded with its own entities and accounts, so the new ones only win their share.
+
+- [ ] **This is enforced, not just suggested.**
+      `tests/test_nothing_ships_half_wired.py` runs the same probe over every
+      entry in `REGISTRY`, so the new source is enrolled the moment it is
+      registered — there is no list to add it to. It decides what to require
+      from the `ai_source` entries in `ta_registry.py`: promise an `account`
+      there and the sweep insists one reaches the wire.
+- [ ] If the source carries an account in some encoded form rather than
+      verbatim — the PowerShell channel has no user name at all and represents
+      an account as a derived SID — the sweep will fail until you say so in its
+      `account_appears_as()`. Say it in the registry's field description too, or
+      the reader is left wondering where their account went.
+
 ## Phase 4 — Frontend
 
 - [ ] `static/js/modules/sourcetype-config.js` — `checkboxGroup`, `optionKey`,
@@ -157,8 +199,18 @@ print('pools morts :', sorted(p for p in want if not hasattr(g,p)) or 'aucun')"
 
 ## Phase 5 — Prove it
 
-- [ ] `pytest -q` — `test_registry_coherence.py` and `test_entity_pairing.py`
-      pick up the new add-on automatically.
+- [ ] `pytest -q`. Three files enrol a new source on their own, with no list to
+      update: `test_registry_coherence.py`, `test_nothing_ships_half_wired.py`
+      (A&I actually reaching the wire) and `test_ui_wiring.py` (the category
+      checkboxes exist and are hidden with the rest).
+      `test_entity_pairing.py` does **not** — it sweeps a hand-written
+      `MULTI_FIELD` constant, which is part of why Sysmon shipped with no A&I at
+      all. Add the source there as well if it draws more than one field from one
+      entity.
+- [ ] Several tests hold a deliberate second copy of a list — the registry
+      counts, `SPLUNKBASE_APPS`, `NOT_SYSLOG`, `NEVER_FRAMED`,
+      `EXPECTED_LOG_TYPES`. They are meant to fail on a new source: each failure
+      is a decision to make, not a number to bump without reading it.
 - [ ] `npm test`.
 - [ ] **Capture the real wire.** Point a sender at a local HTTP listener and read
       the actual payloads — path, `index`, `sourcetype`, `source`, body shape.
@@ -468,7 +520,16 @@ looked sound the whole way down.
   | **`user` rotating** | password spraying | credential stuffing |
 
   Adding a variant means filling a cell of this matrix, not inventing a name.
-- [ ] `ai_fields` — which fields the A&I picker offers for this attack.
+- [ ] `ai_fields` — which fields the A&I picker offers for this attack. Every
+      key here needs a matching entry in `identity_fields`, or the form offers
+      no way to pick one and the declaration is dead. The sweep checks it: two
+      declarations of the same thing is how a field that quietly stops being
+      offered gets noticed.
+- [ ] `identity_fields` — the per-field picker. Give each one a `kind`
+      (`hostname`, `username`, `ip`) and a `picker` (`assets`, `identities`);
+      the sweep types a value into every hostname and username field and
+      insists it reaches every event, then asks for A&I and insists the value
+      comes from the environment.
 - [ ] `sample_logs` — two or three real lines, shown in the UI. Never invent a
       format: copy a genuine one from the vendor's documentation.
 - [ ] Overrides: the UI writes `target_<field>` into the sender options, read by
@@ -477,8 +538,37 @@ looked sound the whole way down.
 
 ## Prove it
 
+`tests/test_nothing_ships_half_wired.py` is parametrised over `ATTACK_REGISTRY`,
+so a new attack is enrolled the moment it is registered. It already holds you to:
+
+- the declared `datamodel` being one its sources actually grant, or empty;
+- every declared source existing in `ta_registry.py`, with real formats;
+- the count asked for being the count planned, attack and noise alike;
+- every event being a single line;
+- a typed hostname or username reaching every event;
+- an A&I request returning a value from the environment;
+- `ai_fields` and `identity_fields` describing the same fields;
+- the `splunk_research_url` carrying the detection's own id.
+
+Two lists in that file are deliberate second copies and will fail on a new
+attack: `NO_IDENTITY_PICKER`, which pins the older attacks that offer no picker
+so a new one cannot join them by staying silent, and `DETECTION_SECTIONS` in
+`test_catalog.py`, which pins the research.splunk.com section — the URL format
+test passes on a wrong section, and one attack shipped pointing at `/endpoint/`
+for a detection filed under `/network/`, a 404 for the reader.
+
+What the sweep cannot judge, and you still have to:
+
 - [ ] The attack shows in the picker under its category, and the sourcetype list
       is hidden (attack mode has no registry sourcetype).
+- [ ] **The noise is a near miss that fires nothing.** Simulate the detection
+      against the noise, do not eyeball it. For PowerView this caught three
+      benign lines that tripped published rules, two of them on substrings:
+      `Re`+`start-Service` matching `*start-service*`, and
+      `Get-LocalGroup`+`Member` matching `*get-localgroup*`.
+- [ ] **Mutate the generator and confirm the tests fail.** A test that cannot
+      fail proves nothing, and comparing an extracted value to the constant that
+      produced it is the easy way to write one.
 - [ ] Its events reach Splunk under the host TA's sourcetype and source.
 - [ ] The declared eventtype, tag and datamodel all match on real events.
 - [ ] Against a coherent A&I baseline running in parallel, the attack **stands

@@ -173,7 +173,8 @@ def test_nothing_leaves_the_syslog_sink_without_a_priority(log_type):
 #: moved another, and only the table makes that visible.
 FRAMES_WITHOUT_ASKING = {"cisco_ios"}
 FRAMES_WHEN_ASKED = {"apache", "auditd", "fortigate", "ssh", "zscaler"}
-NEVER_FRAMED = {"active_directory", "cisco_asa", "paloalto", "sysmon", "windows"}
+NEVER_FRAMED = {"active_directory", "cisco_asa", "paloalto", "sysmon", "windows",
+                "powershell"}
 
 
 def _framed_by_the_sink(log_type, options):

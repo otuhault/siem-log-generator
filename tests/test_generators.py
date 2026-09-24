@@ -25,7 +25,7 @@ MULTI_INSTANCE = {"apache", "windows", "zscaler"}
 
 def test_registry_exposes_every_generator_once():
     assert len(REGISTRY) == len(GENERATORS), "a generator is registered twice or not at all"
-    assert len(REGISTRY) == 11
+    assert len(REGISTRY) == 12
 
 
 @pytest.mark.parametrize("log_type", ALL_LOG_TYPES)

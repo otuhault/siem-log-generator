@@ -9,7 +9,8 @@ from ta_registry import TA_REGISTRY, list_tas
 EXPECTED_LOG_TYPES = {
     "active_directory", "apache",
     "auditd", "cisco_asa", "cisco_ios",
-    "fortigate", "paloalto", "ssh", "sysmon", "windows", "zscaler",
+    "fortigate", "paloalto", "powershell", "ssh", "sysmon", "windows",
+    "zscaler",
 }
 
 EXPECTED_CLASS_NAMES = {
@@ -18,14 +19,14 @@ EXPECTED_CLASS_NAMES = {
     "CiscoIOSLogGenerator",
     "PaloAltoLogGenerator", "SSHAuthLogGenerator", "WindowsEventLogGenerator",
     "ZscalerLogGenerator",
-    "FortiGateLogGenerator", "SysmonLogGenerator",
+    "FortiGateLogGenerator", "SysmonLogGenerator", "PowerShellLogGenerator",
 }
 
 
 def test_registry_and_generators_hold_the_same_classes():
     """REGISTRY is derived from GENERATORS and must not drift from it."""
     assert set(REGISTRY.values()) == set(GENERATORS)
-    assert len(REGISTRY) == len(GENERATORS) == 11
+    assert len(REGISTRY) == len(GENERATORS) == 12
     assert set(REGISTRY) == EXPECTED_LOG_TYPES
     assert {cls.__name__ for cls in GENERATORS} == EXPECTED_CLASS_NAMES
 
@@ -52,8 +53,8 @@ def test_every_generator_declares_the_contract_log_senders_relies_on():
             )
 
 
-def test_all_ten_generators_importable_from_package_root():
-    """`from log_generators import <AnyGenerator>` works for all 10 (audit §8.8)."""
+def test_every_generator_is_importable_from_package_root():
+    """`from log_generators import <AnyGenerator>` works for each one (audit §8.8)."""
     module = importlib.reload(log_generators)
     missing = sorted(name for name in EXPECTED_CLASS_NAMES if not hasattr(module, name))
     assert not missing, f"not exported from log_generators: {missing}"
@@ -82,7 +83,7 @@ def test_every_sourcetype_is_reachable_from_a_log_type():
             assert sourcetype.get("name"), f"{ta_name} has an unnamed sourcetype"
             assert isinstance(sourcetype.get("datamodels", []), list)
             reachable += 1
-    assert reachable == 21, f"expected 21 sourcetypes in the registry, found {reachable}"
+    assert reachable == 22, f"expected 22 sourcetypes in the registry, found {reachable}"
 
 
 def test_generator_declared_sourcetypes_exist_in_ta_registry():

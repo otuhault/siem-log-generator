@@ -24,6 +24,7 @@ from datetime import datetime
 from log_generators.cisco_asa import CiscoASALogGenerator
 from log_generators.cisco_ios import CiscoIOSLogGenerator
 from log_generators.fortigate import FortiGateLogGenerator
+from log_generators.powershell import PowerShellLogGenerator
 from log_generators.sysmon import SysmonLogGenerator
 from log_generators.windows_xml import render as render_windows_xml
 from xml.sax.saxutils import escape
@@ -3216,6 +3217,244 @@ SYSMON_NETWORK_ATTACK_TYPES = {
 }
 
 
+#: PowerView's reconnaissance sequence, in the order an operator walks it:
+#: who is in the domain, which machines, how it is joined to others, then the
+#: paths worth taking. Each line is one script block, exactly as the engine logs
+#: an interactive call — short, with no Path, the shape Splunk's own datasets
+#: for these detections carry (`get-domaingroup`, `Get-NetComputer -Unconstrained`).
+#:
+#: Seventeen published detections read these, which is the point of the attack:
+#: no other single source here lights up so many rules from one run. The
+#: comments name what each line is for, not which rule it trips — the rules are
+#: checked in tests/test_attack_powerview.py against their own filters.
+POWERVIEW_RECON = [
+    # Loading the module is itself logged, and names the tool.
+    "Import-Module .\\PowerView.ps1",
+    # Who.
+    "Get-DomainUser -Identity * -Properties samaccountname,memberof,lastlogon",
+    "Get-DomainGroup -Identity 'Domain Admins' | Select-Object member",
+    # What.
+    "Get-DomainComputer -Properties dnshostname,operatingsystem",
+    "Get-DomainController -Domain corp.local",
+    "Get-DomainOU -Properties name,distinguishedname",
+    # How it is joined to the rest.
+    "Get-DomainTrust",
+    "Get-ForestDomain",
+    "Get-DomainPolicy | Select-Object -ExpandProperty SystemAccess",
+    # Where the weaknesses are.
+    "Get-DomainComputer -Unconstrained -Properties dnshostname",
+    "Get-DomainComputer -TrustedToAuth -Properties msds-allowedtodelegateto",
+    "Get-DomainUser -SPN -Properties serviceprincipalname",
+    "Get-DomainSPNTicket -SPN MSSQLSvc/sql01.corp.local:1433",
+    "Find-InterestingDomainAcl -ResolveGUIDs",
+    "Find-LocalAdminAccess -Domain corp.local",
+    "Invoke-ShareFinder -CheckShareAccess -ExcludeStandard",
+]
+
+#: The near miss: a domain administrator asking the same questions with
+#: Microsoft's own ActiveDirectory module, from the same host and the same
+#: account. `Get-ADTrust` beside PowerView's `Get-DomainTrust`, and
+#: `Get-ADOrganizationalUnit` beside `Get-DomainOU`, are the same query with the
+#: supported tool.
+#:
+#: Which of them is safe to send was measured, not assumed: the AD module is
+#: itself widely covered, and `Get-ADUser`, `Get-ADComputer` and `Get-ADGroup`
+#: each have a published rule of their own. `Get-ADDomainController` is the
+#: subtle one — it contains the string `get-addomain`, which PowerShell Domain
+#: Enumeration watches for. Everything below was checked against all 121
+#: detections and trips none; tests/test_attack_powerview.py re-checks it.
+POWERVIEW_NOISE = [
+    "Get-ADOrganizationalUnit -Filter * | Select-Object Name,DistinguishedName",
+    "Get-ADTrust -Filter * | Select-Object Name,Direction",
+    "Get-ADReplicationSite -Filter * | Select-Object Name",
+    "Get-ADPrincipalGroupMembership -Identity jsmith | Select-Object Name",
+    "Get-ADObject -LDAPFilter '(objectClass=site)' -SearchBase 'CN=Configuration,DC=corp,DC=local'",
+    "Search-ADAccount -AccountInactive -TimeSpan 90.00:00:00 -UsersOnly",
+    "Get-ADReplicationPartnerMetadata -Target dc01.corp.local",
+    "Get-ADServiceAccount -Filter * | Select-Object Name,Enabled",
+    "Get-ADOptionalFeature -Filter * | Select-Object Name,EnabledScopes",
+    "Get-ADRootDSE | Select-Object dnsHostName,forestFunctionality",
+    "Test-ComputerSecureChannel -Server dc01.corp.local",
+    "Sync-ADObject -Object 'CN=jsmith,OU=Staff,DC=corp,DC=local' -Source dc01 -Destination dc02",
+]
+
+
+class PowerShellAttackGenerator(BaseAttackGenerator):
+    """Base for attacks that show up as PowerShell script blocks (EventID 4104).
+
+    The same arrangement as SysmonAttackGenerator: every event renders through
+    the source's own generator, so one place decides what a 4104 looks like and
+    the benign noise is literally what the sender already emits. A subclass
+    supplies `plan_identities` and `_build`.
+    """
+
+    FIELD_DEFAULTS = {}
+
+    def __init__(self, field_behaviors, options=None):
+        super().__init__(field_behaviors, options)
+        self._powershell = PowerShellLogGenerator()
+
+    def generate(self) -> str:
+        self.event_count += 1
+        return self._render(self._identity)
+
+    def generate_noise(self) -> str:
+        return self._render(self._identity)
+
+    def _render(self, event):
+        event = event or self._standalone()
+        if event.get('ordinary'):
+            return self._powershell.generate()
+        return self._powershell.render(self._build(event))
+
+    def _build(self, event):
+        raise NotImplementedError
+
+
+class PowerShellPowerViewGenerator(PowerShellAttackGenerator):
+    """A PowerView sweep of Active Directory, seen through script block logging.
+
+    PowerView is one PowerShell module, so one operator session is one attack —
+    not a bundle of unrelated things. Running it walks the domain: accounts,
+    groups, machines, trusts, then the delegation and ACL weaknesses worth
+    taking. Seventeen published detections read those cmdlet names out of
+    ScriptBlockText, and a full run trips all of them.
+
+    Two things about the shape are taken from Splunk's own datasets rather than
+    invented. The events are the *invocations* — short, Path empty — because
+    that is what `T1059.001/powershell_script_block_logging/domaingroup.log` and
+    the constrained-delegation dataset contain. What those datasets also contain
+    is the other half of the signal: importing PowerView.ps1 compiles the module
+    itself, which the engine logs as ~41 events of ~19 KB sharing one
+    ScriptBlockId, each carrying the file in Path. That half is not reproduced
+    here — it is multi-line and far past the size at which the engine splits a
+    block, and this app sends one event per line.
+
+    The cmdlets are spelled the PowerView 3.0 way (`Get-Domain*`). PowerView 2.0
+    named several of them `Get-Net*`, and the delegation and SPN rules accept
+    either through an OR; the narrower rules name only the 3.0 spelling, so a
+    3.0 run is the one that reaches all seventeen.
+    """
+
+    @classmethod
+    def plan_identities(cls, definition, options, attacks, noise, environment, rng=random):
+        """(attack identities, noise identities), each event decided once.
+
+        One endpoint and one account for the whole session, because it is one
+        operator at one console. The recon lines are dealt in order and wrap
+        around, so a short run still covers the start of the sequence and a run
+        the length of the sequence covers all of it.
+
+        The noise is the same administration done with Microsoft's
+        ActiveDirectory module — same host, same account, nothing a rule reads.
+        """
+        values = (environment or {}).get('values') or {}
+        identity = options.get('attack_identity')
+        identity = identity if isinstance(identity, dict) else {}
+
+        def choice(field):
+            value = identity.get(field)
+            return value if isinstance(value, dict) else {}
+
+        dest = _single_value(choice('dest'), 'dest', values,
+                             lambda r: r.choice(WINDOWS_WORKSTATIONS), rng)
+        user = _single_value(choice('user'), 'user', values,
+                             lambda r: r.choice(WINDOWS_ATTACK_USERS), rng)
+
+        attack_identities = [
+            {'dest': dest, 'user': user,
+             'script_block_text': POWERVIEW_RECON[i % len(POWERVIEW_RECON)]}
+            for i in range(attacks)
+        ]
+        noise_identities = [
+            {'dest': dest, 'user': user,
+             'script_block_text': rng.choice(POWERVIEW_NOISE)}
+            for _ in range(noise)
+        ]
+        return attack_identities, noise_identities
+
+    def _build(self, event):
+        # Path stays empty: these are typed at a console, not compiled from a
+        # file, which is what the published datasets show.
+        return self._powershell.script_block_event(
+            script_block_text=event['script_block_text'], path='',
+            dest=event['dest'], user=event['user'])
+
+    def _standalone(self):
+        """An event rendered outside a plan — a preview, or a format test."""
+        return {'dest': random.choice(WINDOWS_WORKSTATIONS),
+                'user': random.choice(WINDOWS_ATTACK_USERS),
+                'script_block_text': POWERVIEW_RECON[1]}
+
+
+POWERSHELL_POWERVIEW_ATTACK_TYPES = {
+    'powershell_powerview_domain_recon': {
+        'name': 'PowerView Domain Reconnaissance',
+        'description': 'A PowerView sweep of Active Directory through PowerShell '
+                       'script block logging — accounts, groups, machines, trusts, '
+                       'then delegation and ACL weaknesses. One run trips 17 '
+                       'published detections (T1087.002, T1018, T1069.002, T1482)',
+        'log_type': 'powershell',
+        'category': 'Endpoint',
+        # This channel reaches no CIM datamodel: the two eventtypes it matches
+        # carry one tag between them and it is not a CIM tag. Every one of the
+        # detections is a raw search, so there is no datamodel to claim.
+        'datamodel': '',
+        'splunk_research_url': 'https://research.splunk.com/endpoint/e1866ce2-ca22-11eb-8e44-acde48001122/',
+        'data_sources': [
+            {'log_type': 'powershell',
+             'sourcetype': 'XmlWinEventLog:Microsoft-Windows-PowerShell/Operational',
+             'label': 'PowerShell · script block logging (EventID 4104)',
+             'formats': ['xml']},
+        ],
+        # splunk/security_content detections/endpoint/powershell_domain_enumeration.yml
+        # is the anchor — one published rule whose IN-list covers the family.
+        # The other sixteen a full run trips are listed in
+        # tests/test_attack_powerview.py, checked against their own filters.
+        'detection': {
+            'name': 'PowerShell Domain Enumeration',
+            'id': 'e1866ce2-ca22-11eb-8e44-acde48001122',
+            'datamodel': None,
+            'where': 'EventCode=4104 ScriptBlockText IN (*get-netdomaintrust*, '
+                     '*get-netforesttrust*, *get-addomain*, *get-adgroupmember*, '
+                     '*get-domainuser*)',
+            'by': ['dest', 'signature', 'signature_id', 'user_id', 'vendor_product',
+                   'EventID', 'Guid', 'Opcode', 'Name', 'Path', 'ProcessID',
+                   'ScriptBlockId', 'ScriptBlockText'],
+            'entities': ['dest', 'user'],
+        },
+        'defaults': {'events': 16, 'noise_events': 20, 'duration': 60},
+        'count_label': 'Number of Cmdlets Run',
+        'count_hint': 'Each cmdlet fires its own rule, so there is no threshold to '
+                      'reach — but the 16 in the sequence are what trips all 17 '
+                      'detections. Fewer covers the start of the sweep.',
+        'identity_fields': [
+            {'field': 'dest', 'mode': 'asset', 'label': 'Endpoint',
+             'picker': 'assets', 'picker_value': 'nt_host', 'kind': 'hostname',
+             'hint': 'The machine PowerView was run from (Computer).'},
+            {'field': 'user', 'mode': 'asset', 'label': 'User',
+             'picker': 'identities', 'picker_value': 'username', 'kind': 'username',
+             'hint': 'The account it ran as. This channel carries no user name, '
+                     'only a SID, so the account is represented as a stable SID '
+                     'derived from it.'},
+        ],
+        'ai_fields': {
+            'dest': {'type': 'entity', 'entity_type': 'endpoint', 'entity_field': 'nt_host',
+                     'description': 'Endpoint PowerView was run from'},
+            'user': {'type': 'either', 'options': [
+                        {'type': 'account', 'account_type': 'standard', 'account_field': 'username'},
+                        {'type': 'account', 'account_type': 'admin', 'account_field': 'username'},
+                     ],
+                     'description': 'Account it ran as, carried as a derived SID'},
+        },
+        'field_behaviors': {},
+        'sample_logs': [
+            "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-PowerShell' Guid='{A0C1853B-5C40-4B15-8766-3CF1C58F985A}'/><EventID>4104</EventID><Version>1</Version><Level>5</Level><Task>2</Task><Opcode>15</Opcode><Keywords>0x0</Keywords><TimeCreated SystemTime='2026-02-18T10:30:01.000000000Z'/><EventRecordID>173536</EventRecordID><Correlation ActivityID='{3282F326-6ACF-0002-0F16-8432CF6ADA01}'/><Execution ProcessID='4744' ThreadID='3940'/><Channel>Microsoft-Windows-PowerShell/Operational</Channel><Computer>WKS-FIN01</Computer><Security UserID='S-1-5-21-3344543075-1022232225-2459664213-1105'/></System><EventData><Data Name='MessageNumber'>1</Data><Data Name='MessageTotal'>1</Data><Data Name='ScriptBlockText'>Get-DomainUser -Identity * -Properties samaccountname,memberof,lastlogon</Data><Data Name='ScriptBlockId'>dad71a18-1edf-4d03-afb0-a69983c05ad5</Data><Data Name='Path'></Data></EventData></Event>",
+        ],
+    },
+}
+
+
 def _register(attack_types_dict: dict, generator_class) -> None:
     """Register a group of attack-type definitions with their generator class."""
     for key, defn in attack_types_dict.items():
@@ -3237,6 +3476,7 @@ _register(SYSMON_FILE_ATTACK_TYPES,    SysmonTempPathDropGenerator)
 _register(SYSMON_DNS_ATTACK_TYPES,     SysmonNgrokDnsGenerator)
 _register(SYSMON_SIP_ATTACK_TYPES,     SysmonSipProviderGenerator)
 _register(SYSMON_NETWORK_ATTACK_TYPES, SysmonSuspectLocationConnectionGenerator)
+_register(POWERSHELL_POWERVIEW_ATTACK_TYPES, PowerShellPowerViewGenerator)
 
 # Backward-compat alias used by log_senders.py
 ALL_ATTACK_TYPES = ATTACK_REGISTRY

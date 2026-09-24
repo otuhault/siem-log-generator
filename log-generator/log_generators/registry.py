@@ -18,6 +18,7 @@ from .auditd import AuditdLogGenerator
 from .zscaler import ZscalerLogGenerator
 from .fortigate import FortiGateLogGenerator
 from .sysmon import SysmonLogGenerator
+from .powershell import PowerShellLogGenerator
 
 # Ordered list of all generator classes.
 GENERATORS = [
@@ -32,6 +33,7 @@ GENERATORS = [
     AuditdLogGenerator,
     FortiGateLogGenerator,
     SysmonLogGenerator,
+    PowerShellLogGenerator,
 ]
 
 # log_type -> generator class

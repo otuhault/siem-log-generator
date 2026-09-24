@@ -102,6 +102,8 @@ def test_a_source_syslog_cannot_carry_is_never_badged(catalog):
 SPLUNKBASE_APPS = {
     "windows": 742,           # Splunk Add-on for Microsoft Windows
     "active_directory": 742,  # ditto: a domain controller's Security events
+    "powershell": 742,        # ditto: the whole PowerShell/Operational channel
+                              # is granted by two lines in Splunk_TA_windows
     "ssh": 833,               # Splunk Add-on for Unix and Linux
     "auditd": 833,            # ditto
     "cisco_asa": 1620,        # Splunk Add-on for Cisco ASA
@@ -134,6 +136,7 @@ DETECTION_SECTIONS = {
     "cisco_traffic_mirroring": "network",
     "paloalto_horizontal_port_scan": "network",
     "paloalto_vertical_port_scan": "network",
+    "powershell_powerview_domain_recon": "endpoint",
     "sysmon_ngrok_dns": "network",
     "sysmon_connection_from_suspect_path": "endpoint",
     "sysmon_firewall_rule_registry": "endpoint",

@@ -653,6 +653,19 @@
                             </div>
                         </div>
 
+                        <div class="form-group" id="powershellEventCategoriesGroup" style="display: none;">
+                            <label>PowerShell event:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="powershell_event_categories" value="script_block" checked>
+                                    <span class="checkbox-text">
+                                        <strong>Script block logging</strong>
+                                        <small>EventID 4104 &mdash; the source text of every block the engine compiled</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-group" id="fortigateEventCategoriesGroup" style="display: none;">
                             <label>Log category:</label>
                             <div class="checkbox-group">
@@ -1726,7 +1739,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/app.js?v=20260916-lastrun"></script>
+    <script type="module" src="/static/js/app.js?v=20260924-powershell"></script>
     <script type="module" src="/static/js/modules/environment.js?v=20260915-rename"></script>
 </body>
 </html>

@@ -266,7 +266,7 @@ def test_syslog_viability_is_declared_not_inferred():
     """
     from ta_registry import get_ta, list_tas
 
-    windows_family = ("windows", "active_directory", "sysmon")
+    windows_family = ("windows", "active_directory", "sysmon", "powershell")
     for ta_name in windows_family:
         assert get_ta(ta_name)["syslog_viable"] is False, ta_name
     for ta_name in list_tas():

@@ -1129,6 +1129,7 @@ export function closeSenderForm() {
     document.getElementById('auditdEventCategoriesGroup').style.display = 'none';
     document.getElementById('fortigateEventCategoriesGroup').style.display = 'none';
     document.getElementById('sysmonEventCategoriesGroup').style.display = 'none';
+    document.getElementById('powershellEventCategoriesGroup').style.display = 'none';
     document.getElementById('deliveryFormatGroup').style.display = 'none';
     document.getElementById('useAssetsIdentitiesGroup').style.display = 'none';
     document.getElementById('useAssetsIdentities').checked = false;

@@ -58,6 +58,11 @@ export const SOURCETYPE_CONFIG = {
         checkboxGroup: 'sysmon_event_categories',
         optionKey: 'event_categories',
         formGroups: ['sysmonEventCategoriesGroup']
+    },
+    'powershell': {
+        checkboxGroup: 'powershell_event_categories',
+        optionKey: 'event_categories',
+        formGroups: ['powershellEventCategoriesGroup']
     }
 };
 

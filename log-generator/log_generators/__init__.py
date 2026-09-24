@@ -15,6 +15,7 @@ from .auditd import AuditdLogGenerator
 from .zscaler import ZscalerLogGenerator
 from .fortigate import FortiGateLogGenerator
 from .sysmon import SysmonLogGenerator
+from .powershell import PowerShellLogGenerator
 from .registry import REGISTRY, GENERATORS
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     'AuditdLogGenerator',
     'FortiGateLogGenerator',
     'SysmonLogGenerator',
+    'PowerShellLogGenerator',
     'REGISTRY',
     'GENERATORS',
 ]
