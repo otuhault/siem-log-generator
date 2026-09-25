@@ -17,7 +17,8 @@
 
 import { state } from './state.js';
 import { filterLogTypeDropdown } from './sourcetypes.js';
-import { SOURCETYPE_CONFIG } from './sourcetype-config.js';
+import { SOURCETYPE_CONFIG, getAllFormGroupIds } from './sourcetype-config.js';
+import { showNotification } from './utils.js';
 
 const REG_API = '/api/ta-registry';
 
@@ -32,6 +33,87 @@ let _syslogViable = true;       // does the TA document a syslog collection path
 let _syslogFraming = null;      // framing the TA needs added, when shipped over syslog
 let _delivery = null;           // { default, offered: { file, syslog, configuration } } from the API
 let _deliveryChosen = false;    // a saved or user-picked value, kept across destination changes
+
+/** Move every per-technology category group under the sourcetype selector.
+ *
+ * They are scattered through the form for historical reasons and end up about a
+ * thousand pixels below the sourcetypes they refine, which reads as an
+ * unrelated section. Moving the nodes keeps every existing show/hide rule
+ * working — getElementById does not care where they sit — and costs no markup
+ * surgery across ten blocks.
+ */
+function relocateCategoryGroups() {
+    const slot = document.getElementById('sourcetypeCategoriesSlot');
+    if (!slot) return;
+    getAllFormGroupIds().forEach((id) => {
+        const group = document.getElementById(id);
+        if (group && group.parentElement !== slot) slot.appendChild(group);
+    });
+}
+
+/** Say which Splunk sourcetype each generator category lands in.
+ *
+ * For FortiGate the two lists do not line up: eleven categories, four
+ * sourcetypes. Ticking `utm_ips` and reading `fortigate_utm` in the list above
+ * is the connection, and nothing in the form drew it.
+ *
+ * Where they all land in the same place — Sysmon's eight events, every
+ * single-sourcetype TA — a per-row badge repeats a fifty-character string eight
+ * times and says nothing the list above does not. Those groups get one line
+ * instead.
+ *
+ * Both halves come from the registry, so a source added tomorrow is labelled
+ * without touching this file. A generator that names the pairing —
+ * METADATA.sources[].sourcetype, the same bridge `_sourcetypesUsedBy` reads —
+ * is believed; a TA declaring a single sourcetype has nowhere else to put a
+ * category, so that one is used even where the generator stays silent. Five TAs
+ * are in that second case today (ssh, auditd, cisco_asa, cisco_ios,
+ * active_directory) and an earlier version, driven off a hand-written table,
+ * labelled neither them nor sysmon.
+ *
+ * @param {Array} sourcetypes  the registry's sourcetypes for this technology
+ */
+function labelCategoriesWithSourcetype(technology, sourcetypes = []) {
+    const slot = document.getElementById('sourcetypeCategoriesSlot');
+    if (!slot) return;
+
+    const meta = state.logTypes ? state.logTypes[technology] : null;
+    const declared = new Map(((meta && meta.sources) || [])
+        .filter(s => s.sourcetype)
+        .map(s => [s.id, s.sourcetype]));
+    const only = sourcetypes.length === 1 ? sourcetypes[0].name : null;
+
+    Array.from(slot.children).forEach((group) => {
+        const boxes = Array.from(group.querySelectorAll('input[type="checkbox"]'));
+        const landing = boxes.map(box => [box, declared.get(box.value) || only]);
+        const distinct = new Set(landing.map(([, name]) => name).filter(Boolean));
+
+        // Start from nothing: the previous technology's labels are still here.
+        group.querySelectorAll('.sender-cat-stype').forEach(el => el.remove());
+        group.querySelector('.sender-cat-lands')?.remove();
+        if (!distinct.size) return;
+
+        if (distinct.size === 1) {
+            const note = document.createElement('p');
+            note.className = 'hint-meta sender-cat-lands';
+            note.innerHTML = 'All of these land in ' +
+                `<code class="inline-code">${escapeHtml(Array.from(distinct)[0])}</code>`;
+            const heading = group.querySelector(':scope > label');
+            if (heading) heading.insertAdjacentElement('afterend', note);
+            else group.prepend(note);
+            return;
+        }
+
+        landing.forEach(([box, name]) => {
+            const text = box.parentElement.querySelector('.checkbox-text');
+            if (!text || !name) return;
+            const badge = document.createElement('code');
+            badge.className = 'inline-code sender-cat-stype';
+            badge.textContent = name;
+            text.appendChild(badge);
+        });
+    });
+}
 
 export async function initSenderForm() {
     // Attach listeners FIRST so they bind even if loadTechnologies fails.
@@ -75,6 +157,7 @@ export async function initSenderForm() {
     const initial = document.querySelector('input[name="source_mode"]:checked');
     syncModeVisibility(initial ? initial.value : 'sourcetype');
 
+    relocateCategoryGroups();
     setupPoolSelectorListeners();
 
     // When the Use Environment toggle flips, recompute pool blocks visibility
@@ -241,6 +324,7 @@ export async function hydrateFromSender(logType, options = {}) {
         _stByName = Object.fromEntries(sourcetypes.map(s => [s.name, s]));
         syncDeliveryFormat();
         renderSourcetypeChecks(sourcetypes, _sourcetypesUsedBy(logType, options));
+        labelCategoriesWithSourcetype(logType, sourcetypes);
     } catch (err) {
         console.error('hydrateFromSender failed:', err);
         if (list) list.innerHTML = '<p class="hint-meta">Failed to load sourcetypes.</p>';
@@ -756,6 +840,7 @@ async function onTechChange(e) {
         _deliveryChosen = false;        // another source, another default shape
         syncDeliveryFormat();
         renderSourcetypeChecks(sts);
+        labelCategoriesWithSourcetype(taName, sts);
         refreshPoolSelectors();
     } catch (err) {
         list.innerHTML = '<p class="hint-meta">Failed to load sourcetypes.</p>';
@@ -874,6 +959,16 @@ function renderSourcetypeChecks(sourcetypes, preselected = null) {
 
     list.querySelectorAll('input[name="splunk_sourcetypes"]').forEach(cb => {
         cb.addEventListener('change', () => {
+            // A sender with no sourcetype has nothing to send. Refusing the last
+            // one here says so at the moment of the click, where a validation
+            // message on submit would leave the form looking merely empty.
+            if (!cb.checked && _activeST.size === 1 && _activeST.has(cb.value)) {
+                cb.checked = true;
+                showNotification(
+                    'Keep at least one sourcetype — a sender with none sends nothing',
+                    'error');
+                return;
+            }
             if (cb.checked) _activeST.add(cb.value);
             else            _activeST.delete(cb.value);
             syncLegacyCategoryCheckboxes(sourcetypes);

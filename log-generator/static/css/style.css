@@ -1878,13 +1878,20 @@ header p {
 }
 
 .sender-tech-grid {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) 2fr;
-    gap: 14px;
+    /* Stacked, not side by side: the sourcetypes refine the technology above
+       them, and reading down one column says that. */
+    display: block;
+}
+
+.sender-tech-grid > div + div {
+    margin-top: 16px;
 }
 
 .sender-sourcetype-list {
-    max-height: 180px;
+    /* Tall enough for the widest technology's list — FortiGate has four, and at
+       180px only two showed. Unchecking the two visible ones looked like
+       unchecking everything while two stayed ticked above the fold. */
+    max-height: 340px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -2993,4 +3000,19 @@ th[aria-sort="descending"] .th-sort-arrow {
 #createSenderForm.attack-sourced #hecSourcetypeMapGroup,
 #createSenderForm.attack-sourced #hecSourceMapGroup {
     display: none !important;
+}
+
+/* Which Splunk sourcetype a generator category lands in. For FortiGate the two
+   lists do not line up — eleven categories, four sourcetypes — and the badge is
+   what draws the connection. */
+.sender-cat-stype {
+    margin-left: 8px;
+    font-size: .8em;
+    opacity: .75;
+}
+
+/* Where every category of a technology lands in the same sourcetype, the form
+   says it once here instead of repeating it on each row. */
+.sender-cat-lands {
+    margin: -4px 0 10px;
 }

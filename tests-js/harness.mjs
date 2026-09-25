@@ -29,7 +29,7 @@ export const APP_ROOT = process.env.APP_ROOT
  * imported. tests/test_source_metadata.py asserts it still matches ta_registry.py,
  * which stays the single source of truth for the running app.
  */
-const REGISTRY = {
+export const REGISTRY = {
   paloalto: {
     name: 'paloalto', full_name: 'Splunk Add-on for Palo Alto Networks',
     display_name: 'Palo Alto', vendor: 'Palo Alto Networks',

@@ -75,6 +75,11 @@
                                 </div>
                             </div>
                             <div id="sourcetypePreview" class="sender-st-preview"></div>
+                            <!-- The per-technology category groups are moved in here at
+                                 startup. They live scattered through the form for
+                                 historical reasons, and read as unrelated when they sit
+                                 a thousand pixels below the sourcetypes they refine. -->
+                            <div id="sourcetypeCategoriesSlot"></div>
                         </div>
 
                         <!-- Datamodel mode (Phase 4d) -->
@@ -1739,7 +1744,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/app.js?v=20260924-powershell"></script>
+    <script type="module" src="/static/js/app.js?v=20260925-senders"></script>
     <script type="module" src="/static/js/modules/environment.js?v=20260915-rename"></script>
 </body>
 </html>
