@@ -126,6 +126,106 @@ A few things specific to Windows:
 
 ---
 
+## Running with Docker or Podman
+
+The container runs the application without requiring Python on the host. Building
+the image requires internet access to download the base image and Python
+dependencies from PyPI.
+
+### Docker Compose
+
+Requires Docker Engine with the Compose plugin.
+
+```bash
+git clone https://github.com/otuhault/siem-log-generator.git
+cd siem-log-generator
+docker compose up --build -d
+```
+
+Then open **http://127.0.0.1:5002**. Follow the logs with
+`docker compose logs -f`, and stop the app with `docker compose down`.
+
+### Podman
+
+The same `Dockerfile` and `compose.yaml` can be used with Podman. Podman requires
+a Compose provider; these commands use the standalone `podman-compose` provider:
+
+```bash
+git clone https://github.com/otuhault/siem-log-generator.git
+cd siem-log-generator
+podman-compose up --build -d
+```
+
+Alternatively, `podman compose` delegates to an installed Compose provider. If
+that provider is Docker Compose using Podman's rootless socket, enable the socket
+and point Compose to it before starting the app:
+
+```bash
+systemctl --user enable --now podman.socket
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
+podman compose up --build -d
+```
+
+The Compose healthcheck is defined in `compose.yaml` as well as the `Dockerfile`.
+Podman defaults to OCI-format images, which do not preserve the Dockerfile
+`HEALTHCHECK`; the Compose healthcheck provides container health reporting under
+both Docker and Podman.
+
+### State and updates
+
+Senders, destinations, assets, identities, network pools and simulations are
+kept in the `siem-log-generator-state` named volume. They survive container
+recreation and image rebuilds. As with a local run, senders come back stopped
+after an application restart.
+
+To update the checked-out repository and rebuild:
+
+```bash
+git pull
+docker compose up --build -d
+```
+
+With Podman, use the Compose command you started with:
+
+```bash
+git pull
+podman-compose up --build -d
+```
+
+`docker compose down -v` or `podman-compose down -v` also deletes the state
+volume, including saved configurations and HEC tokens.
+
+`LOG_GENERATOR_PORT` changes the host-side port, not the port the app listens on
+inside the container. For example:
+
+```bash
+LOG_GENERATOR_PORT=5005 docker compose up --build -d
+```
+
+Open **http://127.0.0.1:5005**.
+
+### Network exposure
+
+The Compose configuration publishes the service on loopback only by default.
+The application has no authentication, and its API returns stored HEC tokens.
+To allow LAN access, replace the `ports` entry in `compose.yaml` with:
+
+```yaml
+    ports:
+      - "${LOG_GENERATOR_PORT:-5002}:5002"
+```
+
+Recreate the service, then connect to the host's LAN IP and the selected host
+port. Expose it only on a trusted network. Docker-published ports may bypass
+some host firewall rules, so review the firewall behavior on your system before
+enabling LAN access.
+
+Flask's interactive debugger is off in the container. The image starts the app
+with `flask run --no-debugger --no-reload` rather than `python app.py`, so the
+arbitrary-code console is not exposed on the container's network interface.
+
+---
+
 ## First steps in the app
 
 1. **Configuration → HEC Destinations** (or **Syslog Destinations**): add where the
@@ -195,6 +295,7 @@ on a fresh clone; to run them, extract the add-ons from Splunkbase into `TAs/`
 | `references/` | How each data source was researched, and the checklist for adding one |
 | `tests/`, `tests-js/` | Python and browser-side test suites |
 | `start.sh`, `stop.sh` | macOS / Linux launch helpers — `-p PORT`, `-H HOST` |
+| `Dockerfile`, `compose.yaml` | Container image and Compose setup - see *Running with Docker or Podman* |
 
 ---
 

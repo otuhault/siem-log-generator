@@ -1,0 +1,16 @@
+.git
+.gitignore
+.pytest_cache
+.coverage*
+__pycache__
+*.py[cod]
+venv
+.venv
+node_modules
+TAs
+tests
+tests-js
+references
+*.json
+*.bak-*
+.DS_Store
