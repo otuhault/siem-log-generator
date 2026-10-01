@@ -1,0 +1,30 @@
+services:
+  siem-log-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: siem-log-generator:local
+    ports:
+      # Loopback only: no authentication, and the API returns HEC tokens.
+      - "127.0.0.1:${LOG_GENERATOR_PORT:-5002}:5002"
+      # LAN access on a trusted network: use this line instead.
+      #- "${LOG_GENERATOR_PORT:-5002}:5002"
+    environment:
+      LOG_GENERATOR_STATE_DIR: /data
+    volumes:
+      - siem-log-generator-state:/data
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:5002/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  siem-log-generator-state:
