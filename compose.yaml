@@ -13,6 +13,16 @@ services:
       LOG_GENERATOR_STATE_DIR: /data
     volumes:
       - siem-log-generator-state:/data
+      # File destinations write inside the container and are lost when it is
+      # recreated. To keep them on the host, create ./output first, uncomment
+      # this line, and use /output/<name>.log as the destination path.
+      #- ./output:/output
+    # Reaching a service on this machine (an SC4S or Splunk container that
+    # publishes its port, for example): use host.docker.internal as the
+    # destination host. Docker Desktop resolves it already; Docker on Linux
+    # needs this line. Podman provides host.containers.internal instead.
+    #extra_hosts:
+    #  - "host.docker.internal:host-gateway"
     init: true
     restart: unless-stopped
     healthcheck:

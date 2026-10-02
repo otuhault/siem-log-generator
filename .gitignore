@@ -73,3 +73,6 @@ htmlcov/
 # ---------------------------------------------------------------------------
 node_modules/
 package-lock.json
+
+# Docker file-destination output, if mounted (see README)
+output/

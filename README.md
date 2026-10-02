@@ -204,7 +204,34 @@ LOG_GENERATOR_PORT=5005 docker compose up --build -d
 
 Open **http://127.0.0.1:5005**.
 
-### Network exposure
+### Writing to files
+
+A file destination writes inside the container, so its output is not visible
+from the host and is lost when the container is recreated. To keep it, mount a
+host folder:
+
+1. Create the folder next to `compose.yaml`: `mkdir output`. On Linux, also
+   make it writable by the container user: `sudo chown 10001:10001 output`.
+2. In `compose.yaml`, uncomment `- ./output:/output` under `volumes`.
+3. Recreate the service, then use `/output/<name>.log` as the destination path
+   in the app.
+
+### Sending to another container or a service on this machine
+
+Inside the container, `127.0.0.1` is the container itself — a destination set
+to it receives nothing. To reach something running on the same machine, such as
+an SC4S or Splunk container that publishes its port:
+
+- **Docker Desktop (macOS, Windows):** use `host.docker.internal` as the
+  destination host, with the port the other container publishes (514 for SC4S).
+- **Docker on Linux:** same, after uncommenting the `extra_hosts` lines in
+  `compose.yaml`.
+- **Podman:** use `host.containers.internal`.
+
+If both run under Compose, you can instead attach them to a shared Docker
+network and use the other container's name as the destination host.
+
+### Exposing the container on your network
 
 The Compose configuration publishes the service on loopback only by default.
 The application has no authentication, and its API returns stored HEC tokens.

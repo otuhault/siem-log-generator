@@ -14,3 +14,6 @@ references
 *.json
 *.bak-*
 .DS_Store
+
+# Docker file-destination output, if mounted (see README)
+output

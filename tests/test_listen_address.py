@@ -22,8 +22,10 @@ too. Loopback is the default now; reaching it from another machine stays
 possible through --host, with a warning and without the debugger.
 """
 
+import contextlib
 import socket
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -98,17 +100,66 @@ def test_a_port_something_holds_is_not(taken_port):
     assert not is_free(taken_port)
 
 
-def test_a_wildcard_listener_does_not_block_a_loopback_bind():
-    """Surprising, and deliberate: on BSD the specific bind is allowed, and
-    Werkzeug would take the port too. Probing 0.0.0.0 instead would refuse a
-    port that works."""
+#: Where a listener on 0.0.0.0 leaves a later bind to 127.0.0.1 alone. Linux
+#: refuses that bind; the BSD family, macOS included, allows it.
+BSD = sys.platform.startswith(("darwin", "freebsd", "openbsd", "netbsd"))
+
+
+@contextlib.contextmanager
+def wildcard_listener():
+    """A port held on 0.0.0.0, the way another server on the machine holds it."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as wildcard:
         wildcard.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         wildcard.bind(('0.0.0.0', 0))
         wildcard.listen(1)
-        port = wildcard.getsockname()[1]
-        assert is_free(port, '127.0.0.1'), "loopback is still bindable"
-        assert not is_free(port, '0.0.0.0'), "the wildcard itself is not"
+        yield wildcard.getsockname()[1]
+
+
+def server_could_bind(port, host):
+    """What Werkzeug would get, asked independently of `is_free`.
+
+    The same two calls the server makes — SO_REUSEADDR, then bind — so the test
+    compares the probe with the server rather than with an expectation about
+    one operating system.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as attempt:
+        attempt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            attempt.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def test_the_probe_answers_what_the_server_would_find():
+    """The contract, and it holds on every system.
+
+    Beside a listener on 0.0.0.0, the answer for 127.0.0.1 is the operating
+    system's to give, and they disagree: BSD allows the bind, Linux refuses it.
+    Either way the start-up check must say what the server would then find, so
+    it never refuses a port that works nor promises one that does not.
+
+    This used to assert the BSD answer outright. It passed on every machine the
+    suite had run on — all macOS — and failed the first time someone ran it on
+    Linux, where the probe was right and the test was not.
+    """
+    with wildcard_listener() as port:
+        assert is_free(port, '127.0.0.1') == server_could_bind(port, '127.0.0.1')
+        assert not is_free(port, '0.0.0.0'), "the wildcard itself is taken"
+
+
+@pytest.mark.skipif(not BSD, reason="Linux refuses the loopback bind, so the "
+                                    "probe and the wildcard agree there")
+def test_on_bsd_a_wildcard_listener_does_not_block_a_loopback_bind():
+    """Why the probe asks about the address it will bind, not a fixed one.
+
+    Only BSD makes the difference visible: the loopback bind is allowed and
+    Werkzeug would take the port. A probe that checked 0.0.0.0 instead would
+    refuse a port that works. On Linux both answers are "taken", so a probe
+    that cut that corner would pass there and fail here.
+    """
+    with wildcard_listener() as port:
+        assert is_free(port, '127.0.0.1'), "loopback is still bindable on BSD"
 
 
 def test_resolve_returns_a_free_port_and_refuses_a_taken_one(taken_port):
