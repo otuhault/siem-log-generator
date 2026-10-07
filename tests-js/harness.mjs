@@ -287,6 +287,8 @@ async function loadAppModules() {
     simulation: await load('modules/simulation.js'),
     attackConfig: await load('modules/attack-config.js'),
     sourcetypeConfig: await load('modules/sourcetype-config.js'),
+    readme: await load('modules/readme.js'),
+    catalog: await load('modules/catalog.js'),
   };
   return _modules;
 }

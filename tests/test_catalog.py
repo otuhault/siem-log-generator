@@ -312,3 +312,30 @@ def test_the_rules_shown_grant_the_datamodels_claimed(catalog):
             granted = {dm for c in sourcetype["datamodel_conditions"] for dm in c["datamodels"]}
             assert granted == set(sourcetype["datamodels"]), \
                 (source["key"], sourcetype["name"])
+
+
+# ── the add-ons to install, grouped once for the Read Me tab and the README ──
+
+def test_every_add_on_is_listed_once_with_every_source_that_needs_it(catalog):
+    """Windows, Active Directory and PowerShell share Splunk_TA_windows.
+
+    The Read Me tab and tools/readme_sources.py both render this list, so it is
+    held here, over every source in the registry: each source appears under
+    exactly one add-on, and each add-on exactly once.
+    """
+    add_ons = catalog["add_ons"]
+    packages = [row["package"] for row in add_ons]
+    assert len(packages) == len(set(packages)), "an add-on is listed twice"
+
+    by_source = {source["name"]: source for source in catalog["sources"]}
+    seen = [name for row in add_ons for name in row["used_by"]]
+    assert sorted(seen) == sorted(by_source), \
+        "a source is missing from the add-ons, or listed under two"
+
+    for row in add_ons:
+        assert row["name"] and row["package"] and row["version"], row
+        assert row["url"].startswith("https://splunkbase.splunk.com/app/"), row
+        for name in row["used_by"]:
+            source = by_source[name]
+            assert source["add_on_package"] == row["package"], name
+            assert source["add_on_url"] == row["url"], name

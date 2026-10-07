@@ -1596,6 +1596,7 @@
 
                     <nav class="readme-toc" aria-label="Contents">
                         <a href="#readme-quickstart">Quick start</a>
+                        <a href="#readme-data-sources">Data sources &amp; add-ons</a>
                         <a href="#readme-destinations">Destinations</a>
                         <a href="#readme-senders">Senders</a>
                         <a href="#readme-environment">Environment</a>
@@ -1617,6 +1618,27 @@
                             <li><strong>Check Splunk</strong>: <code>index=&lt;your index&gt; earliest=-15m latest=+1h</code>,
                                 with no sourcetype filter first.</li>
                         </ol>
+                    </section>
+
+                    <section id="readme-data-sources">
+                        <h3>Data sources &amp; add-ons</h3>
+                        <p>The app needs no add-on to run: it generates the events itself.
+                            <strong>Splunk</strong> needs the add-on for each source you send, to parse
+                            those events and map them to CIM. Install each one on the Splunk instances
+                            that parse and search the data — indexers and search heads, or Splunk Cloud —
+                            before you start a sender.</p>
+                        <table class="catalog-table">
+                            <thead><tr><th>Source</th><th>Splunk sourcetypes</th><th>Add-on</th></tr></thead>
+                            <tbody id="readmeSourcesRows"></tbody>
+                        </table>
+                        <h4>Add-ons to install in Splunk</h4>
+                        <p class="hint-meta"><em>Checked against</em> is the add-on version the generated
+                            events are verified against. Newer versions usually work, but they are not what
+                            the tests ran.</p>
+                        <table class="catalog-table">
+                            <thead><tr><th>Add-on</th><th>Package</th><th>Checked against</th><th>Used by</th></tr></thead>
+                            <tbody id="readmeAddOnsRows"></tbody>
+                        </table>
                     </section>
 
                     <section id="readme-destinations">
@@ -1744,7 +1766,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/app.js?v=20260925-senders"></script>
+    <script type="module" src="/static/js/app.js?v=20261007-readme-sources"></script>
     <script type="module" src="/static/js/modules/environment.js?v=20260915-rename"></script>
 </body>
 </html>

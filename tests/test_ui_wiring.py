@@ -154,3 +154,14 @@ def test_every_source_that_offers_categories_has_them_in_the_form():
                 f"{log_type}: index.html has no #{form_group}"
             assert f"getElementById('{form_group}')" in senders_js, \
                 f"{log_type}: #{form_group} is never hidden when another source is picked"
+
+
+def test_every_read_me_contents_entry_points_at_a_section():
+    """A contents link to a section that was renamed scrolls nowhere, silently."""
+    html = (APP / "templates" / "index.html").read_text()
+    readme = html[html.index('id="readmeTab"'):]
+    toc = readme[readme.index('class="readme-toc"'):readme.index("</nav>")]
+    targets = re.findall(r'href="#([^"]+)"', toc)
+    assert targets, "the Read Me contents is empty"
+    for target in targets:
+        assert f'id="{target}"' in readme, f"#{target} has no section in the Read Me"

@@ -13,6 +13,7 @@ import { loadLogTypes } from './modules/sourcetypes.js';
 import { SOURCETYPE_CONFIG, getAllFormGroupIds } from './modules/sourcetype-config.js';
 import { loadSimulations, initSimulation } from './modules/simulation.js';
 import { loadCatalog } from './modules/catalog.js';
+import { loadReadmeSources } from './modules/readme.js';
 import { initAttackConfig, showAttackConfig, hideAttackConfig } from './modules/attack-config.js';
 import {
     loadSyslogDestinations,
@@ -320,6 +321,8 @@ function setupTabs() {
                 loadSimulations();
             } else if (tabName === 'catalog') {
                 loadCatalog();
+            } else if (tabName === 'readme') {
+                loadReadmeSources();
             }
         });
     });

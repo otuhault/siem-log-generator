@@ -138,6 +138,9 @@ def build_catalog():
             # The version the source was modelled against, not one read at run
             # time: the add-ons are not shipped with this application.
             'add_on_version': ta.get('add_on_version', ''),
+            # The folder the add-on installs as — what a reader checks for in
+            # $SPLUNK_HOME/etc/apps/, and what the add-on rows are grouped by.
+            'add_on_package': ta.get('add_on_package', ''),
             'description': ta.get('description') or metadata.get('description', ''),
             'sourcetypes': sourcetypes,
             'datamodels': sorted({dm for st in sourcetypes for dm in st['datamodels']}),
@@ -168,4 +171,27 @@ def build_catalog():
     sources.sort(key=lambda s: s['name'].lower())
     attacks.sort(key=lambda a: (a['category'].lower(), a['name'].lower()))
     return {'sources': sources, 'attacks': attacks,
-            'datamodels': _datamodels(sources, attacks)}
+            'datamodels': _datamodels(sources, attacks),
+            'add_ons': add_ons(sources)}
+
+
+def add_ons(sources):
+    """One row per Splunk add-on, with every source that needs it.
+
+    Windows, Active Directory and PowerShell are all parsed by
+    Splunk_TA_windows; a reader installing add-ons wants that add-on once, with
+    the three sources beside it. Grouped here and nowhere else: the Read Me tab
+    renders this list, and so does tools/readme_sources.py for the repository
+    README, so the two cannot disagree about what to install.
+    """
+    rows = {}
+    for source in sources:
+        row = rows.setdefault(source['add_on_package'], {
+            'name': source['add_on'],
+            'url': source['add_on_url'],
+            'package': source['add_on_package'],
+            'version': source['add_on_version'],
+            'used_by': [],
+        })
+        row['used_by'].append(source['name'])
+    return sorted(rows.values(), key=lambda row: row['name'].lower())

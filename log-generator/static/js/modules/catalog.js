@@ -22,6 +22,16 @@ export function resetCatalogCache() {
     payload = null;
 }
 
+/** The payload, from the cache when there is one.
+ *
+ * Shared with the Read Me tab, which lists the data sources and the add-ons
+ * they need from the same payload — one request, and one place the add-on
+ * grouping comes from.
+ */
+export async function fetchCatalog() {
+    return payload || (payload = await (await fetch('/api/catalog')).json());
+}
+
 /** escapeHtml leaves quotes alone, which is fine in text but not inside an attribute. */
 function escapeAttr(text) {
     return escapeHtml(String(text ?? '')).replace(/"/g, '&quot;');
@@ -32,7 +42,7 @@ export async function loadCatalog() {
     const datamodelsEl = document.getElementById('catalogDatamodels');
     const attacksEl = document.getElementById('catalogAttacks');
     try {
-        const catalog = payload || (payload = await (await fetch('/api/catalog')).json());
+        const catalog = await fetchCatalog();
         sourcesEl.innerHTML = catalog.sources.map(renderSource).join('');
         datamodelsEl.innerHTML = catalog.datamodels.map(renderDatamodel).join('')
             || '<p class="no-senders">No datamodel is reached by any source.</p>';
