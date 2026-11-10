@@ -1,0 +1,1 @@
+https://help.splunk.com/en/search?q=threat%20intelligence&size=n_10_n&filters%5B0%5D%5Bname%5D=source_name_s&filters%5B0%5D%5Bvalue%5D%5B0%5D=Heretto&filters%5B0%5D%5Btype%5D=any&filters%5B0%5D%5Bfield%5D=source_name_s&filters%5B0%5D%5Bvalues%5D%5B0%5D=Heretto

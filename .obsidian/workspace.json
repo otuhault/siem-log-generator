@@ -1,0 +1,235 @@
+{
+  "main": {
+    "id": "25ed0d655ef4565e",
+    "type": "split",
+    "children": [
+      {
+        "id": "d981bca89708734c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d39c5eb68f554848",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8e6d9a89690dc121",
+    "type": "split",
+    "children": [
+      {
+        "id": "21521a9442b2621c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "32749b1f2e1fdd69",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "ccf4b5e8a904ade9",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "9bf6a2d2038635d1",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 308.5
+  },
+  "right": {
+    "id": "892012f1d101ee05",
+    "type": "split",
+    "children": [
+      {
+        "id": "50c1e46e280c1ab1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "721b12a389dc9f81",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "93ec4215b1b67412",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Accueil.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Accueil"
+            }
+          },
+          {
+            "id": "1a8185f62fc4af5e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "bbb67d3f116d113c",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "8e748b50f99d0068",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "00_INFRASTRUCTURE/System/SE Linux.md",
+                "followCursor": false,
+                "showSearch": true,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of SE Linux"
+            }
+          }
+        ],
+        "currentTab": 4
+      }
+    ],
+    "direction": "horizontal",
+    "width": 326.5,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false,
+      "omnisearch:Omnisearch": false,
+      "templater-obsidian:Templater": false
+    }
+  },
+  "active": "d39c5eb68f554848",
+  "lastOpenFiles": [
+    "z_Screenshots/Pasted image 20260923140246.png",
+    "z_Screenshots/Pasted image 20260908113155.png",
+    "z_Screenshots/Pasted image 20260902172623.png",
+    "z_Screenshots/Pasted image 20260721160511.png",
+    "z_Screenshots/Pasted image 20260721154652.png",
+    "z_Screenshots/Pasted image 20260721154100.png",
+    "z_Screenshots/Pasted image 20260721153709.png",
+    "z_Screenshots/Pasted image 20260721153638.png",
+    "z_Screenshots/Pasted image 20260721152549.png",
+    "z_Screenshots/Pasted image 20260721152152.png",
+    "z_Screenshots/Pasted image 20260721152010.png",
+    "z_Archives/Core Consultant/LabPrep/Lab 3.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 8.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 4.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 7.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 6.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 5.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 1.md",
+    "z_Archives/Core Consultant/LabPrep/Lab 2.md",
+    "z_Archives/Core Consultant/Videos Notes.md",
+    "z_Archives/Core Consultant/Questions.md",
+    "z_Archives/Core Consultant/QCM.md",
+    "z_Archives/Core Consultant/Labs Notes.md",
+    "z_Archives/Core Consultant/LabPrep",
+    "z_Archives/Core Consultant/LABS.md",
+    "z_Archives/Core Consultant/BootCamp Notes Advices.md",
+    "z_Archives/ES Implementation - Exam.md",
+    "z_Archives/Core Consultant",
+    "z_Archives",
+    "Tools.md",
+    "z_Screenshots",
+    "Todo.md",
+    "Shortcuts.md",
+    "Questions.md",
+    "Ghost.md",
+    "Divers.md",
+    "Cheatsheet CLI.md",
+    "@CUSTOMERS/FDJ/Draft.md",
+    "@CUSTOMERS/BRED/Edge Processor.md",
+    "@CUSTOMERS/CA/Draft.md",
+    "@CUSTOMERS/FDJ",
+    "@CUSTOMERS/CA",
+    "@CUSTOMERS/BRED",
+    "@CUSTOMERS",
+    "99_PS/library/findings/system",
+    "99_PS/library/findings/indexing"
+  ]
+}

@@ -1,0 +1,1 @@
+For any client with a Palo Alto (Cortex)  Xsoar integration with ES. as of ES 8.2 there is a new Palo alot integration package, so the client would need to aldo upgrade this (docs [here](https://xsoar.pan.dev/docs/reference/integrations/splunk-py-v2) and [here](https://cortex.marketplace.pan.dev/marketplace/details/SplunkPy))

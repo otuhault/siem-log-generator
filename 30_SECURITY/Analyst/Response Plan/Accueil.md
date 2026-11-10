@@ -1,0 +1,3 @@
+Create response plans to help document your security operating procedures and standardize the tasks and phases that analysts complete while they respond to investigations in Splunk Enterprise Security. A response plan is a template of guidelines for analysts to follow so that they can provide a standardized response for investigations of the same type. You can use response plans provided by Splunk Enterprise Security, such as NIST 800-61 or Vulnerability Disclosure, or you can create your own custom response plan.
+
+Response plans describe the procedures usable by analysts when they investigate detections and alerts. Response plans can be created by users to match SOC needs.

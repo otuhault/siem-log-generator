@@ -1,0 +1,3 @@
+- UEBA ONLY available for ES Premier Edition
+- Sizing guidance for small scale environment but large not yet available.
+- Sizing calculator only for CMP
